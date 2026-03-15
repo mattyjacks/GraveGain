@@ -155,3 +155,4 @@ func is_climbing() -> bool:
 
 func can_jump() -> bool:
 	return gravity_system.is_grounded if gravity_system else false
+

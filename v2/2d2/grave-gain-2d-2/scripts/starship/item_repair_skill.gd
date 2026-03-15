@@ -14,7 +14,7 @@ var skill_xp: float = 0.0
 var xp_per_level: float = 100.0
 
 var current_repair_item: Dictionary = {}
-var repair_progress: float = 0.0
+var repair_progress_value: float = 0.0
 var repair_active: bool = false
 
 var repair_costs: Dictionary = {
@@ -64,7 +64,7 @@ func start_repair(item: Dictionary) -> bool:
 		return false
 	
 	current_repair_item = item.duplicate()
-	repair_progress = 0.0
+	repair_progress_value = 0.0
 	repair_active = true
 	repair_started.emit(item)
 	return true
@@ -78,20 +78,20 @@ func update_repair(delta: float, click_count: int = 0, drag_progress: float = 0.
 	
 	# Progress from clicking and dragging mini-games
 	var progress_per_second = (1.0 / repair_time) * 100.0
-	repair_progress += progress_per_second * delta
+	repair_progress_value += progress_per_second * delta
 	
 	# Bonus from click mini-game
 	if click_count > 0:
-		repair_progress += click_count * 2.0
+		repair_progress_value += click_count * 2.0
 	
 	# Bonus from drag mini-game
 	if drag_progress > 0.0:
-		repair_progress += drag_progress * 1.5
+		repair_progress_value += drag_progress * 1.5
 	
-	repair_progress = minf(repair_progress, 100.0)
-	repair_progress.emit(current_repair_item, repair_progress)
+	repair_progress_value = minf(repair_progress_value, 100.0)
+	repair_progress.emit(current_repair_item, repair_progress_value)
 	
-	if repair_progress >= 100.0:
+	if repair_progress_value >= 100.0:
 		_complete_repair()
 
 func _complete_repair() -> void:
@@ -112,14 +112,14 @@ func _complete_repair() -> void:
 	repair_completed.emit(current_repair_item, cost)
 	repair_active = false
 	current_repair_item = {}
-	repair_progress = 0.0
+	repair_progress_value = 0.0
 
 func cancel_repair() -> void:
 	if repair_active:
 		repair_failed.emit(current_repair_item)
 		repair_active = false
 		current_repair_item = {}
-		repair_progress = 0.0
+		repair_progress_value = 0.0
 
 func add_xp(amount: float) -> void:
 	skill_xp += amount
@@ -154,4 +154,4 @@ func is_repairing() -> bool:
 	return repair_active
 
 func get_repair_progress() -> float:
-	return repair_progress
+	return repair_progress_value

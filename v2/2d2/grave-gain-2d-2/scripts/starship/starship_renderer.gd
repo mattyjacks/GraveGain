@@ -25,7 +25,7 @@ func set_map_data(data: RefCounted) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	if not map_data:
+	if not map_data or not map_data.tiles:
 		return
 	
 	var cam := get_viewport().get_camera_2d()
@@ -59,6 +59,8 @@ func _draw() -> void:
 					draw_rect(rect, HULL_COLOR)
 
 func _draw_full_map() -> void:
+	if not map_data or not map_data.tiles:
+		return
 	for y in range(map_data.MAP_HEIGHT):
 		for x in range(map_data.MAP_WIDTH):
 			var tile: int = map_data.tiles[y][x]
@@ -77,7 +79,7 @@ func _draw_floor_tile(x: int, y: int, rect: Rect2) -> void:
 	var base_color := FLOOR_COLOR if checker else FLOOR_ACCENT
 	
 	# Tint by room type
-	var room := map_data.get_room_at(Vector2(x * TILE_SIZE + 16, y * TILE_SIZE + 16))
+	var room: Dictionary = map_data.get_room_at(Vector2(x * TILE_SIZE + 16, y * TILE_SIZE + 16))
 	if not room.is_empty():
 		var room_color: Color = room.get("color", Color.GRAY)
 		base_color = base_color.lerp(room_color, 0.15)
@@ -110,8 +112,8 @@ func _draw_wall_tile(x: int, y: int, rect: Rect2) -> void:
 	draw_rect(rect, WALL_COLOR)
 	
 	# Check if wall faces a floor tile for highlight edge
-	var has_floor_below := y + 1 < map_data.MAP_HEIGHT and map_data.tiles[y + 1][x] == StarshipMap.TILE_FLOOR
-	var has_floor_right := x + 1 < map_data.MAP_WIDTH and map_data.tiles[y][x + 1] == StarshipMap.TILE_FLOOR
+	var has_floor_below: bool = y + 1 < map_data.MAP_HEIGHT and map_data.tiles[y + 1][x] == StarshipMap.TILE_FLOOR
+	var has_floor_right: bool = x + 1 < map_data.MAP_WIDTH and map_data.tiles[y][x + 1] == StarshipMap.TILE_FLOOR
 	
 	if has_floor_below:
 		draw_rect(Rect2(rect.position.x, rect.position.y + TILE_SIZE - 3, TILE_SIZE, 3), WALL_HIGHLIGHT)
@@ -162,6 +164,8 @@ func _build_wall_collisions() -> void:
 	_build_light_occluders()
 
 func _build_light_occluders() -> void:
+	if not map_data or not map_data.tiles:
+		return
 	for y in range(map_data.MAP_HEIGHT):
 		for x in range(map_data.MAP_WIDTH):
 			var tile: int = map_data.tiles[y][x]

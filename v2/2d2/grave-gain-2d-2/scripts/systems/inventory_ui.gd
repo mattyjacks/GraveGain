@@ -363,7 +363,7 @@ func _show_tooltip(item: Dictionary) -> void:
 	var rarity_color: Color = InventoryManager.RARITY_COLORS.get(rarity, Color.WHITE)
 	var color_hex := rarity_color.to_html(false)
 	
-	var text := "[b][color=#" + color_hex + "]" + item.get("name", "Unknown") + "[/color][/b]\n"
+	var text: String = "[b][color=#" + color_hex + "]" + item.get("name", "Unknown") + "[/color][/b]\n"
 	text += "[color=#888888]" + rarity.capitalize() + " - Lv." + str(item.get("level", 1)) + "[/color]\n\n"
 	
 	# Stats

@@ -30,7 +30,8 @@ func _ready() -> void:
 	emoji_label.position = Vector2(-8, -8)
 	emoji_label.size = Vector2(16, 16)
 	var settings := LabelSettings.new()
-	settings.font = GameData.emoji_font
+	if GameData.emoji_font:
+		settings.font = GameData.emoji_font
 	settings.font_size = 14
 	emoji_label.label_settings = settings
 

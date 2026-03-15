@@ -132,7 +132,7 @@ func equip_item(index: int) -> bool:
 	
 	# Unequip current item in that slot
 	if not equipped[slot_type].is_empty():
-		var old_item := equipped[slot_type].duplicate(true)
+		var old_item: Dictionary = equipped[slot_type].duplicate(true)
 		equipped[slot_type] = {}
 		inventory.append(old_item)
 	
@@ -150,7 +150,7 @@ func unequip_item(slot: int) -> bool:
 	if inventory.size() >= MAX_INVENTORY_SIZE:
 		return false
 	
-	var item := equipped[slot].duplicate(true)
+	var item: Dictionary = equipped[slot].duplicate(true)
 	equipped[slot] = {}
 	inventory.append(item)
 	
@@ -280,7 +280,7 @@ func _generate_weapon(level: int, rarity: String, rng: RandomNumberGenerator) ->
 	]
 	var base: Dictionary = weapons[rng.randi_range(0, weapons.size() - 1)]
 	var rarity_mult := _get_rarity_mult(rarity)
-	var dmg := base["base_dmg"] * (1.0 + level * 0.1) * rarity_mult
+	var dmg: float = base["base_dmg"] * (1.0 + level * 0.1) * rarity_mult
 	
 	var prefixes := _get_rarity_prefixes(rarity)
 	var prefix: String = prefixes[rng.randi_range(0, prefixes.size() - 1)]
@@ -381,7 +381,7 @@ func _generate_consumable(level: int, rarity: String, rng: RandomNumberGenerator
 	]
 	var base: Dictionary = consumables[rng.randi_range(0, consumables.size() - 1)]
 	var rarity_mult := _get_rarity_mult(rarity)
-	var val := base["base_val"] * rarity_mult * (1.0 + level * 0.1)
+	var val: float = base["base_val"] * rarity_mult * (1.0 + level * 0.1)
 	
 	return {
 		"id": "consumable_" + base["effect"],

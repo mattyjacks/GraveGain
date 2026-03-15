@@ -60,6 +60,9 @@ func _build_nodes() -> void:
 	var emoji_text: String = type_info["emoji"]
 	var font_size := 24
 	var is_already_collected := LoreManager.has_collected(entry_id)
+	var text_based: bool = GameSystems.get_setting("text_based_graphics") == true
+	if text_based:
+		emoji_text = _get_text_representation(emoji_text)
 
 	if is_gravestone_type:
 		font_size = 28
@@ -79,7 +82,8 @@ func _build_nodes() -> void:
 	shadow_label.modulate = Color(0, 0, 0, 0.35)
 	shadow_label.z_index = -1
 	var ss := LabelSettings.new()
-	ss.font = GameData.emoji_font
+	if GameData.emoji_font and not text_based:
+		ss.font = GameData.emoji_font
 	ss.font_size = font_size
 	shadow_label.label_settings = ss
 	add_child(shadow_label)
@@ -91,20 +95,25 @@ func _build_nodes() -> void:
 	emoji_label.position = Vector2(-font_size * 0.75, -font_size * 0.75)
 	emoji_label.size = Vector2(font_size * 1.5, font_size * 1.5)
 	var ls := LabelSettings.new()
-	ls.font = GameData.emoji_font
+	if GameData.emoji_font and not text_based:
+		ls.font = GameData.emoji_font
 	ls.font_size = font_size
 	emoji_label.label_settings = ls
 	add_child(emoji_label)
 
 	if not is_sign_type and not is_gravestone_type and not is_already_collected:
 		glow_label = Label.new()
-		glow_label.text = "\u2728"
+		var glow_text := "\u2728"
+		if text_based:
+			glow_text = "[*]"
+		glow_label.text = glow_text
 		glow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		glow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		glow_label.position = Vector2(-8, -font_size - 4)
 		glow_label.size = Vector2(16, 16)
 		var gs := LabelSettings.new()
-		gs.font = GameData.emoji_font
+		if GameData.emoji_font and not text_based:
+			gs.font = GameData.emoji_font
 		gs.font_size = 12
 		glow_label.label_settings = gs
 		add_child(glow_label)
@@ -202,9 +211,12 @@ func setup_random() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_interactable or is_collected:
 		return
-	if event.is_action_pressed("interact"):
+	if Input.is_action_just_pressed("interact"):
 		if is_sign_type or is_gravestone_type:
 			_read_in_place()
+			get_viewport().set_input_as_handled()
+		else:
+			pickup(null)
 			get_viewport().set_input_as_handled()
 
 func pickup(_player: Node2D) -> void:
@@ -226,6 +238,19 @@ func _read_in_place() -> void:
 	LoreManager.collect_entry(entry_id)
 	is_collected = true
 	lore_picked_up.emit(entry_id)
+
+func _get_text_representation(emoji: String) -> String:
+	var text_map := {
+		"\U0001F4DD": "[N]",
+		"\U0001F4DA": "[B]",
+		"\U0001F4C4": "[S]",
+		"\u26B0\uFE0F": "[G]",
+		"\U0001F52E": "[C]",
+		"\U0001F4E7": "[L]",
+		"\U0001F5DD": "[J]",
+		"\u270E\uFE0F": "[T]",
+	}
+	return text_map.get(emoji, emoji)
 
 func _show_collect_animation(is_new: bool) -> void:
 	var tween := create_tween()

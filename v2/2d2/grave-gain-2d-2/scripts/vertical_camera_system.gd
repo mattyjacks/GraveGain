@@ -9,7 +9,7 @@ const ISOMETRIC_ANGLE: float = PI / 6.0
 const DEPTH_SCALE: float = 0.5
 
 var player_ref: Node2D = null
-var vertical_system: VerticalLevelSystem = null
+var vertical_system: Node = null
 var gravity_system: GravitySystem = null
 
 var camera_height_offset: float = 200.0
@@ -24,7 +24,7 @@ func _ready() -> void:
 	position_smoothing_enabled = true
 	position_smoothing_speed = 5.0
 
-func set_references(player: Node2D, v_system: VerticalLevelSystem, g_system: GravitySystem) -> void:
+func set_references(player: Node2D, v_system: Node, g_system: GravitySystem) -> void:
 	player_ref = player
 	vertical_system = v_system
 	gravity_system = g_system

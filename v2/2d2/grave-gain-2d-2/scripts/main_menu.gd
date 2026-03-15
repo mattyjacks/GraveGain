@@ -15,6 +15,9 @@ var class_info_label: Label = null
 var bg_timer: float = 0.0
 var graphics_panel: Control = null
 
+var dev_mode_enabled: bool = false
+var text_based_graphics: bool = false
+
 func _ready() -> void:
 	_build_ui()
 	_update_class_buttons()
@@ -26,51 +29,57 @@ func _build_ui() -> void:
 	bg.color = Color(0.02, 0.02, 0.05)
 	add_child(bg)
 
+	var main_grid := GridContainer.new()
+	main_grid.set_anchors_preset(Control.PRESET_FULL_RECT)
+	main_grid.columns = 2
+	main_grid.add_theme_constant_override("h_separation", 20)
+	main_grid.add_theme_constant_override("v_separation", 20)
+	main_grid.offset_left = 40
+	main_grid.offset_top = 40
+	main_grid.offset_right = -40
+	main_grid.offset_bottom = -40
+	add_child(main_grid)
+
 	var center := VBoxContainer.new()
-	center.set_anchors_preset(Control.PRESET_CENTER)
-	center.position = Vector2(-300, -350)
-	center.size = Vector2(600, 700)
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	center.alignment = BoxContainer.ALIGNMENT_CENTER
-	center.add_theme_constant_override("separation", 12)
-	add_child(center)
+	center.add_theme_constant_override("separation", 16)
+	main_grid.add_child(center)
 
 	title_label = Label.new()
-	title_label.text = "\u26B0\uFE0F GraveGain 2D \u26B0\uFE0F"
+	title_label.text = "GraveGain 2D"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var title_settings := LabelSettings.new()
-	title_settings.font_size = 52
-	title_settings.font_color = Color(0.85, 0.6, 1.0)
-	title_settings.outline_size = 4
+	title_settings.font_size = 64
+	title_settings.font_color = Color(0.9, 0.7, 1.0)
+	title_settings.outline_size = 3
 	title_settings.outline_color = Color(0.2, 0.0, 0.4)
-	title_settings.font = GameData.emoji_font
 	title_label.label_settings = title_settings
 	center.add_child(title_label)
 
 	subtitle_label = Label.new()
-	subtitle_label.text = "CryptArtist - MoonRock Awaits"
+	subtitle_label.text = "Descend into the Depths"
 	subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var sub_settings := LabelSettings.new()
-	sub_settings.font_size = 16
-	sub_settings.font_color = Color(0.6, 0.6, 0.7)
+	sub_settings.font_size = 18
+	sub_settings.font_color = Color(0.7, 0.7, 0.8)
 	subtitle_label.label_settings = sub_settings
 	center.add_child(subtitle_label)
 
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 20)
-	center.add_child(spacer)
-
 	var race_title := Label.new()
-	race_title.text = "Choose Your Race"
+	race_title.text = "Race"
 	race_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var rt_settings := LabelSettings.new()
-	rt_settings.font_size = 22
-	rt_settings.font_color = Color(0.9, 0.85, 0.7)
+	rt_settings.font_size = 24
+	rt_settings.font_color = Color(1.0, 0.8, 0.4)
 	race_title.label_settings = rt_settings
 	center.add_child(race_title)
 
-	var race_grid := HBoxContainer.new()
-	race_grid.alignment = BoxContainer.ALIGNMENT_CENTER
-	race_grid.add_theme_constant_override("separation", 16)
+	var race_grid := GridContainer.new()
+	race_grid.columns = 2
+	race_grid.add_theme_constant_override("h_separation", 12)
+	race_grid.add_theme_constant_override("v_separation", 12)
 	center.add_child(race_grid)
 
 	var races := [
@@ -82,10 +91,11 @@ func _build_ui() -> void:
 	for r in races:
 		var stats: Dictionary = GameData.race_stats[r]
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(130, 80)
+		btn.custom_minimum_size = Vector2(140, 100)
 		btn.text = stats["emoji"] + "\n" + stats["name"]
 		btn.tooltip_text = stats["desc"]
-		btn.add_theme_font_override("font", GameData.emoji_font)
+		if GameData.emoji_font:
+			btn.add_theme_font_override("font", GameData.emoji_font)
 		_style_button(btn, stats["color"])
 		btn.pressed.connect(_on_race_selected.bind(r))
 		race_grid.add_child(btn)
@@ -94,22 +104,18 @@ func _build_ui() -> void:
 	race_info_label = Label.new()
 	race_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var ri_settings := LabelSettings.new()
-	ri_settings.font_size = 14
-	ri_settings.font_color = Color(0.7, 0.7, 0.8)
+	ri_settings.font_size = 12
+	ri_settings.font_color = Color(0.6, 0.6, 0.7)
 	race_info_label.label_settings = ri_settings
 	center.add_child(race_info_label)
 	_update_race_info()
 
-	var spacer2 := Control.new()
-	spacer2.custom_minimum_size = Vector2(0, 12)
-	center.add_child(spacer2)
-
 	var class_title := Label.new()
-	class_title.text = "Choose Your Class"
+	class_title.text = "Class"
 	class_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var ct_settings := LabelSettings.new()
-	ct_settings.font_size = 22
-	ct_settings.font_color = Color(0.9, 0.85, 0.7)
+	ct_settings.font_size = 24
+	ct_settings.font_color = Color(1.0, 0.8, 0.4)
 	class_title.label_settings = ct_settings
 	center.add_child(class_title)
 
@@ -117,9 +123,10 @@ func _build_ui() -> void:
 	class_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	center.add_child(class_container)
 
-	var class_grid := HBoxContainer.new()
-	class_grid.alignment = BoxContainer.ALIGNMENT_CENTER
-	class_grid.add_theme_constant_override("separation", 16)
+	var class_grid := GridContainer.new()
+	class_grid.columns = 2
+	class_grid.add_theme_constant_override("h_separation", 12)
+	class_grid.add_theme_constant_override("v_separation", 12)
 	class_container.add_child(class_grid)
 
 	var classes := [
@@ -130,10 +137,13 @@ func _build_ui() -> void:
 	]
 	for c in classes:
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(130, 70)
+		btn.custom_minimum_size = Vector2(140, 100)
+		var class_name_str: String = GameData.get_class_name_for(selected_race, c)
+		btn.text = class_name_str
 		btn.tooltip_text = GameData.class_descs[c]
-		btn.add_theme_font_override("font", GameData.emoji_font)
-		_style_button(btn, Color(0.5, 0.5, 0.6))
+		if GameData.emoji_font:
+			btn.add_theme_font_override("font", GameData.emoji_font)
+		_style_button(btn, Color(0.5, 0.6, 0.7))
 		btn.pressed.connect(_on_class_selected.bind(c))
 		class_grid.add_child(btn)
 		class_buttons.append(btn)
@@ -141,54 +151,94 @@ func _build_ui() -> void:
 	class_info_label = Label.new()
 	class_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var ci_settings := LabelSettings.new()
-	ci_settings.font_size = 14
-	ci_settings.font_color = Color(0.7, 0.7, 0.8)
+	ci_settings.font_size = 12
+	ci_settings.font_color = Color(0.6, 0.6, 0.7)
 	class_info_label.label_settings = ci_settings
 	class_container.add_child(class_info_label)
 
-	var spacer3 := Control.new()
-	spacer3.custom_minimum_size = Vector2(0, 20)
-	center.add_child(spacer3)
+	var difficulty_title := Label.new()
+	difficulty_title.text = "Difficulty"
+	difficulty_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var dt_settings := LabelSettings.new()
+	dt_settings.font_size = 24
+	dt_settings.font_color = Color(1.0, 0.8, 0.4)
+	difficulty_title.label_settings = dt_settings
+	center.add_child(difficulty_title)
+
+	var difficulty_grid := GridContainer.new()
+	difficulty_grid.columns = 2
+	difficulty_grid.add_theme_constant_override("h_separation", 12)
+	difficulty_grid.add_theme_constant_override("v_separation", 12)
+	center.add_child(difficulty_grid)
+
+	var difficulties := [
+		GameSystems.Difficulty.EASY,
+		GameSystems.Difficulty.NORMAL,
+		GameSystems.Difficulty.HARD,
+		GameSystems.Difficulty.NIGHTMARE,
+	]
+	for diff in difficulties:
+		var btn := Button.new()
+		btn.text = GameSystems.difficulty_names[diff]
+		btn.custom_minimum_size = Vector2(140, 60)
+		_style_button(btn, Color(0.6, 0.4, 0.3))
+		btn.pressed.connect(_on_difficulty_selected.bind(diff))
+		difficulty_grid.add_child(btn)
 
 	start_button = Button.new()
-	start_button.text = "\u2694\uFE0F  START MISSION  \u2694\uFE0F"
-	start_button.custom_minimum_size = Vector2(300, 55)
+	start_button.text = "START MISSION"
+	start_button.custom_minimum_size = Vector2(280, 60)
 	_style_button(start_button, Color(0.2, 0.8, 0.3))
 	start_button.pressed.connect(_on_start_pressed)
 	center.add_child(start_button)
 
+	var right_panel := VBoxContainer.new()
+	right_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right_panel.alignment = BoxContainer.ALIGNMENT_CENTER
+	right_panel.add_theme_constant_override("separation", 16)
+	main_grid.add_child(right_panel)
+
 	var lore_button := Button.new()
-	lore_button.text = "\U0001F4DA  LORE COLLECTION  \U0001F4DA"
-	lore_button.custom_minimum_size = Vector2(300, 40)
+	lore_button.text = "LORE COLLECTION"
+	lore_button.custom_minimum_size = Vector2(280, 50)
 	_style_button(lore_button, Color(0.5, 0.3, 0.7))
 	lore_button.pressed.connect(_on_lore_pressed)
-	center.add_child(lore_button)
+	right_panel.add_child(lore_button)
 
 	var lore_progress := Label.new()
 	var pct := LoreManager.get_completion_percentage()
-	lore_progress.text = str(LoreManager.total_collected) + "/" + str(LoreManager.total_entries) + " collected (" + str(int(pct)) + "%)"
+	lore_progress.text = str(LoreManager.total_collected) + "/" + str(LoreManager.total_entries) + " collected"
 	lore_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var lp_settings := LabelSettings.new()
-	lp_settings.font_size = 12
-	lp_settings.font_color = Color(0.5, 0.4, 0.6)
+	lp_settings.font_size = 14
+	lp_settings.font_color = Color(0.7, 0.6, 0.8)
 	lore_progress.label_settings = lp_settings
-	center.add_child(lore_progress)
+	right_panel.add_child(lore_progress)
 
 	var settings_button := Button.new()
-	settings_button.text = "\u2699\uFE0F  GRAPHICS SETTINGS  \u2699\uFE0F"
-	settings_button.custom_minimum_size = Vector2(300, 40)
+	settings_button.text = "GRAPHICS SETTINGS"
+	settings_button.custom_minimum_size = Vector2(280, 50)
 	_style_button(settings_button, Color(0.5, 0.5, 0.6))
 	settings_button.pressed.connect(_on_settings_pressed)
-	center.add_child(settings_button)
+	right_panel.add_child(settings_button)
+
+	var dev_button := Button.new()
+	dev_button.text = "[DEV] TEXT MODE"
+	dev_button.custom_minimum_size = Vector2(280, 45)
+	_style_button(dev_button, Color(0.7, 0.3, 0.3))
+	dev_button.pressed.connect(_on_dev_mode_pressed)
+	right_panel.add_child(dev_button)
 
 	var controls_label := Label.new()
-	controls_label.text = "WASD: Move | Mouse: Aim | LMB: Attack | RMB: Block | Shift: Sprint | Space: Jump\nF: Ability | C: Light | E: Interact | 1-4: Slots | R: Reload | I/Tab: Lore | ESC: Quit"
+	controls_label.text = "WASD: Move | Mouse: Aim | LMB: Attack | RMB: Block\nShift: Sprint | Space: Jump | F: Ability | C: Light\nE: Interact | 1-4: Slots | R: Reload | I/Tab: Lore"
 	controls_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	controls_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var cl_settings := LabelSettings.new()
 	cl_settings.font_size = 12
 	cl_settings.font_color = Color(0.4, 0.4, 0.5)
 	controls_label.label_settings = cl_settings
-	center.add_child(controls_label)
+	right_panel.add_child(controls_label)
 
 func _style_button(btn: Button, accent: Color) -> void:
 	var normal := StyleBoxFlat.new()
@@ -230,6 +280,10 @@ func _on_class_selected(c: int) -> void:
 	_update_class_info()
 	_highlight_class_button()
 
+func _update_race_info() -> void:
+	var stats: Dictionary = GameData.race_stats[selected_race]
+	race_info_label.text = stats["desc"]
+
 func _highlight_race_button() -> void:
 	var races := [GameData.Race.HUMAN, GameData.Race.ELF, GameData.Race.DWARF, GameData.Race.ORC]
 	for i in range(race_buttons.size()):
@@ -242,33 +296,34 @@ func _highlight_race_button() -> void:
 func _highlight_class_button() -> void:
 	var classes := [GameData.PlayerClass.DPS, GameData.PlayerClass.TANK, GameData.PlayerClass.SUPPORT, GameData.PlayerClass.MAGE]
 	for i in range(class_buttons.size()):
-		if classes[i] == selected_class:
-			_style_button(class_buttons[i], Color(0.8, 0.7, 0.3))
-		else:
-			_style_button(class_buttons[i], Color(0.4, 0.4, 0.5))
+		var btn = class_buttons[i]
+		var class_id = classes[i]
+		var is_selected = class_id == selected_class
+		btn.modulate = Color(1.0, 1.0, 1.0) if is_selected else Color(0.7, 0.7, 0.7)
 
-func _update_race_info() -> void:
-	var stats: Dictionary = GameData.race_stats[selected_race]
-	race_info_label.text = stats["name"] + " - HP: " + str(int(stats["max_hp"])) + " | Regen: " + str(stats["hp_regen"]) + "/s | Speed: " + str(int(stats["run_speed"])) + " | " + stats["desc"]
+func _update_class_buttons() -> void:
+	var classes := [GameData.PlayerClass.DPS, GameData.PlayerClass.TANK, GameData.PlayerClass.SUPPORT, GameData.PlayerClass.MAGE]
+	for i in range(class_buttons.size()):
+		var btn = class_buttons[i]
+		var class_id = classes[i]
+		var is_selected = class_id == selected_class
+		btn.modulate = Color(1.0, 1.0, 1.0) if is_selected else Color(0.7, 0.7, 0.7)
+		var class_name_str: String = GameData.get_class_name_for(selected_race, class_id)
+		btn.text = class_name_str
+	_update_class_info()
 
 func _update_class_info() -> void:
 	var class_name_str: String = GameData.get_class_name_for(selected_race, selected_class)
 	class_info_label.text = class_name_str + " - " + GameData.class_descs[selected_class]
 
-func _update_class_buttons() -> void:
-	var classes := [GameData.PlayerClass.DPS, GameData.PlayerClass.TANK, GameData.PlayerClass.SUPPORT, GameData.PlayerClass.MAGE]
-	for i in range(class_buttons.size()):
-		var class_name_str: String = GameData.get_class_name_for(selected_race, classes[i])
-		var emoji: String = GameData.class_emojis[classes[i]]
-		class_buttons[i].text = emoji + "\n" + class_name_str
-	_update_class_info()
-	_highlight_race_button()
-	_highlight_class_button()
-
 func _on_start_pressed() -> void:
-	GameData.selected_race = selected_race
-	GameData.selected_class = selected_class
-	get_tree().change_scene_to_file("res://scenes/game.tscn")
+	GameData.selected_race = selected_race as GameData.Race
+	GameData.selected_class = selected_class as GameData.PlayerClass
+	var tree := get_tree()
+	if tree:
+		tree.change_scene_to_file("res://scenes/game.tscn")
+	else:
+		push_error("Failed to get scene tree for scene change")
 
 func _on_lore_pressed() -> void:
 	var LoreCollectionScript := preload("res://scripts/lore/lore_collection_ui.gd")
@@ -455,7 +510,7 @@ func _add_option_row(parent: VBoxContainer, label_text: String, options: Array, 
 			_style_button(btn, Color(0.3, 0.3, 0.4))
 		btn.add_theme_font_size_override("font_size", 11)
 		var idx := i
-		btn.pressed.connect(func(): callback.call(idx))
+		btn.pressed.connect(func() -> void: callback.call(idx))
 		btn_group.add_child(btn)
 	row.add_child(btn_group)
 
@@ -739,6 +794,23 @@ func _apply_quality_preset(quality: int) -> void:
 			GameSystems.set_setting("vignette_enabled", true)
 			GameSystems.set_setting("damage_numbers", true)
 			GameSystems.set_setting("hit_markers", true)
+
+func _on_difficulty_selected(difficulty: int) -> void:
+	GameSystems.current_difficulty = difficulty
+	GameSystems.set_setting("difficulty", difficulty)
+
+func _on_dev_mode_pressed() -> void:
+	dev_mode_enabled = true
+	text_based_graphics = true
+	GameSystems.set_setting("dev_mode", true)
+	GameSystems.set_setting("text_based_graphics", true)
+	GameData.selected_race = selected_race as GameData.Race
+	GameData.selected_class = selected_class as GameData.PlayerClass
+	var tree := get_tree()
+	if tree:
+		tree.change_scene_to_file("res://scenes/game.tscn")
+	else:
+		push_error("Failed to get scene tree for dev mode scene change")
 
 func _process(delta: float) -> void:
 	bg_timer += delta

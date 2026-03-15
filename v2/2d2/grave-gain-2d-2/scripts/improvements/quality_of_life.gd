@@ -85,7 +85,7 @@ func play_ui_sound(sound_type: String = "click") -> void:
 	var audio_player = AudioStreamPlayer.new()
 	add_child(audio_player)
 	audio_player.bus = "UI"
-	audio_player.volume_db = linear2db(ui_click_volume)
+	audio_player.volume_db = linear_to_db(ui_click_volume)
 	
 	match sound_type:
 		"click":
@@ -154,7 +154,7 @@ func apply_colorblind_filter(color: Color) -> Color:
 		_:
 			return color
 
-func get_setting(setting_name: String) -> var:
+func get_setting(setting_name: String) -> Variant:
 	match setting_name:
 		"tooltips": return tooltip_enabled
 		"sfx": return sfx_enabled

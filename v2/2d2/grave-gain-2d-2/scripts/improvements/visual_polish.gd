@@ -63,7 +63,7 @@ func play_particle_effect(effect_name: String, position: Vector2) -> void:
 		var angle = (i / float(effect_data["count"])) * TAU
 		var velocity = Vector2(cos(angle), sin(angle)) * effect_data["speed"]
 		
-		var particle = _create_particle(effect_data["color"], position, velocity, effect_data["lifetime"])
+		var particle = await _create_particle(effect_data["color"], position, velocity, effect_data["lifetime"])
 		add_child(particle)
 	
 	effect_played.emit(effect_name)
@@ -72,10 +72,10 @@ func _create_particle(color: Color, position: Vector2, velocity: Vector2, lifeti
 	var particle = Node2D.new()
 	particle.position = position
 	
-	var sprite = Sprite2D.new()
-	sprite.text = "✨"
-	sprite.modulate = color
-	particle.add_child(sprite)
+	var label = Label.new()
+	label.text = "✨"
+	label.add_theme_color_override("font_color", color)
+	particle.add_child(label)
 	
 	var tween = create_tween()
 	tween.set_parallel(true)

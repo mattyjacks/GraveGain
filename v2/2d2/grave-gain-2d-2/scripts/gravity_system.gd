@@ -20,12 +20,12 @@ var current_height: float = 0.0
 var max_height_reached: float = 0.0
 
 var player_ref: Node2D = null
-var vertical_system: VerticalLevelSystem = null
+var vertical_system: Node = null
 
 func _ready() -> void:
 	pass
 
-func set_references(player: Node2D, v_system: VerticalLevelSystem) -> void:
+func set_references(player: Node2D, v_system: Node) -> void:
 	player_ref = player
 	vertical_system = v_system
 	current_floor = v_system.get_current_floor()

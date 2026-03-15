@@ -8,7 +8,7 @@ signal score_changed(new_score: int)
 signal combo_updated(count: int, timer: float)
 signal kill_feed_entry(killer: String, victim: String, weapon: String)
 signal tutorial_hint(text: String, duration: float)
-signal boss_hp_updated(current_hp: float, max_hp: float)
+signal boss_hp_updated(boss_name: String, hp_pct: float, visible: bool)
 
 const SAVE_PATH := "user://game_systems.save"
 const SETTINGS_PATH := "user://settings.cfg"
@@ -17,10 +17,10 @@ const SETTINGS_PATH := "user://settings.cfg"
 enum Difficulty { EASY, NORMAL, HARD, NIGHTMARE }
 var current_difficulty: Difficulty = Difficulty.NORMAL
 var difficulty_multipliers: Dictionary = {
-	Difficulty.EASY: {"enemy_hp": 0.6, "enemy_dmg": 0.5, "enemy_speed": 0.8, "loot": 1.5, "xp": 0.75, "spawn_rate": 0.7},
-	Difficulty.NORMAL: {"enemy_hp": 1.0, "enemy_dmg": 1.0, "enemy_speed": 1.0, "loot": 1.0, "xp": 1.0, "spawn_rate": 1.0},
-	Difficulty.HARD: {"enemy_hp": 1.5, "enemy_dmg": 1.5, "enemy_speed": 1.15, "loot": 0.8, "xp": 1.5, "spawn_rate": 1.3},
-	Difficulty.NIGHTMARE: {"enemy_hp": 2.5, "enemy_dmg": 2.0, "enemy_speed": 1.3, "loot": 0.6, "xp": 2.5, "spawn_rate": 1.6},
+	Difficulty.EASY: {"enemy_hp": 0.6, "enemy_dmg": 0.5, "enemy_speed": 0.9, "loot": 1.5, "xp": 0.75, "spawn_rate": 0.7},
+	Difficulty.NORMAL: {"enemy_hp": 1.0, "enemy_dmg": 1.0, "enemy_speed": 1.2, "loot": 1.0, "xp": 1.0, "spawn_rate": 1.0},
+	Difficulty.HARD: {"enemy_hp": 1.5, "enemy_dmg": 1.5, "enemy_speed": 1.4, "loot": 0.8, "xp": 1.5, "spawn_rate": 1.3},
+	Difficulty.NIGHTMARE: {"enemy_hp": 2.5, "enemy_dmg": 2.0, "enemy_speed": 1.6, "loot": 0.6, "xp": 2.5, "spawn_rate": 1.6},
 }
 var difficulty_names: Array[String] = ["Easy", "Normal", "Hard", "Nightmare"]
 
@@ -693,10 +693,6 @@ func get_respawn_invuln() -> float:
 # ===== Improvement #100: Difficulty Scaling Over Time =====
 func get_difficulty_multiplier(mission_time: float) -> float:
 	return 1.0 + (mission_time / 300.0) * 0.5
-
-# ===== Improvement (screen shake request signal) =====
-signal screen_shake_requested(intensity: float, duration: float)
-signal damage_indicator_requested(angle: float)
 
 func reset_mission() -> void:
 	kill_streak = 0

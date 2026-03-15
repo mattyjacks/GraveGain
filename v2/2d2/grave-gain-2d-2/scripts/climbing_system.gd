@@ -17,12 +17,12 @@ var climb_direction: int = 1
 var climb_speed: float = 100.0
 
 var player_ref: Node2D = null
-var vertical_system: VerticalLevelSystem = null
+var vertical_system: Node = null
 
 func _ready() -> void:
 	pass
 
-func set_references(player: Node2D, v_system: VerticalLevelSystem) -> void:
+func set_references(player: Node2D, v_system: Node) -> void:
 	player_ref = player
 	vertical_system = v_system
 

@@ -6,6 +6,8 @@ extends Node
 
 signal emoji_set_changed(set_id: String)
 
+var twemoji_loader: Node = null
+
 const EMOJI_SETS: Dictionary = {
 	"system": {
 		"name": "System Default",
@@ -105,6 +107,9 @@ const FALLBACK_SET_ORDER: Array[String] = [
 ]
 
 func _ready() -> void:
+	twemoji_loader = get_node_or_null("/root/TwemojiLoader")
+	if twemoji_loader and twemoji_loader.is_twemoji_available():
+		print("✓ Twemoji loader initialized and font available")
 	_scan_available_sets()
 	var saved_val = GameSystems.get_setting("emoji_set")
 	var saved_set: String = saved_val if saved_val != null and saved_val is String else "system"
@@ -184,20 +189,21 @@ func apply_emoji_set(set_id: String) -> void:
 		current_set_id = "system"
 
 	_build_fallback_chain(set_id)
-	GameData.emoji_font = font
 	
-	# Create large variant
-	var font_large: Font
-	if font is SystemFont:
-		var sf_large := SystemFont.new()
-		sf_large.font_names = (font as SystemFont).font_names
-		sf_large.antialiasing = (font as SystemFont).antialiasing
-		sf_large.size = 48
-		font_large = sf_large
+	# Ensure font is properly wrapped in a FontVariation if needed
+	if font and not (font is FontVariation):
+		var font_var := FontVariation.new()
+		font_var.base_font = font
+		GameData.emoji_font = font_var
 	else:
-		font_large = font
+		GameData.emoji_font = font
 	
+	# Create large variant with size override
+	var font_large := FontVariation.new()
+	font_large.base_font = GameData.emoji_font
+	font_large.opentype_features = {"size": 48}
 	GameData.emoji_font_large = font_large
+	
 	emoji_set_changed.emit(current_set_id)
 
 func _build_fallback_chain(primary_set: String) -> void:
@@ -244,10 +250,12 @@ func _create_system_font() -> Font:
 		"Android Emoji",
 		"EmojiOne Color",
 		"Emoji",
+		"Courier New",
+		"Arial",
+		"Times New Roman",
 	])
 	sf.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-	sf.size = 32
-	sf.outline_size = 0
+	sf.force_autohinter = false
 	return sf
 
 func _load_font_from_path(path: String) -> Font:

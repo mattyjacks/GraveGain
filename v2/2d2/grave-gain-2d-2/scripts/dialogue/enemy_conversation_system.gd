@@ -20,7 +20,7 @@ func set_references(dm: DialogueManager, game: Node) -> void:
 	dialogue_manager = dm
 	game_ref = game
 
-func update_conversations(delta: float, all_enemies: Array[Node2D], player_pos: Vector2) -> void:
+func update_conversations(delta: float, all_enemies: Array[CharacterBody2D], player_pos: Vector2) -> void:
 	if not dialogue_manager or all_enemies.is_empty():
 		return
 	
@@ -53,9 +53,9 @@ func update_conversations(delta: float, all_enemies: Array[Node2D], player_pos: 
 		active_conversations[group_key] = current_time
 		conversation_overheard.emit(group, text)
 
-func _find_enemy_groups(all_enemies: Array[Node2D]) -> Array[Array]:
+func _find_enemy_groups(all_enemies: Array[CharacterBody2D]) -> Array[Array]:
 	var groups: Array[Array] = []
-	var processed: Array[Node2D] = []
+	var processed: Array[CharacterBody2D] = []
 	
 	for enemy in all_enemies:
 		if not is_instance_valid(enemy) or enemy in processed:
@@ -65,7 +65,7 @@ func _find_enemy_groups(all_enemies: Array[Node2D]) -> Array[Array]:
 		if enemy.has_method("is_alerted") and enemy.is_alerted():
 			continue
 		
-		var group: Array[Node2D] = [enemy]
+		var group: Array[CharacterBody2D] = [enemy]
 		processed.append(enemy)
 		
 		# Find nearby unalerted enemies of same type
@@ -88,7 +88,7 @@ func _find_enemy_groups(all_enemies: Array[Node2D]) -> Array[Array]:
 	
 	return groups
 
-func _get_group_key(group: Array[Node2D]) -> String:
+func _get_group_key(group: Array[CharacterBody2D]) -> String:
 	var ids: Array[String] = []
 	for enemy in group:
 		ids.append(str(enemy.get_instance_id()))

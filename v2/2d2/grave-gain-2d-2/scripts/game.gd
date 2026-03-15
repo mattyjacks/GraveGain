@@ -107,6 +107,10 @@ var pause_menu: CanvasLayer = null
 var inventory_mgr: Node = null
 var inventory_ui: CanvasLayer = null
 
+# Dev mode
+var dev_mode_enabled: bool = false
+var text_based_graphics: bool = false
+
 var enemies: Array[CharacterBody2D] = []
 var active_lights: Array[PointLight2D] = []
 
@@ -174,17 +178,26 @@ func _ready() -> void:
 
 	GameSystems.reset_mission()
 	
+	# Check for dev mode
+	dev_mode_enabled = GameSystems.get_setting("dev_mode") == true
+	text_based_graphics = GameSystems.get_setting("text_based_graphics") == true
+	
 	# Ensure emoji fonts are initialized before spawning player
-	if EmojiManager:
+	if EmojiManager and not text_based_graphics:
 		EmojiManager.apply_emoji_set("system")
 
 	# Setup pause menu and inventory (always available)
 	_setup_pause_menu()
 	_setup_inventory()
 
-	# Start on the starship
-	_setup_starship()
-	_spawn_player_on_starship()
+	if dev_mode_enabled:
+		# Dev mode: skip starship, go directly to dungeon
+		_setup_dungeon_directly()
+	else:
+		# Normal mode: start on the starship
+		_setup_starship()
+		_spawn_player_on_starship()
+	
 	_setup_hud()
 	_setup_lore_ui()
 
@@ -192,10 +205,16 @@ func _ready() -> void:
 	_setup_touch_controls()
 	_setup_low_health_overlay()
 	_setup_dialogue_systems()
-	_setup_starship_skills()
+	
+	if not dev_mode_enabled:
+		_setup_starship_skills()
+	
 	_setup_improvement_systems()
 
-	GameSystems.show_tutorial("starship", "Explore the ship. Talk to crew with [E]. Head to the Hangar to deploy. Visit your quarters to earn $UUSD!", 8.0)
+	if dev_mode_enabled:
+		GameSystems.show_tutorial("dev", "[DEV MODE] Text-based graphics enabled. Direct dungeon entry. Press ESC to quit.", 5.0)
+	else:
+		GameSystems.show_tutorial("starship", "Explore the ship. Talk to crew with [E]. Head to the Hangar to deploy. Visit your quarters to earn $UUSD!", 8.0)
 
 	Input.set_mouse_mode(Input.MOUSE_MODE_CONFINED)
 
@@ -287,6 +306,52 @@ func _build_scene_tree() -> void:
 	camera.drag_bottom_margin = 0.15
 	add_child(camera)
 
+func _setup_dungeon_directly() -> void:
+	is_on_starship = false
+	_generate_map()
+	_build_scene_tree()
+	_spawn_player()
+	_place_torches()
+	_place_items()
+	_place_lore_pickups()
+	_place_safespace()
+	_place_destructibles()
+	_place_traps()
+	_place_chests()
+	_place_fountains()
+	_place_altars()
+	_place_decorations()
+	_place_dead_end_treasures()
+	_place_buildings()
+	_place_game_corners()
+
+func _get_text_representation(emoji: String) -> String:
+	if not text_based_graphics:
+		return emoji
+	
+	var text_map := {
+		"\U0001F525": "[F]",
+		"\U0001F308": "[R]",
+		"\U0001F4E6": "[C]",
+		"\U0001F48E": "[G]",
+		"\U0001F3C6": "[T]",
+		"\U0001F451": "[L]",
+		"\u2728": "[*]",
+		"\u2694\uFE0F": "[S]",
+		"\U0001F469\u200D\U0001F680": "[H]",
+		"\U0001F9DD\u200D\u2640\uFE0F": "[E]",
+		"\u26CF\uFE0F": "[D]",
+		"\U0001F9B9": "[O]",
+		"\U0001F480": "[X]",
+		"\u2620\uFE0F": "[!]",
+		"\U0001F4A2": "[*]",
+		"\U0001F4DA": "[B]",
+		"\u2699\uFE0F": "[?]",
+		"\u26B0\uFE0F": "[#]",
+	}
+	
+	return text_map.get(emoji, emoji)
+
 func _spawn_player() -> void:
 	player = CharacterBody2D.new()
 	player.set_script(PlayerScript)
@@ -324,7 +389,8 @@ func _place_torches() -> void:
 		torch_emoji.position = Vector2(-10, -14)
 		torch_emoji.size = Vector2(20, 20)
 		var ts := LabelSettings.new()
-		ts.font = GameData.emoji_font
+		if GameData.emoji_font:
+			ts.font = GameData.emoji_font
 		ts.font_size = 16
 		torch_emoji.label_settings = ts
 		torch_node.add_child(torch_emoji)
@@ -378,7 +444,8 @@ func _place_safespace() -> void:
 	rainbow_label.position = Vector2(-32, -32)
 	rainbow_label.size = Vector2(64, 64)
 	var rs := LabelSettings.new()
-	rs.font = GameData.emoji_font
+	if GameData.emoji_font:
+		rs.font = GameData.emoji_font
 	rs.font_size = 48
 	rainbow_label.label_settings = rs
 	safespace_visual.add_child(rainbow_label)
@@ -522,6 +589,7 @@ func _spawn_room_enemies(room_data: Dictionary) -> void:
 	var points: Array = room_data["spawn_points"]
 
 	for spawn_pos in points:
+		spawn_pos = _get_offscreen_spawn_position(spawn_pos)
 		var etype: int
 		match difficulty:
 			"easy":
@@ -625,6 +693,25 @@ func _spawn_enemy(pos: Vector2, etype: int, make_elite: bool = false) -> void:
 	var dist_to_player := pos.distance_to(player.global_position)
 	if dist_to_player < enemy.detection_range:
 		enemy.set_target(player)
+
+func _get_offscreen_spawn_position(base_pos: Vector2) -> Vector2:
+	if not is_instance_valid(player) or not camera:
+		return base_pos
+	
+	var camera_pos := camera.global_position
+	var viewport_size := get_viewport().get_visible_rect().size
+	var camera_zoom := camera.zoom
+	var half_width := viewport_size.x / (2.0 * camera_zoom.x)
+	var half_height := viewport_size.y / (2.0 * camera_zoom.y)
+	
+	var spawn_distance := 150.0
+	var direction := (base_pos - camera_pos).normalized()
+	
+	if direction.length() < 0.1:
+		direction = Vector2.from_angle(randf() * TAU)
+	
+	var offscreen_pos := camera_pos + direction * spawn_distance
+	return offscreen_pos
 
 func _on_enemy_alert(alert_pos: Vector2, alert_range: float) -> void:
 	if not is_instance_valid(player):
@@ -757,7 +844,7 @@ func _handle_melee_attack(data: Dictionary) -> void:
 
 	if hit_count > 0 and player.is_alive:
 		# Lifesteal: 2 temp HP per hit + overkill bonus
-		var lifesteal := hit_count * 2.0 + total_overkill * 0.1
+		var lifesteal: float = hit_count * 2.0 + total_overkill * 0.1
 		player.add_temp_hp(lifesteal)
 		_on_screen_shake_request(0.15 * hit_count, 0.1)
 		# Camera punch toward hit direction
@@ -796,7 +883,7 @@ func _on_enemy_died(_enemy: CharacterBody2D, data: Dictionary) -> void:
 		if player.has_method("on_kill"):
 			player.on_kill()
 		# Improvement #1119: Lifesteal on kill - restore 5% max HP
-		var lifesteal := player.max_hp * 0.05
+		var lifesteal: float = player.max_hp * 0.05
 		if player.hp < player.max_hp and player.has_method("heal"):
 			player.heal(lifesteal, false)
 			if vfx:
@@ -816,7 +903,7 @@ func _on_enemy_died(_enemy: CharacterBody2D, data: Dictionary) -> void:
 
 	# Track with GameSystems
 	var enemy_name: String = data.get("name", "Enemy")
-	var weapon := "melee" if data.get("killed_by_melee", true) else "ranged"
+	var weapon: String = "melee" if data.get("killed_by_melee", true) else "ranged"
 	GameSystems.register_kill(enemy_name, weapon)
 	GameSystems.track("total_kills")
 	GameSystems.track("total_gold_earned", data["gold"])
@@ -1040,7 +1127,7 @@ func _update_hud(delta: float) -> void:
 		for enemy in enemies:
 			if is_instance_valid(enemy) and enemy.is_alive:
 				enemy_positions.append(enemy.global_position)
-		if hud.has_method("update_minimap"):
+		if hud.has_method("update_minimap") and map_gen and map_gen.tiles:
 			hud.update_minimap(map_gen.tiles, player.global_position, enemy_positions, map_gen.safespace_position)
 
 func _update_torch_flicker(delta: float) -> void:
@@ -1103,7 +1190,8 @@ func _spawn_destructible(pos: Vector2, dtype: String) -> void:
 	lbl.position = Vector2(-12, -16)
 	lbl.size = Vector2(24, 24)
 	var ls := LabelSettings.new()
-	ls.font = GameData.emoji_font
+	if GameData.emoji_font:
+		ls.font = GameData.emoji_font
 	ls.font_size = 20
 	lbl.label_settings = ls
 	destr.add_child(lbl)
@@ -1181,7 +1269,8 @@ func _spawn_trap(pos: Vector2, ttype: String) -> void:
 	lbl.position = Vector2(-10, -10)
 	lbl.size = Vector2(20, 20)
 	var ls := LabelSettings.new()
-	ls.font = GameData.emoji_font
+	if GameData.emoji_font:
+		ls.font = GameData.emoji_font
 	ls.font_size = 14
 	lbl.label_settings = ls
 	lbl.modulate = Color(1, 1, 1, 0.3)
@@ -1267,7 +1356,8 @@ func _spawn_chest(pos: Vector2, rarity: String) -> void:
 	lbl.position = Vector2(-16, -20)
 	lbl.size = Vector2(32, 32)
 	var ls := LabelSettings.new()
-	ls.font = GameData.emoji_font
+	if GameData.emoji_font:
+		ls.font = GameData.emoji_font
 	ls.font_size = 24
 	lbl.label_settings = ls
 	chest.add_child(lbl)
@@ -1400,7 +1490,8 @@ func _place_fountains() -> void:
 		lbl.position = Vector2(-12, -16)
 		lbl.size = Vector2(24, 24)
 		var ls := LabelSettings.new()
-		ls.font = GameData.emoji_font
+		if GameData.emoji_font:
+			ls.font = GameData.emoji_font
 		ls.font_size = 20
 		lbl.label_settings = ls
 		fountain.add_child(lbl)
@@ -1470,7 +1561,8 @@ func _place_altars() -> void:
 		lbl.position = Vector2(-14, -18)
 		lbl.size = Vector2(28, 28)
 		var ls := LabelSettings.new()
-		ls.font = GameData.emoji_font
+		if GameData.emoji_font:
+			ls.font = GameData.emoji_font
 		ls.font_size = 22
 		lbl.label_settings = ls
 		altar.add_child(lbl)
@@ -1542,7 +1634,8 @@ func _place_decorations() -> void:
 		lbl.size = Vector2(20, 20)
 		lbl.modulate = Color(1.0, 1.0, 1.0, 0.6)
 		var ls := LabelSettings.new()
-		ls.font = GameData.emoji_font
+		if GameData.emoji_font:
+			ls.font = GameData.emoji_font
 		ls.font_size = 14
 		lbl.label_settings = ls
 		deco.add_child(lbl)
@@ -1619,8 +1712,7 @@ func _check_player_room() -> void:
 # ===== Batch 4: Signal Connections =====
 
 func _connect_game_signals() -> void:
-	GameSystems.screen_shake_requested.connect(_on_screen_shake_request)
-	GameSystems.damage_indicator_requested.connect(_on_damage_direction)
+	pass
 
 func _setup_touch_controls() -> void:
 	touch_controls = CanvasLayer.new()
@@ -1790,7 +1882,8 @@ func _spawn_building_visual(bdata: Dictionary) -> void:
 	emoji_lbl.position = Vector2(-32, -40)
 	emoji_lbl.size = Vector2(64, 64)
 	var ls := LabelSettings.new()
-	ls.font = GameData.emoji_font_large
+	if GameData.emoji_font_large:
+		ls.font = GameData.emoji_font_large
 	ls.font_size = 48
 	emoji_lbl.label_settings = ls
 	building.add_child(emoji_lbl)
@@ -1848,7 +1941,7 @@ func _check_building_entry(delta: float) -> void:
 		return
 	building_entry_check_timer = 0.1
 
-	var nearest_building: Node2D = null
+	var _nearest_building: Node2D = null
 	var nearest_dist: float = 999999.0
 
 	for building in buildings_node.get_children():
@@ -1863,7 +1956,6 @@ func _check_building_entry(delta: float) -> void:
 
 		if dist < nearest_dist:
 			nearest_dist = dist
-			nearest_building = building
 
 
 func _try_enter_nearest_building() -> void:
@@ -1975,7 +2067,8 @@ func _spawn_game_corner(pos: Vector2) -> void:
 	emoji_lbl.position = Vector2(-32, -40)
 	emoji_lbl.size = Vector2(64, 64)
 	var ls := LabelSettings.new()
-	ls.font = GameData.emoji_font_large
+	if GameData.emoji_font_large:
+		ls.font = GameData.emoji_font_large
 	ls.font_size = 48
 	emoji_lbl.label_settings = ls
 	corner.add_child(emoji_lbl)
@@ -2248,7 +2341,8 @@ func _place_starship_interactables() -> void:
 		emoji_label.position = Vector2(-12, -16)
 		emoji_label.size = Vector2(24, 24)
 		var ls := LabelSettings.new()
-		ls.font = GameData.emoji_font
+		if GameData.emoji_font:
+			ls.font = GameData.emoji_font
 		ls.font_size = 18
 		emoji_label.label_settings = ls
 		inter_node.add_child(emoji_label)
@@ -2305,7 +2399,7 @@ func _try_starship_interaction() -> void:
 			if not is_instance_valid(inter_node):
 				continue
 			var dist: float = player.global_position.distance_to(inter_node.global_position)
-			if dist < 50.0:
+			if dist < 80.0:
 				var inter_data: Dictionary = inter_node.get_meta("inter_data", {})
 				_handle_starship_interactable(inter_data)
 				return
@@ -2332,20 +2426,20 @@ func _handle_starship_interactable(data: Dictionary) -> void:
 		"equip_weapons":
 			# Give player a random weapon
 			if inventory_mgr:
-				var weapon := inventory_mgr.generate_random_item(GameSystems.player_level, "uncommon")
+				var weapon: Dictionary = inventory_mgr.generate_random_item(GameSystems.player_level, "uncommon")
 				if inventory_mgr.add_item(weapon):
 					if hud and hud.has_method("show_notification"):
 						hud.show_notification("Found: " + weapon.get("name", "item"), Color(0.3, 1.0, 0.3))
 		"equip_armor":
 			# Give player random armor
 			if inventory_mgr:
-				var armor := inventory_mgr.generate_random_item(GameSystems.player_level, "common")
+				var armor: Dictionary = inventory_mgr.generate_random_item(GameSystems.player_level, "common")
 				if inventory_mgr.add_item(armor):
 					if hud and hud.has_method("show_notification"):
 						hud.show_notification("Found: " + armor.get("name", "item"), Color(0.3, 1.0, 0.3))
 		"loot_crate":
 			if inventory_mgr:
-				var loot := inventory_mgr.generate_random_item(GameSystems.player_level)
+				var loot: Dictionary = inventory_mgr.generate_random_item(GameSystems.player_level)
 				if inventory_mgr.add_item(loot):
 					if hud and hud.has_method("show_notification"):
 						hud.show_notification("Looted: " + loot.get("name", "item"), Color(1.0, 0.85, 0.3))
@@ -2450,9 +2544,9 @@ func _update_item_magnet(delta: float) -> void:
 	for item in items_node.get_children():
 		if not is_instance_valid(item):
 			continue
-		var dist := player.global_position.distance_to(item.global_position)
+		var dist: float = player.global_position.distance_to(item.global_position)
 		if dist < item_magnet_range and dist > 10.0:
-			var dir := (player.global_position - item.global_position).normalized()
+			var dir: Vector2 = (player.global_position - item.global_position).normalized()
 			item.global_position += dir * 200.0 * delta
 
 # Improvement #1131: Low health screen edge warning
@@ -2473,90 +2567,103 @@ func _update_low_health_warning(delta: float) -> void:
 
 func _setup_improvement_systems() -> void:
 	# Create quality of life system
-	quality_of_life = Node.new()
-	quality_of_life.set_script(QualityOfLifeScript)
-	quality_of_life.name = "QualityOfLife"
-	add_child(quality_of_life)
+	var qol = Node.new()
+	qol.set_script(QualityOfLifeScript)
+	qol.name = "QualityOfLife"
+	add_child(qol)
+	quality_of_life = qol as QualityOfLifeImprovements
 	
 	# Create advanced enemy AI system
-	advanced_enemy_ai = Node.new()
-	advanced_enemy_ai.set_script(AdvancedEnemyAIScript)
-	advanced_enemy_ai.name = "AdvancedEnemyAI"
-	add_child(advanced_enemy_ai)
+	var aea = Node.new()
+	aea.set_script(AdvancedEnemyAIScript)
+	aea.name = "AdvancedEnemyAI"
+	add_child(aea)
+	advanced_enemy_ai = aea as AdvancedEnemyAI
 	
 	# Create visual polish system
-	visual_polish = Node.new()
-	visual_polish.set_script(VisualPolishScript)
-	visual_polish.name = "VisualPolish"
-	add_child(visual_polish)
+	var vp = Node.new()
+	vp.set_script(VisualPolishScript)
+	vp.name = "VisualPolish"
+	add_child(vp)
+	visual_polish = vp as VisualPolish
 	
 	# Create performance optimization system
-	performance_optimization = Node.new()
-	performance_optimization.set_script(PerformanceOptimizationScript)
-	performance_optimization.name = "PerformanceOptimization"
-	add_child(performance_optimization)
+	var po = Node.new()
+	po.set_script(PerformanceOptimizationScript)
+	po.name = "PerformanceOptimization"
+	add_child(po)
+	performance_optimization = po as PerformanceOptimization
 
 func _setup_starship_skills() -> void:
 	# Create currency system
-	currency_system = Node.new()
-	currency_system.set_script(CurrencySystemScript)
-	currency_system.name = "CurrencySystem"
-	add_child(currency_system)
+	var cs = Node.new()
+	cs.set_script(CurrencySystemScript)
+	cs.name = "CurrencySystem"
+	add_child(cs)
+	currency_system = cs as CurrencySystem
 	
 	# Create repair skill
-	repair_skill = Node.new()
-	repair_skill.set_script(ItemRepairSkillScript)
-	repair_skill.name = "RepairSkill"
-	add_child(repair_skill)
+	var rs = Node.new()
+	rs.set_script(ItemRepairSkillScript)
+	rs.name = "RepairSkill"
+	add_child(rs)
+	repair_skill = rs as ItemRepairSkill
 	
 	# Create botany skill
-	botany_skill = Node.new()
-	botany_skill.set_script(BotanySkillScript)
-	botany_skill.name = "BotanySkill"
-	add_child(botany_skill)
+	var bs = Node.new()
+	bs.set_script(BotanySkillScript)
+	bs.name = "BotanySkill"
+	add_child(bs)
+	botany_skill = bs as BotanySkill
 	
 	# Create personal quarters
-	personal_quarters = Node2D.new()
-	personal_quarters.set_script(PersonalQuartersScript)
-	personal_quarters.name = "PersonalQuarters"
-	add_child(personal_quarters)
+	var pq = Node2D.new()
+	pq.set_script(PersonalQuartersScript)
+	pq.name = "PersonalQuarters"
+	add_child(pq)
+	personal_quarters = pq as PersonalQuarters
 	personal_quarters.set_references(botany_skill, repair_skill, currency_system)
 	
 	# Create quarters UI
-	quarters_ui = CanvasLayer.new()
-	quarters_ui.set_script(QuartersUIScript)
-	quarters_ui.name = "QuartersUI"
-	add_child(quarters_ui)
+	var qui = CanvasLayer.new()
+	qui.set_script(QuartersUIScript)
+	qui.name = "QuartersUI"
+	add_child(qui)
+	quarters_ui = qui as QuartersUI
 	quarters_ui.set_references(botany_skill, repair_skill, currency_system, personal_quarters)
 
 func _setup_dialogue_systems() -> void:
 	# Create dialogue manager
-	dialogue_manager = Node.new()
-	dialogue_manager.set_script(DialogueManagerScript)
-	dialogue_manager.name = "DialogueManager"
-	add_child(dialogue_manager)
+	var dm = Node.new()
+	dm.set_script(DialogueManagerScript)
+	dm.name = "DialogueManager"
+	add_child(dm)
+	dialogue_manager = dm as DialogueManager
 	
 	# Create combat dialogue system
-	combat_dialogue = Node.new()
-	combat_dialogue.set_script(CombatDialogueScript)
-	combat_dialogue.name = "CombatDialogue"
-	add_child(combat_dialogue)
+	var cd = Node.new()
+	cd.set_script(CombatDialogueScript)
+	cd.name = "CombatDialogue"
+	add_child(cd)
+	combat_dialogue = cd as CombatDialogueSystem
 	if is_instance_valid(player):
 		combat_dialogue.set_references(dialogue_manager, self, player)
 	
 	# Create exploration dialogue system
-	exploration_dialogue = Node.new()
-	exploration_dialogue.set_script(ExplorationDialogueScript)
-	exploration_dialogue.name = "ExplorationDialogue"
-	add_child(exploration_dialogue)
+	var ed = Node.new()
+	ed.set_script(ExplorationDialogueScript)
+	ed.name = "ExplorationDialogue"
+	add_child(ed)
+	exploration_dialogue = ed as ExplorationDialogueSystem
 	if is_instance_valid(player):
 		exploration_dialogue.set_references(dialogue_manager, self, player)
 	
 	# Create enemy conversation system
-	enemy_conversation = Node.new()
-	enemy_conversation.set_script(EnemyConversationScript)
-	enemy_conversation.name = "EnemyConversation"
-	add_child(enemy_conversation)
+	var ec = Node.new()
+	ec.set_script(EnemyConversationScript)
+	ec.name = "EnemyConversation"
+	add_child(ec)
+	enemy_conversation = ec as EnemyConversationSystem
 	enemy_conversation.set_references(dialogue_manager, self)
 
 func _setup_low_health_overlay() -> void:
@@ -2584,11 +2691,11 @@ func _apply_enemy_separation(delta: float) -> void:
 			if i == j or not is_instance_valid(enemies[j]) or not enemies[j].is_alive:
 				continue
 			var enemy_b = enemies[j]
-			var dist := enemy_a.global_position.distance_to(enemy_b.global_position)
+			var dist: float = enemy_a.global_position.distance_to(enemy_b.global_position)
 			
 			if dist < enemy_separation_range and dist > 1.0:
-				var push_dir := (enemy_a.global_position - enemy_b.global_position).normalized()
-				var push_force := (1.0 - dist / enemy_separation_range) * enemy_separation_force
+				var push_dir: Vector2 = (enemy_a.global_position - enemy_b.global_position).normalized()
+				var push_force: float = (1.0 - dist / enemy_separation_range) * enemy_separation_force
 				separation += push_dir * push_force
 				neighbor_count += 1
 		
@@ -2630,8 +2737,8 @@ func _draw_gore_decals() -> void:
 		return
 	
 	for decal in gore_decals:
-		var alpha := 1.0 - (decal["age"] / decal["max_age"]) * 0.7
-		var col := decal["color"]
+		var alpha: float = 1.0 - (decal["age"] / decal["max_age"]) * 0.7
+		var col: Color = decal["color"]
 		col.a = alpha
 		draw_circle(decal["pos"], decal["size"], col)
 
@@ -2724,4 +2831,4 @@ func _update_starship_interactable_prompts() -> void:
 		var dist: float = player.global_position.distance_to(inter_node.global_position)
 		var prompt: Label = inter_node.get_meta("prompt_label", null)
 		if prompt:
-			prompt.visible = dist < 50.0
+			prompt.visible = dist < 80.0

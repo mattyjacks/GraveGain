@@ -57,29 +57,29 @@ func _setup_stations() -> void:
 	botany_station.position = botany_station_pos
 	add_child(botany_station)
 	
-	var botany_sprite = Sprite2D.new()
-	botany_sprite.text = "🌱"
-	botany_station.add_child(botany_sprite)
+	var botany_label = Label.new()
+	botany_label.text = "🌱"
+	botany_station.add_child(botany_label)
 	
 	# Create repair station
-	var repair_station = Area2D.new()
-	repair_station.name = "RepairStation"
+	var repair_station = Control.new()
+	repair_station.custom_minimum_size = Vector2(100, 100)
 	repair_station.position = repair_station_pos
 	add_child(repair_station)
 	
-	var repair_sprite = Sprite2D.new()
-	repair_sprite.text = "🔧"
-	repair_station.add_child(repair_sprite)
+	var repair_label = Label.new()
+	repair_label.text = "🔧"
+	repair_station.add_child(repair_label)
 	
 	# Create bed
-	var bed = Area2D.new()
-	bed.name = "Bed"
+	var bed = Control.new()
+	bed.custom_minimum_size = Vector2(100, 100)
 	bed.position = bed_pos
 	add_child(bed)
 	
-	var bed_sprite = Sprite2D.new()
-	bed_sprite.text = "🛏️"
-	bed.add_child(bed_sprite)
+	var bed_label = Label.new()
+	bed_label.text = "🛏️"
+	bed.add_child(bed_label)
 
 func set_references(botany: BotanySkill, repair: ItemRepairSkill, currency: CurrencySystem) -> void:
 	botany_skill = botany

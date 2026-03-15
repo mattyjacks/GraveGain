@@ -122,7 +122,7 @@ func reduce_particle_count(particles: Array[Node2D], target_count: int) -> void:
 		if i % step != 0:
 			particles[i].queue_free()
 
-func cache_expensive_calculations(key: String, value: var, ttl: float = 1.0) -> void:
+func cache_expensive_calculations(key: String, value: Variant, ttl: float = 1.0) -> void:
 	# Simple caching system for expensive calculations
 	var cache_entry = {
 		"value": value,
@@ -136,7 +136,7 @@ func cache_expensive_calculations(key: String, value: var, ttl: float = 1.0) -> 
 	var cache = get_meta("calculation_cache")
 	cache[key] = cache_entry
 
-func get_cached_calculation(key: String) -> var:
+func get_cached_calculation(key: String) -> Variant:
 	if not has_meta("calculation_cache"):
 		return null
 	

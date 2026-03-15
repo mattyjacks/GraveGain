@@ -86,7 +86,8 @@ func _build_ui() -> void:
 	portrait_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	portrait_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var portrait_settings := LabelSettings.new()
-	portrait_settings.font = GameData.emoji_font
+	if GameData.emoji_font:
+		portrait_settings.font = GameData.emoji_font
 	portrait_settings.font_size = 36
 	portrait_label.label_settings = portrait_settings
 	panel.add_child(portrait_label)

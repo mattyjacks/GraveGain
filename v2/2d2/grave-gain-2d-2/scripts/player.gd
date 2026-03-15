@@ -116,6 +116,12 @@ var block_start_timer: float = 0.0
 var perfect_block_window: float = 0.2
 var was_perfect_block: bool = false
 
+# Shove Mechanic - hold block then attack to shove
+var block_hold_timer: float = 0.0
+var shove_damage: float = 8.0
+var shove_knockback: float = 150.0
+var shove_range: float = 60.0
+
 # Improvement #15: Dash Attack - melee while dodging does 1.5x damage
 var dash_attack_bonus: float = 1.5
 
@@ -333,7 +339,11 @@ func _build_nodes() -> void:
 
 	shadow_label = Label.new()
 	var race_data: Dictionary = GameData.get_race_data(race)
-	shadow_label.text = race_data.get("emoji", "\U0001F9D1")
+	var emoji_text: String = race_data.get("emoji", "\U0001F9D1")
+	var text_based: bool = GameSystems.get_setting("text_based_graphics") == true
+	if text_based:
+		emoji_text = _get_text_representation(emoji_text)
+	shadow_label.text = emoji_text
 	shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shadow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	shadow_label.position = Vector2(-24, -16)
@@ -341,19 +351,21 @@ func _build_nodes() -> void:
 	shadow_label.modulate = Color(0, 0, 0, 0.5)
 	shadow_label.z_index = -1
 	var shadow_settings := LabelSettings.new()
-	shadow_settings.font = GameData.emoji_font
+	if GameData.emoji_font and not text_based:
+		shadow_settings.font = GameData.emoji_font
 	shadow_settings.font_size = 32
 	shadow_label.label_settings = shadow_settings
 	add_child(shadow_label)
 
 	emoji_label = Label.new()
-	emoji_label.text = race_data.get("emoji", "\U0001F9D1")
+	emoji_label.text = emoji_text
 	emoji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	emoji_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	emoji_label.position = Vector2(-24, -24)
 	emoji_label.size = Vector2(48, 48)
 	var label_settings := LabelSettings.new()
-	label_settings.font = GameData.emoji_font
+	if GameData.emoji_font and not text_based:
+		label_settings.font = GameData.emoji_font
 	label_settings.font_size = 32
 	emoji_label.label_settings = label_settings
 	add_child(emoji_label)
@@ -568,8 +580,10 @@ func _handle_combat(delta: float) -> void:
 	is_blocking = Input.is_action_pressed("block")
 	if is_blocking and not was_blocking:
 		block_start_timer = perfect_block_window
+		block_hold_timer = 0.0
 	if is_blocking:
 		block_start_timer = maxf(block_start_timer - delta, 0.0)
+		block_hold_timer += delta
 
 	if is_blocking:
 		stamina = maxf(stamina - 5.0 * delta, 0.0)
@@ -580,13 +594,16 @@ func _handle_combat(delta: float) -> void:
 	if auto_attack_mode and attack_cooldown <= 0 and not is_dodging and not is_blocking:
 		_handle_auto_attack(delta)
 	elif Input.is_action_just_pressed("attack") and attack_cooldown <= 0 and not is_dodging:
-		match current_slot:
-			GameData.Slot.MELEE:
-				_melee_attack()
-			GameData.Slot.RANGED:
-				_ranged_attack()
-			GameData.Slot.THROWABLE:
-				_throwable_attack()
+		if is_blocking and block_hold_timer >= 0.3:
+			_shove_attack()
+		else:
+			match current_slot:
+				GameData.Slot.MELEE:
+					_melee_attack()
+				GameData.Slot.RANGED:
+					_ranged_attack()
+				GameData.Slot.THROWABLE:
+					_throwable_attack()
 
 	if Input.is_action_just_pressed("slot_melee"):
 		current_slot = GameData.Slot.MELEE
@@ -773,6 +790,38 @@ func _ranged_attack() -> void:
 
 func _throwable_attack() -> void:
 	pass
+
+func _shove_attack() -> void:
+	attack_cooldown = melee_cooldown_time * 0.6
+	stamina = maxf(stamina - 12.0, 0.0)
+	melee_swing_timer = 0.2
+	melee_swing_visual = 0.8
+	
+	var attack_dir: Vector2
+	if auto_attack_mode and auto_attack_target and is_instance_valid(auto_attack_target):
+		attack_dir = (auto_attack_target.global_position - global_position).normalized()
+	else:
+		var mouse_pos := get_global_mouse_position()
+		attack_dir = (mouse_pos - global_position).normalized()
+	
+	var final_damage := shove_damage * GameSystems.get_combo_damage_mult()
+	if adrenaline_active:
+		final_damage *= adrenaline_damage_mult
+	
+	GameSystems.register_hit()
+	screen_shake.emit(0.4, 0.12)
+	
+	player_attacked.emit({
+		"type": "melee",
+		"position": global_position,
+		"direction": attack_dir,
+		"damage": final_damage,
+		"range": shove_range,
+		"arc": PI / 3.0,
+		"angle": aim_angle,
+		"knockback": shove_knockback,
+		"is_shove": true,
+	})
 
 func _handle_abilities(delta: float) -> void:
 	ability_cooldown = maxf(ability_cooldown - delta, 0.0)
@@ -1518,3 +1567,13 @@ func _ss_update_visuals(delta: float) -> void:
 
 	invincibility_timer = maxf(invincibility_timer - delta, 0.0)
 	damage_flash_timer = maxf(damage_flash_timer - delta, 0.0)
+
+func _get_text_representation(emoji: String) -> String:
+	var text_map := {
+		"\U0001F469\u200D\U0001F680": "[H]",
+		"\U0001F9DD\u200D\u2640\uFE0F": "[E]",
+		"\u26CF\uFE0F": "[D]",
+		"\U0001F9B9": "[O]",
+		"\U0001F9D1": "[P]",
+	}
+	return text_map.get(emoji, emoji)

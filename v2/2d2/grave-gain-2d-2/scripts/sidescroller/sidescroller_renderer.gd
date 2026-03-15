@@ -44,7 +44,7 @@ func clear_room() -> void:
 func _precalculate_colors() -> void:
 	tile_colors.clear()
 	detail_seeds.clear()
-	if not room_data:
+	if not room_data or not room_data.tiles:
 		return
 
 	for y in range(room_data.height):
@@ -71,7 +71,7 @@ func _precalculate_colors() -> void:
 		detail_seeds.append(seed_row)
 
 func _create_collision() -> void:
-	if not room_data:
+	if not room_data or not room_data.tiles:
 		return
 
 	# Solid wall collision
@@ -196,6 +196,8 @@ func _draw_bg_tile(_x: int, _y: int, pos: Vector2) -> void:
 	draw_rect(Rect2(pos.x, pos.y, 1, TILE_SIZE), Color(1, 1, 1, 0.02))
 
 func _draw_solid_tile(x: int, y: int, pos: Vector2) -> void:
+	if not room_data or not room_data.tiles:
+		return
 	var col: Color = tile_colors[y][x]
 	draw_rect(Rect2(pos, Vector2(TILE_SIZE, TILE_SIZE)), col)
 

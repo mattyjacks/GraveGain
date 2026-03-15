@@ -318,11 +318,15 @@ func _on_settings_pressed() -> void:
 func _on_quit_pressed() -> void:
 	is_open = false
 	visible = false
-	get_tree().paused = false
-	Engine.time_scale = 1.0
-	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	quit_to_menu.emit()
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	var tree := get_tree()
+	if tree:
+		tree.paused = false
+		Engine.time_scale = 1.0
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		quit_to_menu.emit()
+		tree.change_scene_to_file("res://scenes/main_menu.tscn")
+	else:
+		push_error("Failed to get scene tree for quit to menu")
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:

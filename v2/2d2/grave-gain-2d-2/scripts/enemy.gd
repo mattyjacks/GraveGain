@@ -26,13 +26,14 @@ var category: String = "standard"
 
 var is_armored: bool = false
 var armor_rating: float = 0.0
-var is_elite: bool = false
 
 # Knockback weight - heavier enemies resist knockback more (0.5 = half knockback, 2.0 = double)
 var knockback_weight: float = 1.0
 var can_summon: bool = false
 var explodes: bool = false
 var regen_pct: float = 0.0
+var has_ranged: bool = false
+var can_fly: bool = false
 
 var target: CharacterBody2D = null
 var detection_range: float = 400.0
@@ -316,7 +317,11 @@ func _build_nodes() -> void:
 	add_child(collision_shape)
 
 	shadow_label = Label.new()
-	shadow_label.text = stats.get("emoji", "\U0001F480")
+	var emoji_text: String = stats.get("emoji", "\U0001F480")
+	var text_based: bool = GameSystems.get_setting("text_based_graphics") == true
+	if text_based:
+		emoji_text = _get_text_representation(emoji_text)
+	shadow_label.text = emoji_text
 	shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shadow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var shadow_size := int(32 * emoji_scale)
@@ -325,20 +330,22 @@ func _build_nodes() -> void:
 	shadow_label.modulate = Color(0, 0, 0, 0.4)
 	shadow_label.z_index = -1
 	var shadow_settings := LabelSettings.new()
-	shadow_settings.font = GameData.emoji_font
+	if GameData.emoji_font and not text_based:
+		shadow_settings.font = GameData.emoji_font
 	shadow_settings.font_size = shadow_size
 	shadow_label.label_settings = shadow_settings
 	add_child(shadow_label)
 
 	emoji_label = Label.new()
-	emoji_label.text = stats.get("emoji", "\U0001F480")
+	emoji_label.text = emoji_text
 	emoji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	emoji_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var label_size := int(32 * emoji_scale)
 	emoji_label.position = Vector2(-label_size * 0.75, -label_size * 0.75)
 	emoji_label.size = Vector2(label_size * 1.5, label_size * 1.5)
 	var label_settings := LabelSettings.new()
-	label_settings.font = GameData.emoji_font
+	if GameData.emoji_font and not text_based:
+		label_settings.font = GameData.emoji_font
 	label_settings.font_size = label_size
 	emoji_label.label_settings = label_settings
 	add_child(emoji_label)
@@ -360,13 +367,14 @@ func _build_nodes() -> void:
 	# Improvement #23: Elite glow indicator
 	if is_elite:
 		elite_glow = Label.new()
-		elite_glow.text = "\u2B50"
+		elite_glow.text = "\u2728"
 		elite_glow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		elite_glow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		elite_glow.position = Vector2(-8, -32 * emoji_scale)
 		elite_glow.size = Vector2(16, 16)
 		var glow_settings := LabelSettings.new()
-		glow_settings.font = GameData.emoji_font
+		if GameData.emoji_font:
+			glow_settings.font = GameData.emoji_font
 		glow_settings.font_size = 10
 		elite_glow.label_settings = glow_settings
 		add_child(elite_glow)
@@ -1107,3 +1115,13 @@ func _ss_update_visuals(delta: float) -> void:
 
 	if elite_glow and is_alive:
 		elite_glow.modulate.a = (sin(Time.get_ticks_msec() * 0.008) + 1.0) * 0.5
+
+func _get_text_representation(emoji: String) -> String:
+	var text_map := {
+		"\U0001F480": "[X]",
+		"\U0001F9DD\u200D\u2640\uFE0F": "[E]",
+		"\u26CF\uFE0F": "[D]",
+		"\U0001F9B9": "[O]",
+		"\U0001F469\u200D\U0001F680": "[H]",
+	}
+	return text_map.get(emoji, emoji)

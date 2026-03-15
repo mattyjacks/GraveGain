@@ -24,10 +24,13 @@ func _ready() -> void:
 		"Noto Color Emoji",
 		"Segoe UI Symbol",
 		"DejaVu Sans",
-		"Liberation Sans"
+		"Liberation Sans",
+		"Courier New",
+		"Arial",
+		"Times New Roman"
 	])
 	sf.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-	sf.size = 32
+	sf.force_autohinter = false
 	emoji_font = sf
 	
 	var sf_large := SystemFont.new()
@@ -37,10 +40,13 @@ func _ready() -> void:
 		"Noto Color Emoji",
 		"Segoe UI Symbol",
 		"DejaVu Sans",
-		"Liberation Sans"
+		"Liberation Sans",
+		"Courier New",
+		"Arial",
+		"Times New Roman"
 	])
 	sf_large.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-	sf_large.size = 48
+	sf_large.force_autohinter = false
 	emoji_font_large = sf_large
 
 var race_stats: Dictionary = {

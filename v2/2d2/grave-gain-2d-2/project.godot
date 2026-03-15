@@ -21,6 +21,7 @@ GameData="*res://scripts/autoload/game_data.gd"
 EmojiManager="*res://scripts/autoload/emoji_manager.gd"
 GameSystems="*res://scripts/systems/game_systems.gd"
 LoreManager="*res://scripts/lore/lore_manager.gd"
+TwemojiLoader="*res://scripts/autoload/twemoji_loader.gd"
 
 [display]
 

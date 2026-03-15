@@ -144,6 +144,10 @@ func _build_nodes() -> void:
 	else:
 		emoji_text = item_data.get("emoji", "\U0001FA99")
 
+	var text_based: bool = GameSystems.get_setting("text_based_graphics") == true
+	if text_based:
+		emoji_text = _get_text_representation(emoji_text)
+
 	shadow_label = Label.new()
 	shadow_label.text = emoji_text
 	shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -153,7 +157,8 @@ func _build_nodes() -> void:
 	shadow_label.modulate = Color(0, 0, 0, 0.35)
 	shadow_label.z_index = -1
 	var shadow_settings := LabelSettings.new()
-	shadow_settings.font = GameData.emoji_font
+	if GameData.emoji_font and not text_based:
+		shadow_settings.font = GameData.emoji_font
 	shadow_settings.font_size = 18
 	shadow_label.label_settings = shadow_settings
 	add_child(shadow_label)
@@ -165,7 +170,8 @@ func _build_nodes() -> void:
 	emoji_label.position = Vector2(-12, -12)
 	emoji_label.size = Vector2(24, 24)
 	var label_settings := LabelSettings.new()
-	label_settings.font = GameData.emoji_font
+	if GameData.emoji_font and not text_based:
+		label_settings.font = GameData.emoji_font
 	label_settings.font_size = 18
 	emoji_label.label_settings = label_settings
 	add_child(emoji_label)
@@ -314,3 +320,13 @@ func _apply_multiplier(_player: CharacterBody2D) -> void:
 	var hud_node := get_tree().get_first_node_in_group("hud")
 	if hud_node and hud_node.has_method("add_buff"):
 		hud_node.add_buff(multiplier_type + "_mult", multiplier_duration, item_data.get("emoji", ""))
+
+func _get_text_representation(emoji: String) -> String:
+	var text_map := {
+		"\U0001F34E": "[A]",
+		"\U0001FA99": "[I]",
+		"\U0001F4A9": "[P]",
+		"\U0001F48E": "[G]",
+		"\U0001F9F0": "[B]",
+	}
+	return text_map.get(emoji, emoji)

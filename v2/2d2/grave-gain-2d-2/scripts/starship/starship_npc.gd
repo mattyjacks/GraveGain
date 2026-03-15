@@ -40,7 +40,8 @@ func _build_visuals() -> void:
 	emoji_label.position = Vector2(-16, -24)
 	emoji_label.size = Vector2(32, 32)
 	var emoji_settings := LabelSettings.new()
-	emoji_settings.font = GameData.emoji_font
+	if GameData.emoji_font:
+		emoji_settings.font = GameData.emoji_font
 	emoji_settings.font_size = 24
 	emoji_label.label_settings = emoji_settings
 	add_child(emoji_label)
