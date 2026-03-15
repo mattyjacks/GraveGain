@@ -134,7 +134,17 @@ var death_anim_timer: float = 0.0
 
 # Improvement #19: Knockback
 var knockback_vel: Vector2 = Vector2.ZERO
-var knockback_decay: float = 10.0
+var knockback_decay: float = 6.0
+
+# Vertical Movement Systems
+var gravity_system: GravitySystem = null
+var climbing_system: ClimbingSystem = null
+var vertical_system: VerticalLevelSystem = null
+var vertical_camera: VerticalCameraSystem = null
+
+var current_floor: int = 0
+var can_jump: bool = true
+var jump_cooldown: float = 0.0
 
 # Improvement #20: Distance Tracking
 var last_position: Vector2 = Vector2.ZERO
@@ -545,8 +555,8 @@ func _handle_movement(delta: float) -> void:
 	if is_moving and is_grounded:
 		footstep_timer -= delta
 		if footstep_timer <= 0:
-			var speed_ratio := speed / maxf(run_speed, 1.0)
-			footstep_timer = footstep_interval / maxf(speed_ratio, 0.1)
+			var footstep_speed_ratio := speed / maxf(run_speed, 1.0)
+			footstep_timer = footstep_interval / maxf(footstep_speed_ratio, 0.1)
 			var vfx := get_tree().get_first_node_in_group("vfx")
 			if vfx and vfx.has_method("spawn_footstep_dust"):
 				vfx.spawn_footstep_dust(global_position + Vector2(0, 8))
@@ -1072,10 +1082,15 @@ func take_damage(amount: float, from_pos: Vector2 = Vector2.ZERO) -> void:
 	invincibility_timer = 0.15
 	hp_regen_delay = hp_regen_delay_time
 
-	# Improvement #19: Knockback
+	# Improvement #19: Enhanced knockback - scales with damage and applies stagger
 	if from_pos != Vector2.ZERO and amount > 10.0:
 		var kb_dir := (global_position - from_pos).normalized()
-		knockback_vel = kb_dir * minf(amount * 3.0, 300.0)
+		# Knockback scales with damage: base 200 + damage multiplier
+		var kb_force := 200.0 + (amount * 2.5)
+		knockback_vel = kb_dir * minf(kb_force, 500.0)
+		# Apply brief stagger/slowdown on heavy hits
+		if amount > max_hp * 0.2:
+			velocity_smoothing = maxf(velocity_smoothing * 0.5, 0.05)
 
 	screen_shake.emit(minf(amount * 0.02, 1.0), 0.2)
 	GameSystems.track("total_damage_taken", amount)

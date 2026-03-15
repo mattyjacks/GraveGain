@@ -9,6 +9,8 @@ const BLOOD_DARK: Array[Color] = [
 	Color(0.3, 0.0, 0.0), Color(0.25, 0.01, 0.01), Color(0.35, 0.02, 0.0),
 ]
 
+var game_ref: Node = null
+
 var blood_splats: Array[Dictionary] = []
 var blood_particles: Array[Dictionary] = []
 var hit_flashes: Array[Dictionary] = []
@@ -118,6 +120,10 @@ func spawn_blood_splat(pos: Vector2, size: float = 1.0, color_override: Color = 
 			"elongation": randf_range(0.6, 1.4),
 			"drip_offset": Vector2(randf_range(-2, 2), randf_range(-2, 2)),
 		})
+
+		# Add to persistent gore system if available
+		if game_ref and game_ref.has_method("_add_gore_decal"):
+			game_ref._add_gore_decal(pos + offset, splat_size * 0.5, col)
 
 	# Cap splats
 	while blood_splats.size() > MAX_BLOOD_SPLATS:
@@ -508,7 +514,7 @@ func spawn_level_up_burst(pos: Vector2) -> void:
 	for i in range(24):
 		var angle := randf() * TAU
 		var speed := randf_range(80, 200)
-		var col := [Color(0.3, 0.7, 1.0), Color(1.0, 0.9, 0.3), Color(0.4, 1.0, 0.5), Color(1.0, 0.5, 0.8)].pick_random()
+		var col: Color = [Color(0.3, 0.7, 1.0), Color(1.0, 0.9, 0.3), Color(0.4, 1.0, 0.5), Color(1.0, 0.5, 0.8)].pick_random()
 		level_up_particles.append({
 			"pos": pos,
 			"vel": Vector2.from_angle(angle) * speed,
@@ -708,12 +714,14 @@ func _update_execution_slashes(delta: float) -> void:
 
 func _draw_execution_slashes() -> void:
 	for s in execution_slashes:
-		var t := 1.0 - (s["lifetime"] / s["max_life"])
+		var t: float = 1.0 - (float(s["lifetime"]) / float(s["max_life"]))
 		var c: Color = s["color"]
 		c.a *= (1.0 - t)
-		var half_len := s["length"] * (0.5 + t * 0.5)
-		var p1 := s["pos"] - s["dir"] * half_len
-		var p2 := s["pos"] + s["dir"] * half_len
+		var half_len: float = float(s["length"]) * (0.5 + t * 0.5)
+		var s_pos: Vector2 = s["pos"]
+		var s_dir: Vector2 = s["dir"]
+		var p1: Vector2 = s_pos - s_dir * half_len
+		var p2: Vector2 = s_pos + s_dir * half_len
 		draw_line(p1, p2, c, 3.0 * (1.0 - t))
 		# Inner bright line
 		draw_line(p1, p2, Color(1.0, 1.0, 0.8, c.a * 0.8), 1.5 * (1.0 - t))
@@ -809,13 +817,14 @@ func _update_overkill_rings(delta: float) -> void:
 
 func _draw_overkill_rings() -> void:
 	for ring in overkill_rings:
-		var t := 1.0 - (ring["lifetime"] / maxf(ring["max_life"], 0.001))
-		var s := lerpf(ring["size"], ring["max_size"], sqrt(t))
+		var t: float = 1.0 - (float(ring["lifetime"]) / maxf(float(ring["max_life"]), 0.001))
+		var s: float = lerpf(float(ring["size"]), float(ring["max_size"]), sqrt(t))
 		var c: Color = ring["color"]
 		c.a *= (1.0 - t * t)
-		var half := s * 0.5
-		var thickness := maxf(3.0 * (1.0 - t), 1.0)
-		draw_rect(Rect2(ring["pos"].x - half, ring["pos"].y - half, s, thickness), c)
-		draw_rect(Rect2(ring["pos"].x - half, ring["pos"].y + half - thickness, s, thickness), c)
-		draw_rect(Rect2(ring["pos"].x - half, ring["pos"].y - half, thickness, s), c)
-		draw_rect(Rect2(ring["pos"].x + half - thickness, ring["pos"].y - half, thickness, s), c)
+		var half: float = s * 0.5
+		var thickness: float = maxf(3.0 * (1.0 - t), 1.0)
+		var r_pos: Vector2 = ring["pos"]
+		draw_rect(Rect2(r_pos.x - half, r_pos.y - half, s, thickness), c)
+		draw_rect(Rect2(r_pos.x - half, r_pos.y + half - thickness, s, thickness), c)
+		draw_rect(Rect2(r_pos.x - half, r_pos.y - half, thickness, s), c)
+		draw_rect(Rect2(r_pos.x + half - thickness, r_pos.y - half, thickness, s), c)

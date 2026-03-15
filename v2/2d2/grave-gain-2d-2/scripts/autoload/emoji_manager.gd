@@ -185,7 +185,19 @@ func apply_emoji_set(set_id: String) -> void:
 
 	_build_fallback_chain(set_id)
 	GameData.emoji_font = font
-	GameData.emoji_font_large = font
+	
+	# Create large variant
+	var font_large: Font
+	if font is SystemFont:
+		var sf_large := SystemFont.new()
+		sf_large.font_names = (font as SystemFont).font_names
+		sf_large.antialiasing = (font as SystemFont).antialiasing
+		sf_large.size = 48
+		font_large = sf_large
+	else:
+		font_large = font
+	
+	GameData.emoji_font_large = font_large
 	emoji_set_changed.emit(current_set_id)
 
 func _build_fallback_chain(primary_set: String) -> void:
@@ -221,10 +233,21 @@ func get_emoji_with_fallback(emoji: String) -> String:
 func _create_system_font() -> Font:
 	var sf := SystemFont.new()
 	sf.font_names = PackedStringArray([
-		"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji",
-		"Segoe UI Symbol", "Android Emoji", "EmojiOne Color",
+		"Segoe UI Emoji",
+		"Apple Color Emoji",
+		"Noto Color Emoji",
+		"Segoe UI Symbol",
+		"DejaVu Sans",
+		"Liberation Sans",
+		"Ubuntu",
+		"Droid Sans",
+		"Android Emoji",
+		"EmojiOne Color",
+		"Emoji",
 	])
-	sf.antialiasing = TextServer.FONT_ANTIALIASING_LCD
+	sf.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	sf.size = 32
+	sf.outline_size = 0
 	return sf
 
 func _load_font_from_path(path: String) -> Font:

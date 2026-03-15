@@ -189,12 +189,23 @@ func _on_body_exited(body: Node2D) -> void:
 	if body.is_in_group("players"):
 		is_interactable = false
 
+func setup_random() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var picked_id := LoreManager.pick_room_lore(rng)
+	if picked_id != "":
+		setup(picked_id)
+	else:
+		# No lore available, remove self
+		queue_free()
+
 func _unhandled_input(event: InputEvent) -> void:
-	if not is_interactable:
+	if not is_interactable or is_collected:
 		return
 	if event.is_action_pressed("interact"):
 		if is_sign_type or is_gravestone_type:
 			_read_in_place()
+			get_viewport().set_input_as_handled()
 
 func pickup(_player: Node2D) -> void:
 	if is_collected:
@@ -213,6 +224,7 @@ func _read_in_place() -> void:
 	if is_collected:
 		return
 	LoreManager.collect_entry(entry_id)
+	is_collected = true
 	lore_picked_up.emit(entry_id)
 
 func _show_collect_animation(is_new: bool) -> void:

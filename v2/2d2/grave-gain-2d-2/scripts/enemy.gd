@@ -25,8 +25,11 @@ var xp_value: int = 10
 var category: String = "standard"
 
 var is_armored: bool = false
-var has_ranged: bool = false
-var can_fly: bool = false
+var armor_rating: float = 0.0
+var is_elite: bool = false
+
+# Knockback weight - heavier enemies resist knockback more (0.5 = half knockback, 2.0 = double)
+var knockback_weight: float = 1.0
 var can_summon: bool = false
 var explodes: bool = false
 var regen_pct: float = 0.0
@@ -243,6 +246,18 @@ func setup(etype: int, diff_mult: float = 1.0) -> void:
 		loot_explosion_count = 3
 	else:
 		loot_explosion_count = 1
+
+	# Set knockback weight based on enemy type and size
+	# Heavier/larger enemies resist knockback more
+	knockback_weight = 1.0
+	if category == "boss":
+		knockback_weight = 2.5
+	elif category == "elite" or is_elite:
+		knockback_weight = 1.8
+	elif emoji_scale > 1.2:
+		knockback_weight = 1.5
+	elif emoji_scale < 0.8:
+		knockback_weight = 0.7
 
 	# Improvement #41: Varied attack patterns for bosses
 	if category == "boss":
@@ -745,10 +760,17 @@ func take_damage(amount: float, from_pos: Vector2 = Vector2.ZERO, is_headshot: b
 	if amount > max_hp * 0.15:
 		stagger_timer = 0.3
 		if from_pos != Vector2.ZERO:
-			var kb_force := 100.0
-			if is_crit: kb_force = 180.0
+			# Enhanced knockback: scales with damage and crit status
+			var base_kb := 150.0
+			var damage_mult := (amount / max_hp) * 2.0
+			var kb_force := base_kb * (1.0 + damage_mult)
+			if is_crit: kb_force *= 1.5
+			# Apply knockback weight - heavier enemies resist knockback
+			kb_force /= knockback_weight
 			var knockback := (global_position - from_pos).normalized() * kb_force
 			velocity = knockback
+			# Increase stagger duration for heavy hits
+			stagger_timer = 0.3 + (damage_mult * 0.2)
 
 	GameSystems.track("total_damage_dealt", amount)
 

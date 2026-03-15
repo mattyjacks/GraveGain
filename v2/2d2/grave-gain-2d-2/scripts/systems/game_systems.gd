@@ -8,6 +8,7 @@ signal score_changed(new_score: int)
 signal combo_updated(count: int, timer: float)
 signal kill_feed_entry(killer: String, victim: String, weapon: String)
 signal tutorial_hint(text: String, duration: float)
+signal boss_hp_updated(current_hp: float, max_hp: float)
 
 const SAVE_PATH := "user://game_systems.save"
 const SETTINGS_PATH := "user://settings.cfg"
@@ -231,6 +232,7 @@ var settings: Dictionary = {
 	"ambient_particles": true,
 	"hit_pause_enabled": true,
 	"camera_punch": true,
+	"camera_lead": true,
 	# Emoji set
 	"emoji_set": "system",
 }
@@ -280,6 +282,124 @@ var loading_tips: Array[String] = [
 	"The Dwarf Paladin's body cannot be raised as undead.",
 	"Lucifer Hades was awake for 200 years on the colony ship.",
 	"KillCredits are earned from confirmed combat kills.",
+	"Sprinting while attacking extends your melee range.",
+	"Charge attacks deal 3x damage but leave you vulnerable.",
+	"Bloodlust stacks decay after 5 seconds without a kill.",
+	"Fountains in shrine rooms heal you passively.",
+	"Altars grant temporary buffs: strength, speed, protection, fury, or life.",
+	"Elite enemies glow with a special aura and drop better loot.",
+	"Treasure rooms contain enhanced chests with rare items.",
+	"Secret rooms are hidden behind breakable walls.",
+	"Corridor ambushes can spawn enemies unexpectedly.",
+	"Dead-end corridors often contain hidden treasure caches.",
+	"Hazard zones deal damage over time - avoid them or resist the element.",
+	"Environmental kills count toward your statistics.",
+	"Speed running is tracked - try to beat your personal best!",
+	"Prestige resets your level but grants permanent bonuses.",
+	"Daily challenges refresh every 24 hours with new objectives.",
+	"Weapon mastery increases damage with each weapon type.",
+	"Revival tokens give you extra lives - use them wisely.",
+	"Respawn invulnerability lasts 2 seconds after revival.",
+	"Difficulty increases over time during long missions.",
+	"Auto-save happens every 60 seconds.",
+	"Death recap shows the last 10 damage sources.",
+	"Mission time bonuses reward fast completion.",
+	"Damage resistance scales with your level.",
+	"Critical damage multiplier increases as you level up.",
+	"Gold interest earns you passive income every 30 seconds.",
+	"Healing efficiency improves with your level.",
+	"Damage type resistance helps against elemental attacks.",
+	"Lore entries are weighted - new ones spawn more frequently.",
+	"Lore collection progress is saved automatically.",
+	"Text-to-speech can narrate lore entries if configured.",
+	"Emoji sets can be swapped instantly in settings.",
+	"Different emoji sets change the entire visual style.",
+	"Twemoji renders cleanly at all sizes.",
+	"OpenMoji has distinctive black outlines.",
+	"Noto Color Emoji is Google's professional set.",
+	"Blobmoji has a nostalgic, friendly feel.",
+	"Fluent Emoji features 3D-inspired designs.",
+	"JoyPixels offers professional polish.",
+	"Samsung Emoji has vibrant, bold colors.",
+	"System emoji matches your operating system.",
+	"Minimap shows room layouts and enemy positions.",
+	"Vignette darkens screen edges for atmosphere.",
+	"Screen shake intensity can be adjusted.",
+	"Camera lead offsets the view toward movement.",
+	"Hit markers flash on successful strikes.",
+	"Damage numbers float above enemies.",
+	"Combo counter escalates with color.",
+	"Kill streak announcements celebrate your progress.",
+	"Bloodlust display shows your current stacks.",
+	"Charge bar indicates attack power buildup.",
+	"Boss HP bar appears during major encounters.",
+	"DPS meter tracks your damage output.",
+	"Gold popups show pickup amounts.",
+	"Death screen displays comprehensive statistics.",
+	"Tutorial hints can be toggled on or off.",
+	"Colorblind mode adjusts colors for accessibility.",
+	"Auto-pickup range increases with player level.",
+	"Magnet scaling makes items easier to collect.",
+	"Item rarity glow indicates value.",
+	"Spinning animations help items stand out.",
+	"Bobbing animations make items feel alive.",
+	"Loot explosion creates satisfying drops.",
+	"Gore effects can be disabled for sensitivity.",
+	"Blood intensity ranges from off to extreme.",
+	"Particle density affects performance.",
+	"Shadow quality impacts visual fidelity.",
+	"Dynamic lighting creates atmospheric depth.",
+	"Hit flash provides impact feedback.",
+	"Attack trails show weapon movement.",
+	"Impact rings expand on collision.",
+	"Ambient particles fill rooms with atmosphere.",
+	"Hit pause freezes frames on impact.",
+	"Execution slash appears on instant kills.",
+	"Charge glow indicates power buildup.",
+	"Overkill explosion celebrates massive damage.",
+	"Level up burst celebrates progression.",
+	"Dodge afterimage shows your movement.",
+	"Healing particles indicate recovery.",
+	"Shield break shards show protection loss.",
+	"Elemental hits use color-coded effects.",
+	"Screen flash emphasizes critical moments.",
+	"Camera punch provides directional feedback.",
+	"Footstep dust shows movement trails.",
+	"Ambient mist creates atmospheric rooms.",
+	"Sparkles decorate special areas.",
+	"Smoke rises from certain decorations.",
+	"Water pools slow your movement.",
+	"Spike traps deal contact damage.",
+	"Poison traps inflict damage over time.",
+	"Lightning traps stun on contact.",
+	"Ice traps slow movement.",
+	"Fire traps burn continuously.",
+	"Doors can be opened by approaching.",
+	"Buildings contain sidescroller sections.",
+	"Platforms require jumping to traverse.",
+	"Wall jumps let you reach high areas.",
+	"Moving platforms transport you across gaps.",
+	"Breakable walls hide secrets.",
+	"Spikes in buildings deal damage.",
+	"Parallax backgrounds add depth.",
+	"Lore pickups bob gently.",
+	"Gravestones require E to interact.",
+	"Signs display lore when approached.",
+	"Crystals sparkle with magical energy.",
+	"Tablets contain ancient knowledge.",
+	"Journals tell personal stories.",
+	"Letters reveal character relationships.",
+	"Scrolls hold magical secrets.",
+	"Books contain comprehensive lore.",
+	"Rare lore entries are harder to find.",
+	"Legendary lore is extremely valuable.",
+	"Collection UI shows progress per category.",
+	"API keys enable text-to-speech.",
+	"TTS cache stores generated audio.",
+	"Settings persist between sessions.",
+	"High score is tracked globally.",
+	"Statistics are saved automatically.",
+	"Achievements unlock with milestones.",
 ]
 
 func get_random_tip() -> String:
@@ -310,6 +430,9 @@ func _process(delta: float) -> void:
 			combo_updated.emit(0, 0.0)
 
 	stats["total_play_time"] += delta
+	_check_auto_save(delta)
+	if speedrun_active:
+		speedrun_time += delta
 
 func save_settings() -> void:
 	var config := ConfigFile.new()
@@ -361,11 +484,226 @@ func load_stats() -> void:
 	if "shown_tutorials" in data:
 		shown_tutorials = data["shown_tutorials"]
 
+# ===== Improvement #84: Auto-Save System =====
+var auto_save_timer: float = 0.0
+var auto_save_interval: float = 60.0
+
+func _check_auto_save(delta: float) -> void:
+	auto_save_timer += delta
+	if auto_save_timer >= auto_save_interval:
+		auto_save_timer = 0.0
+		save_stats()
+
+# ===== Improvement #85b: Death Recap System =====
+var death_recap: Array[Dictionary] = []
+const MAX_RECAP_ENTRIES := 10
+
+func add_death_recap_entry(source: String, damage: float, damage_type: String) -> void:
+	death_recap.append({
+		"source": source,
+		"damage": damage,
+		"type": damage_type,
+		"time": stats["total_play_time"],
+	})
+	if death_recap.size() > MAX_RECAP_ENTRIES:
+		death_recap.pop_front()
+
+func get_death_recap() -> Array[Dictionary]:
+	return death_recap.duplicate()
+
+func clear_death_recap() -> void:
+	death_recap.clear()
+
+# ===== Improvement #86: Mission Time Bonus =====
+func get_time_bonus(mission_time: float) -> int:
+	if mission_time < 60.0: return 500
+	if mission_time < 120.0: return 300
+	if mission_time < 180.0: return 150
+	if mission_time < 300.0: return 50
+	return 0
+
+# ===== Improvement #87b: Damage Resistance Scaling =====
+func get_damage_resistance(player_level_val: int) -> float:
+	return clampf(player_level_val * 0.005, 0.0, 0.25)
+
+# ===== Improvement #88: Critical Damage Scaling =====
+func get_crit_damage_bonus(player_level_val: int) -> float:
+	return 1.5 + player_level_val * 0.02
+
+# ===== Improvement #89: Gold Interest System =====
+var gold_interest_rate: float = 0.01
+var gold_interest_timer: float = 0.0
+var gold_interest_interval: float = 30.0
+
+func calculate_gold_interest(current_gold: int) -> int:
+	return int(current_gold * gold_interest_rate)
+
+# ===== Improvement #90: Prestige System =====
+var prestige_level: int = 0
+var prestige_bonuses: Dictionary = {
+	0: {"dmg_mult": 1.0, "xp_mult": 1.0, "gold_mult": 1.0},
+	1: {"dmg_mult": 1.05, "xp_mult": 1.1, "gold_mult": 1.1},
+	2: {"dmg_mult": 1.1, "xp_mult": 1.2, "gold_mult": 1.2},
+	3: {"dmg_mult": 1.15, "xp_mult": 1.35, "gold_mult": 1.35},
+	4: {"dmg_mult": 1.2, "xp_mult": 1.5, "gold_mult": 1.5},
+	5: {"dmg_mult": 1.3, "xp_mult": 2.0, "gold_mult": 2.0},
+}
+
+func get_prestige_bonus(key: String) -> float:
+	var p := mini(prestige_level, 5)
+	return prestige_bonuses[p].get(key, 1.0)
+
+func can_prestige() -> bool:
+	return player_level >= MAX_LEVEL
+
+func do_prestige() -> void:
+	if not can_prestige():
+		return
+	prestige_level += 1
+	player_level = 1
+	player_xp = 0
+	xp_to_next_level = xp_for_level(1)
+	save_stats()
+
+# ===== Improvement #91b: Daily Challenge System =====
+var daily_challenges: Array[Dictionary] = []
+var daily_seed: int = 0
+
+func generate_daily_challenges() -> void:
+	var today := Time.get_date_dict_from_system()
+	daily_seed = today["year"] * 10000 + today["month"] * 100 + today["day"]
+	var rng_daily := RandomNumberGenerator.new()
+	rng_daily.seed = daily_seed
+	daily_challenges.clear()
+	var challenge_types := [
+		{"desc": "Kill %d enemies", "target_key": "total_kills", "target_val": 0},
+		{"desc": "Earn %d gold", "target_key": "total_gold_earned", "target_val": 0},
+		{"desc": "Deal %d damage", "target_key": "total_damage_dealt", "target_val": 0},
+		{"desc": "Achieve a %d kill streak", "target_key": "highest_kill_streak", "target_val": 0},
+	]
+	for i in range(3):
+		var ct: Dictionary = challenge_types[rng_daily.randi_range(0, challenge_types.size() - 1)].duplicate()
+		match ct["target_key"]:
+			"total_kills": ct["target_val"] = rng_daily.randi_range(20, 100)
+			"total_gold_earned": ct["target_val"] = rng_daily.randi_range(200, 1000)
+			"total_damage_dealt": ct["target_val"] = rng_daily.randi_range(500, 5000)
+			"highest_kill_streak": ct["target_val"] = rng_daily.randi_range(5, 15)
+		ct["desc"] = ct["desc"] % ct["target_val"]
+		ct["completed"] = false
+		daily_challenges.append(ct)
+
+# ===== Improvement #92: Weapon Mastery System =====
+var weapon_mastery: Dictionary = {
+	"melee": 0,
+	"ranged": 0,
+	"ability": 0,
+}
+const MASTERY_PER_KILL := 1
+const MASTERY_LEVELS := [0, 50, 150, 400, 1000, 2500]
+
+func add_weapon_mastery(weapon_type: String, amount: int = MASTERY_PER_KILL) -> void:
+	if weapon_type in weapon_mastery:
+		weapon_mastery[weapon_type] += amount
+
+func get_mastery_level(weapon_type: String) -> int:
+	var xp_val: int = weapon_mastery.get(weapon_type, 0)
+	var lvl := 0
+	for threshold in MASTERY_LEVELS:
+		if xp_val >= threshold:
+			lvl += 1
+	return mini(lvl, MASTERY_LEVELS.size())
+
+func get_mastery_bonus(weapon_type: String) -> float:
+	return 1.0 + get_mastery_level(weapon_type) * 0.05
+
+# ===== Improvement #93: Environmental Kill Tracking =====
+var env_kills: Dictionary = {
+	"trap_kills": 0,
+	"fall_kills": 0,
+	"hazard_kills": 0,
+	"explosion_kills": 0,
+}
+
+func track_env_kill(kill_type: String) -> void:
+	if kill_type in env_kills:
+		env_kills[kill_type] += 1
+	add_score(25)
+
+# ===== Improvement #94: Speed Run Timer =====
+var speedrun_active: bool = false
+var speedrun_time: float = 0.0
+var speedrun_splits: Array[Dictionary] = []
+var best_speedrun: float = 999999.0
+
+func start_speedrun() -> void:
+	speedrun_active = true
+	speedrun_time = 0.0
+	speedrun_splits.clear()
+
+func add_speedrun_split(label: String) -> void:
+	if speedrun_active:
+		speedrun_splits.append({"label": label, "time": speedrun_time})
+
+func finish_speedrun() -> float:
+	speedrun_active = false
+	if speedrun_time < best_speedrun:
+		best_speedrun = speedrun_time
+	return speedrun_time
+
+# ===== Improvement #95: Damage Type Resistance =====
+var resistance_profile: Dictionary = {
+	"physical": 0.0,
+	"fire": 0.0,
+	"ice": 0.0,
+	"poison": 0.0,
+	"lightning": 0.0,
+}
+
+func apply_resistance(damage: float, damage_type: String) -> float:
+	var res: float = resistance_profile.get(damage_type, 0.0)
+	return damage * (1.0 - clampf(res, 0.0, 0.75))
+
+func add_resistance(damage_type: String, amount: float) -> void:
+	if damage_type in resistance_profile:
+		resistance_profile[damage_type] = clampf(resistance_profile[damage_type] + amount, 0.0, 0.75)
+
+# ===== Improvement #96b: Healing Efficiency =====
+func get_healing_efficiency(player_level_val: int) -> float:
+	return 1.0 + player_level_val * 0.01
+
+# ===== Improvement #98: Revival Token System =====
+var revival_tokens: int = 0
+const MAX_REVIVAL_TOKENS := 3
+
+func add_revival_token() -> void:
+	revival_tokens = mini(revival_tokens + 1, MAX_REVIVAL_TOKENS)
+
+func use_revival_token() -> bool:
+	if revival_tokens > 0:
+		revival_tokens -= 1
+		return true
+	return false
+
+# ===== Improvement #99: Respawn Invulnerability =====
+var respawn_invuln_time: float = 2.0
+
+func get_respawn_invuln() -> float:
+	return respawn_invuln_time
+
+# ===== Improvement #100: Difficulty Scaling Over Time =====
+func get_difficulty_multiplier(mission_time: float) -> float:
+	return 1.0 + (mission_time / 300.0) * 0.5
+
+# ===== Improvement (screen shake request signal) =====
+signal screen_shake_requested(intensity: float, duration: float)
+signal damage_indicator_requested(angle: float)
+
 func reset_mission() -> void:
 	kill_streak = 0
 	kill_streak_timer = 0.0
 	combo_count = 0
 	combo_timer = 0.0
 	score = 0
+	clear_death_recap()
 	stats["total_missions"] += 1
 	save_stats()

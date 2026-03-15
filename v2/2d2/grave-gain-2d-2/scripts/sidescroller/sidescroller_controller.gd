@@ -31,7 +31,7 @@ var current_building: Dictionary = {}
 var player_ref: CharacterBody2D = null
 var camera_ref: Camera2D = null
 var game_ref: Node2D = null
-var top_down_nodes: Array[Node2D] = []
+var top_down_nodes: Array[Node] = []
 
 # Player state backup for restoring after exit
 var player_saved_position: Vector2 = Vector2.ZERO

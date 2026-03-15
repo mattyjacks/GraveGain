@@ -199,7 +199,7 @@ func _draw_solid_tile(x: int, y: int, pos: Vector2) -> void:
 	var col: Color = tile_colors[y][x]
 	draw_rect(Rect2(pos, Vector2(TILE_SIZE, TILE_SIZE)), col)
 
-	var detail := detail_seeds[y][x]
+	var detail: int = detail_seeds[y][x]
 
 	# Check for exposed edges and draw highlights/shadows
 	if y > 0 and room_data.tiles[y - 1][x] != SidescrollerRoom.SS_TILE_SOLID:

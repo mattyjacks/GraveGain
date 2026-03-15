@@ -173,6 +173,10 @@ func open_entry(entry_id: String, tts_mgr: Node = null) -> void:
 	if entry.is_empty():
 		return
 
+	# If already open, close first to reset state cleanly
+	if is_open:
+		_force_close_no_unpause()
+
 	current_entry = entry
 	tts_manager_ref = tts_mgr
 	is_open = true
@@ -224,17 +228,20 @@ func open_entry(entry_id: String, tts_mgr: Node = null) -> void:
 func close_reader() -> void:
 	if not is_open:
 		return
+	_force_close_no_unpause()
+	get_tree().paused = false
+	reader_closed.emit()
+
+func _force_close_no_unpause() -> void:
 	is_open = false
 	visible = false
-	get_tree().paused = false
-	if tts_manager_ref and is_instance_valid(tts_manager_ref) and tts_manager_ref.is_currently_playing():
+	if tts_manager_ref and is_instance_valid(tts_manager_ref) and tts_manager_ref.has_method("is_currently_playing") and tts_manager_ref.is_currently_playing():
 		tts_manager_ref.stop()
 	if tts_manager_ref and is_instance_valid(tts_manager_ref):
-		if tts_manager_ref.tts_started.is_connected(_on_tts_started):
+		if tts_manager_ref.has_signal("tts_started") and tts_manager_ref.tts_started.is_connected(_on_tts_started):
 			tts_manager_ref.tts_started.disconnect(_on_tts_started)
 			tts_manager_ref.tts_finished.disconnect(_on_tts_finished)
 			tts_manager_ref.tts_error.disconnect(_on_tts_error)
-	reader_closed.emit()
 
 func _on_play_pressed() -> void:
 	if not tts_manager_ref or not is_instance_valid(tts_manager_ref) or current_entry.is_empty():

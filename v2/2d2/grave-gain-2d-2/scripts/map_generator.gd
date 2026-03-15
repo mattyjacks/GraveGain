@@ -51,6 +51,23 @@ var room_explored: Array[bool] = []
 # Sidescroller buildings
 var building_positions: Array[Dictionary] = []
 
+# Improvement #76: Fountain room positions (healing zones)
+var fountain_positions: Array[Dictionary] = []
+# Improvement #77: Altar room positions (buff shrines)
+var altar_positions: Array[Dictionary] = []
+# Improvement #78: Room decorations (pillars, statues, rugs)
+var decoration_positions: Array[Dictionary] = []
+# Improvement #79: Corridor ambush spawn points
+var corridor_ambush_points: Array[Dictionary] = []
+# Improvement #80: Dead-end treasure caches
+var dead_end_treasures: Array[Dictionary] = []
+# Improvement #81: Environmental hazard zones
+var hazard_zones: Array[Dictionary] = []
+# Improvement #82: Room difficulty rating by distance
+var room_difficulties: Array[float] = []
+# Improvement #83: Themed room item placements
+var themed_item_positions: Array[Dictionary] = []
+
 var rng := RandomNumberGenerator.new()
 
 func generate(seed_val: int = -1) -> void:
@@ -65,6 +82,7 @@ func generate(seed_val: int = -1) -> void:
 	_assign_room_types()
 	_place_safespace()
 	_place_secret_rooms()
+	_calculate_room_difficulties()
 	_place_torches()
 	_place_items()
 	_place_food()
@@ -75,6 +93,13 @@ func generate(seed_val: int = -1) -> void:
 	_place_doors()
 	_place_water()
 	_place_particles()
+	_place_fountains()
+	_place_altars()
+	_place_decorations()
+	_place_corridor_ambushes()
+	_place_dead_end_treasures()
+	_place_hazard_zones()
+	_place_themed_items()
 	_generate_patrol_routes()
 	_place_buildings()
 	_setup_enemy_spawns()
@@ -622,6 +647,233 @@ func is_walkable(world_pos: Vector2) -> bool:
 	var tp := world_to_tile(world_pos)
 	var t := get_tile(tp.x, tp.y)
 	return t == TILE_FLOOR or t == TILE_SAFESPACE
+
+# ===== Improvement #76: Fountain Rooms =====
+func _place_fountains() -> void:
+	fountain_positions.clear()
+	for i in range(1, rooms.size()):
+		var rt := get_room_type(i)
+		if rt == "shrine" or (rt == "normal" and rng.randf() < 0.15):
+			var room := rooms[i]
+			var cx := room.position.x + room.size.x / 2
+			var cy := room.position.y + room.size.y / 2
+			fountain_positions.append({
+				"pos": Vector2(cx * TILE_SIZE + TILE_SIZE / 2.0, cy * TILE_SIZE + TILE_SIZE / 2.0),
+				"room_index": i,
+				"heal_per_sec": 3.0,
+				"radius": TILE_SIZE * 2.0,
+				"emoji": "\u26F2",
+				"uses_left": rng.randi_range(3, 8),
+			})
+
+# ===== Improvement #77: Altar Rooms =====
+func _place_altars() -> void:
+	altar_positions.clear()
+	var altar_types := [
+		{"name": "Altar of Strength", "emoji": "\u2694\uFE0F", "buff": "damage", "value": 1.2, "duration": 60.0},
+		{"name": "Altar of Swiftness", "emoji": "\u26A1", "buff": "speed", "value": 1.25, "duration": 60.0},
+		{"name": "Altar of Protection", "emoji": "\U0001F6E1\uFE0F", "buff": "defense", "value": 0.8, "duration": 60.0},
+		{"name": "Altar of Fury", "emoji": "\U0001F4A2", "buff": "crit_chance", "value": 0.15, "duration": 45.0},
+		{"name": "Altar of Life", "emoji": "\u2764\uFE0F", "buff": "regen", "value": 2.0, "duration": 90.0},
+	]
+	for i in range(1, rooms.size()):
+		var rt := get_room_type(i)
+		var chance := 0.0
+		if rt == "shrine": chance = 0.8
+		elif rt == "cathedral": chance = 0.5
+		elif i in secret_room_indices: chance = 0.6
+		else: chance = 0.05
+		if rng.randf() < chance:
+			var room := rooms[i]
+			var cx := room.position.x + room.size.x / 2
+			var cy := room.position.y + room.size.y / 2
+			var altar: Dictionary = altar_types[rng.randi_range(0, altar_types.size() - 1)].duplicate()
+			altar["pos"] = Vector2(cx * TILE_SIZE + TILE_SIZE / 2.0, cy * TILE_SIZE + TILE_SIZE / 2.0)
+			altar["room_index"] = i
+			altar["activated"] = false
+			altar_positions.append(altar)
+
+# ===== Improvement #78: Room Decorations =====
+func _place_decorations() -> void:
+	decoration_positions.clear()
+	var deco_types := {
+		"pillar": {"emoji": "\U0001F3DB\uFE0F", "blocking": true, "size": 1},
+		"statue": {"emoji": "\U0001FABBF", "blocking": true, "size": 1},
+		"rug": {"emoji": "\U0001F9F6", "blocking": false, "size": 2},
+		"candle": {"emoji": "\U0001F56F\uFE0F", "blocking": false, "size": 1},
+		"skull": {"emoji": "\U0001F480", "blocking": false, "size": 1},
+		"bone_pile": {"emoji": "\U0001F9B4", "blocking": false, "size": 1},
+		"web": {"emoji": "\U0001F578\uFE0F", "blocking": false, "size": 1},
+	}
+	for i in range(1, rooms.size()):
+		var room := rooms[i]
+		var rt := get_room_type(i)
+		var count := rng.randi_range(0, 3)
+		# Themed decorations
+		var valid_decos: Array[String] = []
+		match rt:
+			"cathedral", "shrine":
+				valid_decos = ["pillar", "candle", "rug"]
+				count += 2
+			"graveyard":
+				valid_decos = ["skull", "bone_pile", "web"]
+				count += 1
+			"lab":
+				valid_decos = ["candle", "skull", "web"]
+			"treasury":
+				valid_decos = ["pillar", "rug", "statue"]
+				count += 1
+			_:
+				valid_decos = ["pillar", "skull", "candle", "web", "bone_pile"]
+		for _j in range(count):
+			var dx := rng.randi_range(room.position.x + 1, room.position.x + room.size.x - 2)
+			var dy := rng.randi_range(room.position.y + 1, room.position.y + room.size.y - 2)
+			if valid_decos.is_empty():
+				continue
+			var dtype: String = valid_decos[rng.randi_range(0, valid_decos.size() - 1)]
+			var info: Dictionary = deco_types.get(dtype, deco_types["skull"])
+			decoration_positions.append({
+				"pos": Vector2(dx * TILE_SIZE + TILE_SIZE / 2.0, dy * TILE_SIZE + TILE_SIZE / 2.0),
+				"type": dtype,
+				"emoji": info["emoji"],
+				"blocking": info["blocking"],
+				"room_index": i,
+			})
+
+# ===== Improvement #79: Corridor Ambush Points =====
+func _place_corridor_ambushes() -> void:
+	corridor_ambush_points.clear()
+	# Find corridor tiles that are narrow (surrounded by walls on 2 sides)
+	for y in range(2, MAP_HEIGHT - 2):
+		for x in range(2, MAP_WIDTH - 2):
+			if tiles[y][x] != TILE_FLOOR:
+				continue
+			# Check if in a room
+			var in_room := false
+			for room in rooms:
+				if x >= room.position.x and x < room.position.x + room.size.x and y >= room.position.y and y < room.position.y + room.size.y:
+					in_room = true
+					break
+			if in_room:
+				continue
+			# Corridor tile - chance to mark as ambush
+			if rng.randf() < 0.03:
+				corridor_ambush_points.append({
+					"pos": Vector2(x * TILE_SIZE + TILE_SIZE / 2.0, y * TILE_SIZE + TILE_SIZE / 2.0),
+					"triggered": false,
+					"enemy_count": rng.randi_range(2, 4),
+				})
+
+# ===== Improvement #80: Dead-End Treasure =====
+func _place_dead_end_treasures() -> void:
+	dead_end_treasures.clear()
+	# Find floor tiles with only 1 adjacent floor tile (dead ends)
+	for y in range(1, MAP_HEIGHT - 1):
+		for x in range(1, MAP_WIDTH - 1):
+			if tiles[y][x] != TILE_FLOOR:
+				continue
+			var adj_floor := 0
+			if tiles[y - 1][x] == TILE_FLOOR or tiles[y - 1][x] == TILE_SAFESPACE: adj_floor += 1
+			if tiles[y + 1][x] == TILE_FLOOR or tiles[y + 1][x] == TILE_SAFESPACE: adj_floor += 1
+			if tiles[y][x - 1] == TILE_FLOOR or tiles[y][x - 1] == TILE_SAFESPACE: adj_floor += 1
+			if tiles[y][x + 1] == TILE_FLOOR or tiles[y][x + 1] == TILE_SAFESPACE: adj_floor += 1
+			if adj_floor == 1 and rng.randf() < 0.5:
+				var rarity := "uncommon"
+				if rng.randf() < 0.2: rarity = "rare"
+				if rng.randf() < 0.05: rarity = "epic"
+				dead_end_treasures.append({
+					"pos": Vector2(x * TILE_SIZE + TILE_SIZE / 2.0, y * TILE_SIZE + TILE_SIZE / 2.0),
+					"rarity": rarity,
+					"collected": false,
+				})
+
+# ===== Improvement #81: Environmental Hazard Zones =====
+func _place_hazard_zones() -> void:
+	hazard_zones.clear()
+	var hazard_types := ["fire", "poison_gas", "lightning", "ice"]
+	for i in range(1, rooms.size()):
+		var rt := get_room_type(i)
+		if rt == "spawn" or rt == "shrine":
+			continue
+		if rng.randf() < 0.12:
+			var room := rooms[i]
+			var hx := rng.randi_range(room.position.x + 1, room.position.x + room.size.x - 2)
+			var hy := rng.randi_range(room.position.y + 1, room.position.y + room.size.y - 2)
+			var htype: String = hazard_types[rng.randi_range(0, hazard_types.size() - 1)]
+			# Match hazard to room theme
+			if rt == "lab": htype = "poison_gas"
+			elif rt == "graveyard": htype = "fire"
+			hazard_zones.append({
+				"pos": Vector2(hx * TILE_SIZE + TILE_SIZE / 2.0, hy * TILE_SIZE + TILE_SIZE / 2.0),
+				"type": htype,
+				"radius": TILE_SIZE * rng.randf_range(1.5, 3.0),
+				"damage": 3.0 + room_difficulties[i] * 2.0 if i < room_difficulties.size() else 3.0,
+				"room_index": i,
+			})
+
+# ===== Improvement #82: Room Difficulty by Distance =====
+func _calculate_room_difficulties() -> void:
+	room_difficulties.clear()
+	var spawn_tile := Vector2(spawn_position.x / TILE_SIZE, spawn_position.y / TILE_SIZE)
+	var max_dist := 1.0
+	# First pass: find max distance
+	for room in rooms:
+		var center := Vector2(room.position.x + room.size.x / 2.0, room.position.y + room.size.y / 2.0)
+		var dist := center.distance_to(spawn_tile)
+		if dist > max_dist:
+			max_dist = dist
+	# Second pass: normalize to 0-1 range
+	for room in rooms:
+		var center := Vector2(room.position.x + room.size.x / 2.0, room.position.y + room.size.y / 2.0)
+		var dist := center.distance_to(spawn_tile)
+		room_difficulties.append(clampf(dist / max_dist, 0.0, 1.0))
+
+func get_room_difficulty(index: int) -> float:
+	if index >= 0 and index < room_difficulties.size():
+		return room_difficulties[index]
+	return 0.5
+
+# ===== Improvement #83: Themed Room Items =====
+func _place_themed_items() -> void:
+	themed_item_positions.clear()
+	for i in range(1, rooms.size()):
+		var room := rooms[i]
+		var rt := get_room_type(i)
+		var items_to_place: Array[Dictionary] = []
+		match rt:
+			"armory":
+				items_to_place = [
+					{"type": "damage_boost", "chance": 0.3},
+					{"type": "shield_orb", "chance": 0.2},
+				]
+			"library":
+				items_to_place = [
+					{"type": "xp_multiplier", "chance": 0.15},
+				]
+			"treasury":
+				items_to_place = [
+					{"type": "gold_multiplier", "chance": 0.25},
+					{"type": "gold_bar", "chance": 0.4},
+					{"type": "gold_coin", "chance": 0.6},
+				]
+			"lab":
+				items_to_place = [
+					{"type": "rage_potion", "chance": 0.2},
+					{"type": "speed_boost", "chance": 0.15},
+				]
+			"graveyard":
+				items_to_place = [
+					{"type": "health_orb", "chance": 0.25},
+				]
+		for item_info in items_to_place:
+			if rng.randf() < item_info["chance"]:
+				var ix := rng.randi_range(room.position.x + 1, room.position.x + room.size.x - 2)
+				var iy := rng.randi_range(room.position.y + 1, room.position.y + room.size.y - 2)
+				themed_item_positions.append({
+					"pos": Vector2(ix * TILE_SIZE + TILE_SIZE / 2.0, iy * TILE_SIZE + TILE_SIZE / 2.0),
+					"type": item_info["type"],
+					"room_index": i,
+				})
 
 func get_floor_color(x: int, y: int) -> Color:
 	var base := 0.12

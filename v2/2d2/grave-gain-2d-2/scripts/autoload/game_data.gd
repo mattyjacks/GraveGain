@@ -18,10 +18,30 @@ var emoji_font_large: Font
 func _ready() -> void:
 	# Initial system font - EmojiManager autoload will override this with the user's chosen set
 	var sf := SystemFont.new()
-	sf.font_names = PackedStringArray(["Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol"])
-	sf.antialiasing = TextServer.FONT_ANTIALIASING_LCD
+	sf.font_names = PackedStringArray([
+		"Segoe UI Emoji",
+		"Apple Color Emoji", 
+		"Noto Color Emoji",
+		"Segoe UI Symbol",
+		"DejaVu Sans",
+		"Liberation Sans"
+	])
+	sf.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	sf.size = 32
 	emoji_font = sf
-	emoji_font_large = sf
+	
+	var sf_large := SystemFont.new()
+	sf_large.font_names = PackedStringArray([
+		"Segoe UI Emoji",
+		"Apple Color Emoji",
+		"Noto Color Emoji",
+		"Segoe UI Symbol",
+		"DejaVu Sans",
+		"Liberation Sans"
+	])
+	sf_large.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	sf_large.size = 48
+	emoji_font_large = sf_large
 
 var race_stats: Dictionary = {
 	Race.HUMAN: {
