@@ -92,14 +92,54 @@ func _build_ui() -> void:
 		var stats: Dictionary = GameData.race_stats[r]
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(140, 100)
-		btn.text = stats["emoji"] + "\n" + stats["name"]
 		btn.tooltip_text = stats["desc"]
-		if GameData.emoji_font:
-			btn.add_theme_font_override("font", GameData.emoji_font)
 		_style_button(btn, stats["color"])
 		btn.pressed.connect(_on_race_selected.bind(r))
 		race_grid.add_child(btn)
 		race_buttons.append(btn)
+
+		# Build button content with PNG emoji + text
+		var btn_vbox := VBoxContainer.new()
+		btn_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		btn_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+		btn_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		var emoji_str: String = stats["emoji"]
+		var emoji_texture = null
+		if SvgEmojiRenderer.is_svg_emoji_available():
+			emoji_texture = SvgEmojiRenderer.load_emoji_texture(emoji_str, 32)
+		if emoji_texture:
+			var emoji_rect := TextureRect.new()
+			emoji_rect.texture = emoji_texture
+			emoji_rect.custom_minimum_size = Vector2(40, 40)
+			emoji_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			emoji_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			emoji_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			btn_vbox.add_child(emoji_rect)
+		else:
+			var emoji_lbl := Label.new()
+			emoji_lbl.text = emoji_str
+			emoji_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			var els := LabelSettings.new()
+			els.font_size = 28
+			if GameData.emoji_font:
+				els.font = GameData.emoji_font
+			emoji_lbl.label_settings = els
+			emoji_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			btn_vbox.add_child(emoji_lbl)
+
+		var name_lbl := Label.new()
+		name_lbl.text = stats["name"]
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var nls := LabelSettings.new()
+		nls.font_size = 14
+		nls.font_color = Color(0.85, 0.85, 0.9)
+		name_lbl.label_settings = nls
+		btn_vbox.add_child(name_lbl)
+
+		btn.add_child(btn_vbox)
+		btn.text = ""
 
 	race_info_label = Label.new()
 	race_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -139,14 +179,43 @@ func _build_ui() -> void:
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(140, 100)
 		var class_name_str: String = GameData.get_class_name_for(selected_race, c)
-		btn.text = class_name_str
 		btn.tooltip_text = GameData.class_descs[c]
-		if GameData.emoji_font:
-			btn.add_theme_font_override("font", GameData.emoji_font)
 		_style_button(btn, Color(0.5, 0.6, 0.7))
 		btn.pressed.connect(_on_class_selected.bind(c))
 		class_grid.add_child(btn)
 		class_buttons.append(btn)
+
+		# Build button content with PNG emoji + text
+		var btn_vbox := VBoxContainer.new()
+		btn_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		btn_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+		btn_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		var class_emoji_str: String = GameData.class_emojis.get(c, "")
+		var class_emoji_texture = null
+		if class_emoji_str and SvgEmojiRenderer.is_svg_emoji_available():
+			class_emoji_texture = SvgEmojiRenderer.load_emoji_texture(class_emoji_str, 28)
+		if class_emoji_texture:
+			var emoji_rect := TextureRect.new()
+			emoji_rect.texture = class_emoji_texture
+			emoji_rect.custom_minimum_size = Vector2(36, 36)
+			emoji_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			emoji_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			emoji_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			btn_vbox.add_child(emoji_rect)
+
+		var name_lbl := Label.new()
+		name_lbl.text = class_name_str
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var nls := LabelSettings.new()
+		nls.font_size = 14
+		nls.font_color = Color(0.85, 0.85, 0.9)
+		name_lbl.label_settings = nls
+		btn_vbox.add_child(name_lbl)
+
+		btn.add_child(btn_vbox)
+		btn.text = ""
 
 	class_info_label = Label.new()
 	class_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -309,7 +378,13 @@ func _update_class_buttons() -> void:
 		var is_selected = class_id == selected_class
 		btn.modulate = Color(1.0, 1.0, 1.0) if is_selected else Color(0.7, 0.7, 0.7)
 		var class_name_str: String = GameData.get_class_name_for(selected_race, class_id)
-		btn.text = class_name_str
+		# Update the name label inside the VBoxContainer (last child of VBox)
+		for child in btn.get_children():
+			if child is VBoxContainer:
+				for sub in child.get_children():
+					if sub is Label:
+						sub.text = class_name_str
+				break
 	_update_class_info()
 
 func _update_class_info() -> void:
@@ -537,6 +612,54 @@ func _build_emoji_selector(parent: VBoxContainer) -> void:
 	var current_id: String = EmojiManager.current_set_id
 	var all_ids: Array[String] = EmojiManager.get_all_set_ids()
 
+	# PNG Twemoji option (rendered textures - best quality)
+	if SvgEmojiRenderer.is_svg_emoji_available():
+		var png_active: bool = (current_id == "png")
+		var png_row := HBoxContainer.new()
+		png_row.custom_minimum_size = Vector2(520, 36)
+		png_row.add_theme_constant_override("separation", 8)
+
+		var png_icon_container := HBoxContainer.new()
+		png_icon_container.add_theme_constant_override("separation", 4)
+
+		var sample_texture = SvgEmojiRenderer.load_emoji_texture("\U0001F480", 16)
+		if sample_texture:
+			var sample_rect = TextureRect.new()
+			sample_rect.texture = sample_texture
+			sample_rect.custom_minimum_size = Vector2(16, 16)
+			sample_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			sample_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			png_icon_container.add_child(sample_rect)
+
+		var png_name_lbl := Label.new()
+		var png_status := " [ACTIVE]" if png_active else ""
+		png_name_lbl.text = "PNG Twemoji (High Quality)" + png_status
+		png_name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var png_ns := LabelSettings.new()
+		png_ns.font_size = 13
+		png_ns.font_color = Color(0.4, 0.9, 0.5) if png_active else Color(0.8, 0.8, 0.85)
+		png_name_lbl.label_settings = png_ns
+		png_icon_container.add_child(png_name_lbl)
+		png_row.add_child(png_icon_container)
+
+		if not png_active:
+			var png_btn := Button.new()
+			png_btn.text = "Use"
+			png_btn.custom_minimum_size = Vector2(55, 28)
+			_style_button(png_btn, Color(0.3, 0.8, 0.4))
+			png_btn.add_theme_font_size_override("font_size", 11)
+			png_btn.pressed.connect(func():
+				EmojiManager.current_set_id = "png"
+				GameSystems.set_setting("emoji_set", "png")
+				graphics_panel.queue_free()
+				graphics_panel = null
+				_build_graphics_panel()
+				_refresh_menu_emojis()
+			)
+			png_row.add_child(png_btn)
+
+		parent.add_child(png_row)
+
 	for set_id: String in all_ids:
 		var info: Dictionary = EmojiManager.get_set_info(set_id)
 		var is_available: bool = EmojiManager.is_set_available(set_id)
@@ -547,13 +670,38 @@ func _build_emoji_selector(parent: VBoxContainer) -> void:
 		row.add_theme_constant_override("separation", 8)
 
 		# Icon + name
+		var icon_container := HBoxContainer.new()
+		icon_container.add_theme_constant_override("separation", 4)
+		
+		# Try to render emoji as texture
+		var emoji_icon = info.get("icon", "")
+		if emoji_icon and SvgEmojiRenderer.is_svg_emoji_available():
+			var emoji_texture = SvgEmojiRenderer.load_emoji_texture(emoji_icon, 16)
+			if emoji_texture:
+				var emoji_rect = TextureRect.new()
+				emoji_rect.texture = emoji_texture
+				emoji_rect.custom_minimum_size = Vector2(16, 16)
+				emoji_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				emoji_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				icon_container.add_child(emoji_rect)
+			else:
+				var emoji_lbl = Label.new()
+				emoji_lbl.text = emoji_icon
+				emoji_lbl.custom_minimum_size = Vector2(16, 16)
+				icon_container.add_child(emoji_lbl)
+		else:
+			var emoji_lbl = Label.new()
+			emoji_lbl.text = emoji_icon
+			emoji_lbl.custom_minimum_size = Vector2(16, 16)
+			icon_container.add_child(emoji_lbl)
+		
 		var name_lbl := Label.new()
 		var status_text := ""
 		if is_active:
 			status_text = " [ACTIVE]"
 		elif not is_available and set_id != "system":
 			status_text = " [Not Installed]"
-		name_lbl.text = info.get("icon", "") + " " + info.get("name", set_id) + status_text
+		name_lbl.text = info.get("name", set_id) + status_text
 		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var ns := LabelSettings.new()
 		ns.font_size = 13
@@ -564,7 +712,9 @@ func _build_emoji_selector(parent: VBoxContainer) -> void:
 		else:
 			ns.font_color = Color(0.45, 0.45, 0.5)
 		name_lbl.label_settings = ns
-		row.add_child(name_lbl)
+		
+		icon_container.add_child(name_lbl)
+		row.add_child(icon_container)
 
 		if is_available and not is_active:
 			var select_btn := Button.new()

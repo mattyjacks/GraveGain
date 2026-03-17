@@ -148,33 +148,98 @@ func _build_nodes() -> void:
 	if text_based:
 		emoji_text = _get_text_representation(emoji_text)
 
-	shadow_label = Label.new()
-	shadow_label.text = emoji_text
-	shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	shadow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	shadow_label.position = Vector2(-12, -4)
-	shadow_label.size = Vector2(24, 24)
-	shadow_label.modulate = Color(0, 0, 0, 0.35)
-	shadow_label.z_index = -1
-	var shadow_settings := LabelSettings.new()
-	if GameData.emoji_font and not text_based:
-		shadow_settings.font = GameData.emoji_font
-	shadow_settings.font_size = 18
-	shadow_label.label_settings = shadow_settings
-	add_child(shadow_label)
+	# Try to render emoji as SVG texture
+	if not text_based and SvgEmojiRenderer.is_svg_emoji_available():
+		var shadow_texture = SvgEmojiRenderer.load_emoji_texture(emoji_text, 18)
+		if shadow_texture:
+			var shadow_rect = TextureRect.new()
+			shadow_rect.texture = shadow_texture
+			shadow_rect.custom_minimum_size = Vector2(24, 24)
+			shadow_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			shadow_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			shadow_rect.position = Vector2(-12, -4)
+			shadow_rect.modulate = Color(0, 0, 0, 0.35)
+			shadow_rect.z_index = -1
+			add_child(shadow_rect)
+			shadow_label = shadow_rect
+			
+			var emoji_texture = SvgEmojiRenderer.load_emoji_texture(emoji_text, 18)
+			if emoji_texture:
+				var emoji_rect = TextureRect.new()
+				emoji_rect.texture = emoji_texture
+				emoji_rect.custom_minimum_size = Vector2(24, 24)
+				emoji_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				emoji_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				emoji_rect.position = Vector2(-12, -12)
+				add_child(emoji_rect)
+				emoji_label = emoji_rect
+			else:
+				emoji_label = Label.new()
+				emoji_label.text = emoji_text
+				emoji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				emoji_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				emoji_label.position = Vector2(-12, -12)
+				emoji_label.size = Vector2(24, 24)
+				var label_settings := LabelSettings.new()
+				label_settings.font_size = 18
+				emoji_label.label_settings = label_settings
+				add_child(emoji_label)
+		else:
+			shadow_label = Label.new()
+			shadow_label.text = emoji_text
+			shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			shadow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			shadow_label.position = Vector2(-12, -4)
+			shadow_label.size = Vector2(24, 24)
+			shadow_label.modulate = Color(0, 0, 0, 0.35)
+			shadow_label.z_index = -1
+			var shadow_settings := LabelSettings.new()
+			if GameData.emoji_font:
+				shadow_settings.font = GameData.emoji_font
+			shadow_settings.font_size = 18
+			shadow_label.label_settings = shadow_settings
+			add_child(shadow_label)
 
-	emoji_label = Label.new()
-	emoji_label.text = emoji_text
-	emoji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	emoji_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	emoji_label.position = Vector2(-12, -12)
-	emoji_label.size = Vector2(24, 24)
-	var label_settings := LabelSettings.new()
-	if GameData.emoji_font and not text_based:
-		label_settings.font = GameData.emoji_font
-	label_settings.font_size = 18
-	emoji_label.label_settings = label_settings
-	add_child(emoji_label)
+			emoji_label = Label.new()
+			emoji_label.text = emoji_text
+			emoji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			emoji_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			emoji_label.position = Vector2(-12, -12)
+			emoji_label.size = Vector2(24, 24)
+			var label_settings := LabelSettings.new()
+			if GameData.emoji_font:
+				label_settings.font = GameData.emoji_font
+			label_settings.font_size = 18
+			emoji_label.label_settings = label_settings
+			add_child(emoji_label)
+	else:
+		shadow_label = Label.new()
+		shadow_label.text = emoji_text
+		shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		shadow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		shadow_label.position = Vector2(-12, -4)
+		shadow_label.size = Vector2(24, 24)
+		shadow_label.modulate = Color(0, 0, 0, 0.35)
+		shadow_label.z_index = -1
+		var shadow_settings := LabelSettings.new()
+		if GameData.emoji_font and not text_based:
+			shadow_settings.font = GameData.emoji_font
+		shadow_settings.font_size = 18
+		shadow_label.label_settings = shadow_settings
+		add_child(shadow_label)
+
+		emoji_label = Label.new()
+		emoji_label.text = emoji_text
+		emoji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		emoji_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		emoji_label.position = Vector2(-12, -12)
+		emoji_label.size = Vector2(24, 24)
+		var label_settings := LabelSettings.new()
+		if GameData.emoji_font and not text_based:
+			label_settings.font = GameData.emoji_font
+		label_settings.font_size = 18
+		emoji_label.label_settings = label_settings
+		add_child(emoji_label)
 
 func _physics_process(delta: float) -> void:
 	glow_timer += delta

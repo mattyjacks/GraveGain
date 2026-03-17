@@ -7,6 +7,7 @@ extends Node
 signal emoji_set_changed(set_id: String)
 
 var twemoji_loader: Node = null
+var svg_emoji_renderer: Node = null
 
 const EMOJI_SETS: Dictionary = {
 	"system": {
@@ -110,13 +111,27 @@ func _ready() -> void:
 	twemoji_loader = get_node_or_null("/root/TwemojiLoader")
 	if twemoji_loader and twemoji_loader.is_twemoji_available():
 		print("✓ Twemoji loader initialized and font available")
+	svg_emoji_renderer = get_node_or_null("/root/SvgEmojiRenderer")
+	if svg_emoji_renderer and svg_emoji_renderer.is_svg_emoji_available():
+		print("✓ PNG emoji renderer initialized with " + str(svg_emoji_renderer.get_available_emoji_count()) + " emoji")
 	_scan_available_sets()
+	
 	var saved_val = GameSystems.get_setting("emoji_set")
-	var saved_set: String = saved_val if saved_val != null and saved_val is String else "system"
-	if saved_set in available_sets or saved_set == "system":
-		apply_emoji_set(saved_set)
+	var saved_set: String = saved_val if saved_val != null and saved_val is String else ""
+	
+	# Use PNG emoji as default if available (or if previously selected)
+	if svg_emoji_renderer and svg_emoji_renderer.is_svg_emoji_available():
+		if saved_set == "" or saved_set == "png" or saved_set == "system":
+			print("✓ Using PNG emoji graphics as default")
+			_use_png_emoji()
+		else:
+			# User explicitly chose a different emoji set
+			apply_emoji_set(saved_set)
 	else:
-		apply_emoji_set("system")
+		if saved_set != "" and saved_set != "png" and (saved_set in available_sets or saved_set == "system"):
+			apply_emoji_set(saved_set)
+		else:
+			apply_emoji_set("system")
 
 func _scan_available_sets() -> void:
 	available_sets.clear()
@@ -304,6 +319,19 @@ func get_available_set_ids() -> Array[String]:
 		if key in available_sets:
 			ids.append(key)
 	return ids
+
+func _use_png_emoji() -> void:
+	if svg_emoji_renderer:
+		current_set_id = "png"
+		GameSystems.set_setting("emoji_set", "png")
+		# Still set up a system font for text fallback
+		var font = _create_system_font()
+		GameData.emoji_font = font
+		var font_large = _create_system_font()
+		font_large.opentype_features = {"size": 48}
+		GameData.emoji_font_large = font_large
+		print("✓ PNG emoji graphics enabled (" + str(svg_emoji_renderer.get_available_emoji_count()) + " emoji)")
+		emoji_set_changed.emit("png")
 
 func rescan() -> void:
 	_scan_available_sets()

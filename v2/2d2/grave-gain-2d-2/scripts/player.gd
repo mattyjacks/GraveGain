@@ -337,12 +337,45 @@ func _build_nodes() -> void:
 	collision_shape.shape = shape
 	add_child(collision_shape)
 
-	shadow_label = Label.new()
 	var race_data: Dictionary = GameData.get_race_data(race)
 	var emoji_text: String = race_data.get("emoji", "\U0001F9D1")
 	var text_based: bool = GameSystems.get_setting("text_based_graphics") == true
 	if text_based:
 		emoji_text = _get_text_representation(emoji_text)
+
+	# Try PNG texture rendering first
+	if not text_based and SvgEmojiRenderer.is_svg_emoji_available():
+		var shadow_texture = SvgEmojiRenderer.load_emoji_texture(emoji_text, 32)
+		if shadow_texture:
+			var shadow_rect = TextureRect.new()
+			shadow_rect.texture = shadow_texture
+			shadow_rect.custom_minimum_size = Vector2(48, 48)
+			shadow_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			shadow_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			shadow_rect.position = Vector2(-24, -16)
+			shadow_rect.modulate = Color(0, 0, 0, 0.5)
+			shadow_rect.z_index = -1
+			add_child(shadow_rect)
+			shadow_label = shadow_rect
+
+			var emoji_rect = TextureRect.new()
+			emoji_rect.texture = shadow_texture
+			emoji_rect.custom_minimum_size = Vector2(48, 48)
+			emoji_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			emoji_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			emoji_rect.position = Vector2(-24, -24)
+			add_child(emoji_rect)
+			emoji_label = emoji_rect
+		else:
+			_create_player_label_emoji(emoji_text, text_based)
+	else:
+		_create_player_label_emoji(emoji_text, text_based)
+
+	_setup_lights()
+	_setup_areas()
+
+func _create_player_label_emoji(emoji_text: String, text_based: bool) -> void:
+	shadow_label = Label.new()
 	shadow_label.text = emoji_text
 	shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shadow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -369,9 +402,6 @@ func _build_nodes() -> void:
 	label_settings.font_size = 32
 	emoji_label.label_settings = label_settings
 	add_child(emoji_label)
-
-	_setup_lights()
-	_setup_areas()
 
 func _setup_lights() -> void:
 	if not GameData.point_light_texture:

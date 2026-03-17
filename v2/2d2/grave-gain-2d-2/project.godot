@@ -23,6 +23,9 @@ GameSystems="*res://scripts/systems/game_systems.gd"
 LoreManager="*res://scripts/lore/lore_manager.gd"
 TwemojiLoader="*res://scripts/autoload/twemoji_loader.gd"
 TwemojiSetupHelper="*res://scripts/autoload/twemoji_setup_helper.gd"
+SvgToPngConverter="*res://scripts/autoload/svg_to_png_converter.gd"
+SvgEmojiRenderer="*res://scripts/autoload/svg_emoji_renderer.gd"
+EmojiPreconverter="*res://scripts/autoload/emoji_preconverter.gd"
 
 [display]
 

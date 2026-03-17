@@ -182,9 +182,7 @@ func _ready() -> void:
 	dev_mode_enabled = GameSystems.get_setting("dev_mode") == true
 	text_based_graphics = GameSystems.get_setting("text_based_graphics") == true
 	
-	# Ensure emoji fonts are initialized before spawning player
-	if EmojiManager and not text_based_graphics:
-		EmojiManager.apply_emoji_set("system")
+	# Emoji fonts are initialized by EmojiManager autoload (PNG or font-based)
 
 	# Setup pause menu and inventory (always available)
 	_setup_pause_menu()
@@ -352,6 +350,58 @@ func _get_text_representation(emoji: String) -> String:
 	
 	return text_map.get(emoji, emoji)
 
+func _create_emoji_node(emoji_text: String, font_size: int, node_size: Vector2, pos: Vector2) -> Control:
+	# Try PNG texture first
+	if not text_based_graphics and SvgEmojiRenderer.is_svg_emoji_available():
+		var texture = SvgEmojiRenderer.load_emoji_texture(emoji_text, font_size)
+		if texture:
+			var rect = TextureRect.new()
+			rect.texture = texture
+			rect.custom_minimum_size = node_size
+			rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			rect.position = pos
+			return rect
+	# Fallback to label
+	var lbl = Label.new()
+	lbl.text = emoji_text if not text_based_graphics else _get_text_representation(emoji_text)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.position = pos
+	lbl.size = node_size
+	var ls := LabelSettings.new()
+	if GameData.emoji_font and not text_based_graphics:
+		ls.font = GameData.emoji_font
+	ls.font_size = font_size
+	lbl.label_settings = ls
+	return lbl
+
+func _create_emoji_node_large(emoji_text: String, font_size: int, node_size: Vector2, pos: Vector2) -> Control:
+	# Try PNG texture first
+	if not text_based_graphics and SvgEmojiRenderer.is_svg_emoji_available():
+		var texture = SvgEmojiRenderer.load_emoji_texture(emoji_text, font_size)
+		if texture:
+			var rect = TextureRect.new()
+			rect.texture = texture
+			rect.custom_minimum_size = node_size
+			rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			rect.position = pos
+			return rect
+	# Fallback to label
+	var lbl = Label.new()
+	lbl.text = emoji_text if not text_based_graphics else _get_text_representation(emoji_text)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.position = pos
+	lbl.size = node_size
+	var ls := LabelSettings.new()
+	if GameData.emoji_font_large and not text_based_graphics:
+		ls.font = GameData.emoji_font_large
+	ls.font_size = font_size
+	lbl.label_settings = ls
+	return lbl
+
 func _spawn_player() -> void:
 	player = CharacterBody2D.new()
 	player.set_script(PlayerScript)
@@ -382,17 +432,7 @@ func _place_torches() -> void:
 		torch_node.global_position = torch_pos
 		torch_node.z_index = 8
 
-		var torch_emoji := Label.new()
-		torch_emoji.text = "\U0001F525"
-		torch_emoji.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		torch_emoji.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		torch_emoji.position = Vector2(-10, -14)
-		torch_emoji.size = Vector2(20, 20)
-		var ts := LabelSettings.new()
-		if GameData.emoji_font:
-			ts.font = GameData.emoji_font
-		ts.font_size = 16
-		torch_emoji.label_settings = ts
+		var torch_emoji = _create_emoji_node("\U0001F525", 16, Vector2(20, 20), Vector2(-10, -14))
 		torch_node.add_child(torch_emoji)
 
 		var light := PointLight2D.new()
@@ -1183,18 +1223,8 @@ func _spawn_destructible(pos: Vector2, dtype: String) -> void:
 		"crystal": "\U0001F48E",
 	}
 
-	var lbl := Label.new()
-	lbl.text = emoji_map.get(dtype, "\U0001F4E6")
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.position = Vector2(-12, -16)
-	lbl.size = Vector2(24, 24)
-	var ls := LabelSettings.new()
-	if GameData.emoji_font:
-		ls.font = GameData.emoji_font
-	ls.font_size = 20
-	lbl.label_settings = ls
-	destr.add_child(lbl)
+	var emoji_node = _create_emoji_node(emoji_map.get(dtype, "\U0001F4E6"), 20, Vector2(24, 24), Vector2(-12, -16))
+	destr.add_child(emoji_node)
 
 	destructibles_node.add_child(destr)
 	destructibles.append(destr)
@@ -1483,18 +1513,8 @@ func _place_fountains() -> void:
 		fountain.set_meta("radius", f_info["radius"])
 		fountain.set_meta("uses_left", f_info["uses_left"])
 
-		var lbl := Label.new()
-		lbl.text = f_info["emoji"]
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.position = Vector2(-12, -16)
-		lbl.size = Vector2(24, 24)
-		var ls := LabelSettings.new()
-		if GameData.emoji_font:
-			ls.font = GameData.emoji_font
-		ls.font_size = 20
-		lbl.label_settings = ls
-		fountain.add_child(lbl)
+		var emoji_node = _create_emoji_node(f_info["emoji"], 20, Vector2(24, 24), Vector2(-12, -16))
+		fountain.add_child(emoji_node)
 
 		var light := PointLight2D.new()
 		light.texture = GameData.point_light_texture
@@ -1554,18 +1574,8 @@ func _place_altars() -> void:
 		altar.collision_layer = 0
 		altar.collision_mask = 1
 
-		var lbl := Label.new()
-		lbl.text = a_info["emoji"]
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.position = Vector2(-14, -18)
-		lbl.size = Vector2(28, 28)
-		var ls := LabelSettings.new()
-		if GameData.emoji_font:
-			ls.font = GameData.emoji_font
-		ls.font_size = 22
-		lbl.label_settings = ls
-		altar.add_child(lbl)
+		var emoji_node = _create_emoji_node(a_info["emoji"], 22, Vector2(28, 28), Vector2(-14, -18))
+		altar.add_child(emoji_node)
 
 		var light := PointLight2D.new()
 		light.texture = GameData.point_light_texture
@@ -1626,19 +1636,9 @@ func _place_decorations() -> void:
 		deco.global_position = d_info["pos"]
 		deco.z_index = 4
 
-		var lbl := Label.new()
-		lbl.text = d_info["emoji"]
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.position = Vector2(-10, -12)
-		lbl.size = Vector2(20, 20)
-		lbl.modulate = Color(1.0, 1.0, 1.0, 0.6)
-		var ls := LabelSettings.new()
-		if GameData.emoji_font:
-			ls.font = GameData.emoji_font
-		ls.font_size = 14
-		lbl.label_settings = ls
-		deco.add_child(lbl)
+		var emoji_node = _create_emoji_node(d_info["emoji"], 14, Vector2(20, 20), Vector2(-10, -12))
+		emoji_node.modulate = Color(1.0, 1.0, 1.0, 0.6)
+		deco.add_child(emoji_node)
 
 		items_node.add_child(deco)
 
@@ -1875,18 +1875,8 @@ func _spawn_building_visual(bdata: Dictionary) -> void:
 	building.set_meta("building_data", bdata)
 
 	# Building emoji (large)
-	var emoji_lbl := Label.new()
-	emoji_lbl.text = bdata["emoji"]
-	emoji_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	emoji_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	emoji_lbl.position = Vector2(-32, -40)
-	emoji_lbl.size = Vector2(64, 64)
-	var ls := LabelSettings.new()
-	if GameData.emoji_font_large:
-		ls.font = GameData.emoji_font_large
-	ls.font_size = 48
-	emoji_lbl.label_settings = ls
-	building.add_child(emoji_lbl)
+	var emoji_node = _create_emoji_node_large(bdata["emoji"], 48, Vector2(64, 64), Vector2(-32, -40))
+	building.add_child(emoji_node)
 
 	# Building name label
 	var name_lbl := Label.new()
@@ -2060,18 +2050,8 @@ func _spawn_game_corner(pos: Vector2) -> void:
 	corner.set_meta("is_game_corner", true)
 
 	# Game corner emoji (arcade cabinet)
-	var emoji_lbl := Label.new()
-	emoji_lbl.text = "🕹️"
-	emoji_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	emoji_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	emoji_lbl.position = Vector2(-32, -40)
-	emoji_lbl.size = Vector2(64, 64)
-	var ls := LabelSettings.new()
-	if GameData.emoji_font_large:
-		ls.font = GameData.emoji_font_large
-	ls.font_size = 48
-	emoji_lbl.label_settings = ls
-	corner.add_child(emoji_lbl)
+	var emoji_node = _create_emoji_node_large("🕹️", 48, Vector2(64, 64), Vector2(-32, -40))
+	corner.add_child(emoji_node)
 
 	# "Press E to Play" hint
 	var hint_lbl := Label.new()
@@ -2334,18 +2314,8 @@ func _place_starship_interactables() -> void:
 		inter_node.set_meta("inter_data", inter_data)
 		
 		# Emoji label
-		var emoji_label := Label.new()
-		emoji_label.text = inter_data.get("emoji", "?")
-		emoji_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		emoji_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		emoji_label.position = Vector2(-12, -16)
-		emoji_label.size = Vector2(24, 24)
-		var ls := LabelSettings.new()
-		if GameData.emoji_font:
-			ls.font = GameData.emoji_font
-		ls.font_size = 18
-		emoji_label.label_settings = ls
-		inter_node.add_child(emoji_label)
+		var emoji_node = _create_emoji_node(inter_data.get("emoji", "?"), 18, Vector2(24, 24), Vector2(-12, -16))
+		inter_node.add_child(emoji_node)
 		
 		# Name label
 		var name_label := Label.new()
