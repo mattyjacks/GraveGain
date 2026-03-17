@@ -22,6 +22,7 @@ EmojiManager="*res://scripts/autoload/emoji_manager.gd"
 GameSystems="*res://scripts/systems/game_systems.gd"
 LoreManager="*res://scripts/lore/lore_manager.gd"
 TwemojiLoader="*res://scripts/autoload/twemoji_loader.gd"
+TwemojiSetupHelper="*res://scripts/autoload/twemoji_setup_helper.gd"
 
 [display]
 
@@ -29,6 +30,10 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[dotnet]
+
+project/assembly_name="GraveGain 2D"
 
 [input]
 

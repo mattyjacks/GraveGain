@@ -5,7 +5,7 @@ extends Node
 
 class_name TwemojiDownloader
 
-const TWEMOJI_DOWNLOAD_URL = "https://github.com/mozilla/twemoji-colr/releases/download/v14.0.2/Twemoji.Mozilla.ttf"
+const TWEMOJI_DOWNLOAD_URL = "https://github.com/mozilla/twemoji-colr/releases/download/v0.7.0/Twemoji.Mozilla.ttf"
 const FONT_SAVE_PATH = "user://fonts/emoji/Twemoji.Mozilla.ttf"
 
 var download_in_progress: bool = false
