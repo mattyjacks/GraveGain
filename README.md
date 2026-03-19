@@ -1571,6 +1571,18 @@ This document contains:
 
 ---
 
+## Related Projects
+
+| Project | Description | Link |
+|---|---|---|
+| **CryptArtist Studio** | Open creative suite with 11 programs (GameStudio used for development) | [GitHub](https://github.com/mattyjacks/CryptArtistStudio) |
+| **GiveGigs** | Global work collective - hire artists and playtesters | [Website](https://givegigs.com) |
+| **VCA** | Video Content Automation for trailers and social media | [GitHub](https://github.com/mattyjacks/VCA) |
+| **mattyjacks.com** | Developer website and portfolio | [Website](https://mattyjacks.com) |
+| **WebsiteBlog** | Blog with GraveGain devlogs | [GitHub](https://github.com/mattyjacks/websiteBlog) |
+
+---
+
 ## License
 
 GraveGain is a personal project. All rights reserved.
