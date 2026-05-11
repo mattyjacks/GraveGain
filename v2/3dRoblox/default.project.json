@@ -1,0 +1,27 @@
+{
+  "name": "GraveGain 3D",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterCharacterScripts": {
+        "$path": "src/client/character"
+      },
+      "StarterPlayerScripts": {
+        "$path": "src/client"
+      }
+    }
+  }
+}
