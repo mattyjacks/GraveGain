@@ -146,7 +146,7 @@ function SettingsManager:create_settings_ui()
 	content_label.BackgroundTransparency = 1
 	content_label.TextColor3 = Color3.fromRGB(200, 200, 200)
 	content_label.TextSize = 14
-	content_label.Font = Enum.Font.GothamMono
+	content_label.Font = Enum.Font.GothamBold
 	content_label.TextXAlignment = Enum.TextXAlignment.Left
 	content_label.TextYAlignment = Enum.TextYAlignment.Top
 	content_label.Text = "Graphics Settings\n\nQuality: Medium\nMotion Blur: On\nBloom: On\nShadows: On"

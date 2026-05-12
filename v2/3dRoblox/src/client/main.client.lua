@@ -12,8 +12,8 @@ print("[Client] StarterPlayerScripts folder:", StarterPlayerScripts:GetFullName(
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("constants"))
 print("[Client] Constants loaded")
 
-local LobbyUI = require(StarterPlayerScripts:WaitForChild("lobby_ui"))
-print("[Client] LobbyUI loaded")
+local GatewaySystem = require(StarterPlayerScripts:WaitForChild("gateway_system"))
+print("[Client] GatewaySystem loaded")
 
 local GameStateManager = require(StarterPlayerScripts:WaitForChild("game_state_manager"))
 print("[Client] GameStateManager loaded")
@@ -51,9 +51,9 @@ print("[Client] PlayerGui ready")
 
 -- Initialize systems asynchronously to prevent blocking
 task.spawn(function()
-	print("[Client] Initializing LobbyUI...")
-	LobbyUI:initialize()
-	print("[Client] LobbyUI initialized")
+	print("[Client] Initializing GatewaySystem...")
+	GatewaySystem:initialize()
+	print("[Client] GatewaySystem initialized")
 end)
 
 task.spawn(function()
