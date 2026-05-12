@@ -1,188 +1,266 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+-- hud_system.lua  -- Complete, self-contained HUD wired to PlayerStats and InputHandler
+-- Shows: HP bar, Shield bar, XP bar, weapon hotkeys (1-4) with active highlight,
+--        ammo counter, grenade cook timer, mission objective banner,
+--        and a flash when the player takes damage.
 
-local HUDSystem = {}
-HUDSystem.__index = HUDSystem
+local Players      = game:GetService("Players")
+local RunService   = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
-function HUDSystem.new(characterSystem)
-	local self = setmetatable({}, HUDSystem)
-	
-	self.characterSystem = characterSystem
-	self.player = Players.LocalPlayer
-	self.playerGui = self.player:WaitForChild("PlayerGui")
-	
-	self:createHUD()
-	
+local HUD = {}
+HUD.__index = HUD
+
+local function makeFrame(parent, props)
+	local f = Instance.new("Frame")
+	for k, v in pairs(props) do f[k] = v end
+	f.Parent = parent
+	return f
+end
+local function makeLabel(parent, props)
+	local l = Instance.new("TextLabel")
+	for k, v in pairs(props) do l[k] = v end
+	l.Parent = parent
+	return l
+end
+local function makeCorner(parent, r)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, r or 6)
+	c.Parent = parent
+end
+
+function HUD.new(playerStats, inputHandler)
+	local self = setmetatable({}, HUD)
+	self.stats        = playerStats   -- PlayerStats object
+	self.input        = inputHandler  -- InputHandler object
+	self.missionText  = ""
+	self.cookStart    = 0
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name          = "GameHUD"
+	gui.ResetOnSpawn  = false
+	gui.IgnoreGuiInset = true
+	gui.Parent        = Players.LocalPlayer:WaitForChild("PlayerGui")
+	self.gui          = gui
+
+	self:buildBars()
+	self:buildHotbar()
+	self:buildObjectiveBanner()
+	self:buildDamageFlash()
+
+	RunService.RenderStepped:Connect(function(dt) self:update(dt) end)
 	return self
 end
 
-function HUDSystem:createHUD()
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "GameHUD"
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = self.playerGui
-	
-	self.screenGui = screenGui
-	
-	self:createHealthBar(screenGui)
-	self:createManaBar(screenGui)
-	self:createAbilityBar(screenGui)
-	self:createMinimap(screenGui)
-	self:createXPBar(screenGui)
-	self:createBuffDebuffPanel(screenGui)
-	
-	RunService.RenderStepped:Connect(function()
-		self:updateHUD()
-	end)
+-- ── Build ──────────────────────────────────────────────────────────────────
+
+function HUD:buildBars()
+	local pad = 12
+
+	-- HP bar
+	local hpBg = makeFrame(self.gui, {
+		Size = UDim2.new(0, 220, 0, 22), Position = UDim2.new(0, pad, 1, -pad - 22),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20), BorderSizePixel = 0,
+	})
+	makeCorner(hpBg, 4)
+	self.hpFill = makeFrame(hpBg, {
+		Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(210, 40, 40), BorderSizePixel = 0,
+	})
+	makeCorner(self.hpFill, 4)
+	self.hpLabel = makeLabel(hpBg, {
+		Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+		TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold,
+		TextSize = 13, ZIndex = 2,
+	})
+
+	-- Shield bar (shown only when shield > 0)
+	local shBg = makeFrame(self.gui, {
+		Size = UDim2.new(0, 220, 0, 10), Position = UDim2.new(0, pad, 1, -pad - 22 - 14),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20), BorderSizePixel = 0,
+	})
+	makeCorner(shBg, 3)
+	self.shFill = makeFrame(shBg, {
+		Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(80, 160, 255), BorderSizePixel = 0,
+	})
+	makeCorner(self.shFill, 3)
+	self.shBg = shBg
+
+	-- XP bar (full width bottom strip)
+	local xpBg = makeFrame(self.gui, {
+		Size = UDim2.new(1, 0, 0, 5), Position = UDim2.new(0, 0, 1, -5),
+		BackgroundColor3 = Color3.fromRGB(30, 30, 30), BorderSizePixel = 0,
+	})
+	self.xpFill = makeFrame(xpBg, {
+		Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(230, 210, 0), BorderSizePixel = 0,
+	})
+	self.xpLabel = makeLabel(self.gui, {
+		Size = UDim2.new(0, 100, 0, 14), Position = UDim2.new(0.5, -50, 1, -18),
+		BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(230, 210, 0),
+		Font = Enum.Font.Gotham, TextSize = 12,
+	})
 end
 
-function HUDSystem:createHealthBar(parent)
-	local healthFrame = Instance.new("Frame")
-	healthFrame.Name = "HealthBar"
-	healthFrame.Size = UDim2.new(0, 200, 0, 30)
-	healthFrame.Position = UDim2.new(0, 10, 1, -50)
-	healthFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	healthFrame.BorderSizePixel = 2
-	healthFrame.BorderColor3 = Color3.fromRGB(200, 0, 0)
-	healthFrame.Parent = parent
-	
-	local healthFill = Instance.new("Frame")
-	healthFill.Name = "Fill"
-	healthFill.Size = UDim2.new(1, 0, 1, 0)
-	healthFill.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-	healthFill.BorderSizePixel = 0
-	healthFill.Parent = healthFrame
-	
-	local healthText = Instance.new("TextLabel")
-	healthText.Name = "Text"
-	healthText.Size = UDim2.new(1, 0, 1, 0)
-	healthText.BackgroundTransparency = 1
-	healthText.TextColor3 = Color3.fromRGB(255, 255, 255)
-	healthText.TextScaled = true
-	healthText.Font = Enum.Font.GothamBold
-	healthText.Parent = healthFrame
-	
-	self.healthBar = healthFrame
-	self.healthFill = healthFill
-	self.healthText = healthText
+function HUD:buildHotbar()
+	local labels = {"⚔ Melee", "🏹 Ranged", "🧪 Potion", "💣 Grenade"}
+	local modes  = {"Melee", "Ranged", "Potion", "Grenade"}
+	local W, H, GAP = 90, 56, 6
+	local totalW = W * 4 + GAP * 3
+	local startX = -totalW / 2
+
+	local hotbarBg = makeFrame(self.gui, {
+		Size = UDim2.new(0, totalW + 16, 0, H + 24),
+		Position = UDim2.new(0.5, startX - 8, 1, -H - 24 - 40),
+		BackgroundColor3 = Color3.fromRGB(10, 10, 15),
+		BackgroundTransparency = 0.4, BorderSizePixel = 0,
+	})
+	makeCorner(hotbarBg, 8)
+
+	self.hotbarSlots = {}
+	for i, mode in ipairs(modes) do
+		local slot = makeFrame(hotbarBg, {
+			Size = UDim2.new(0, W, 0, H),
+			Position = UDim2.new(0, 8 + (i - 1) * (W + GAP), 0, 8),
+			BackgroundColor3 = Color3.fromRGB(40, 40, 55),
+			BorderSizePixel = 0,
+		})
+		makeCorner(slot, 6)
+		makeLabel(slot, {
+			Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 0, 4),
+			BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(200, 200, 220),
+			Font = Enum.Font.GothamBold, TextSize = 11, Text = tostring(i),
+		})
+		local nameLabel = makeLabel(slot, {
+			Size = UDim2.new(1, -4, 0, 20), Position = UDim2.new(0, 2, 1, -24),
+			BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(180, 180, 200),
+			Font = Enum.Font.Gotham, TextSize = 11, Text = labels[i], TextScaled = false,
+		})
+		self.hotbarSlots[mode] = {slot = slot, nameLabel = nameLabel}
+	end
+
+	-- Ammo counter (below hotbar)
+	self.ammoLabel = makeLabel(self.gui, {
+		Size = UDim2.new(0, 120, 0, 20),
+		Position = UDim2.new(0.5, -60, 1, -32),
+		BackgroundTransparency = 1,
+		TextColor3 = Color3.fromRGB(200, 220, 255),
+		Font = Enum.Font.GothamBold, TextSize = 15,
+	})
+
+	-- Grenade cook timer (above hotbar)
+	self.cookLabel = makeLabel(self.gui, {
+		Size = UDim2.new(0, 200, 0, 30),
+		Position = UDim2.new(0.5, -100, 1, -H - 24 - 80),
+		BackgroundTransparency = 1,
+		TextColor3 = Color3.fromRGB(255, 80, 30),
+		Font = Enum.Font.GothamBold, TextSize = 22,
+		Text = "", Visible = false,
+	})
 end
 
-function HUDSystem:createManaBar(parent)
-	local manaFrame = Instance.new("Frame")
-	manaFrame.Name = "ManaBar"
-	manaFrame.Size = UDim2.new(0, 200, 0, 30)
-	manaFrame.Position = UDim2.new(0, 10, 1, -90)
-	manaFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	manaFrame.BorderSizePixel = 2
-	manaFrame.BorderColor3 = Color3.fromRGB(0, 100, 200)
-	manaFrame.Parent = parent
-	
-	local manaFill = Instance.new("Frame")
-	manaFill.Name = "Fill"
-	manaFill.Size = UDim2.new(1, 0, 1, 0)
-	manaFill.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-	manaFill.BorderSizePixel = 0
-	manaFill.Parent = manaFrame
-	
-	local manaText = Instance.new("TextLabel")
-	manaText.Name = "Text"
-	manaText.Size = UDim2.new(1, 0, 1, 0)
-	manaText.BackgroundTransparency = 1
-	manaText.TextColor3 = Color3.fromRGB(255, 255, 255)
-	manaText.TextScaled = true
-	manaText.Font = Enum.Font.GothamBold
-	manaText.Parent = manaFrame
-	
-	self.manaBar = manaFrame
-	self.manaFill = manaFill
-	self.manaText = manaText
+function HUD:buildObjectiveBanner()
+	self.objectiveBg = makeFrame(self.gui, {
+		Size = UDim2.new(0, 360, 0, 36),
+		Position = UDim2.new(0.5, -180, 0, 14),
+		BackgroundColor3 = Color3.fromRGB(10, 10, 20),
+		BackgroundTransparency = 0.35, BorderSizePixel = 0, Visible = false,
+	})
+	makeCorner(self.objectiveBg, 8)
+	self.objectiveLabel = makeLabel(self.objectiveBg, {
+		Size = UDim2.new(1, -10, 1, 0), Position = UDim2.new(0, 5, 0, 0),
+		BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(255, 230, 80),
+		Font = Enum.Font.GothamBold, TextSize = 15, Text = "",
+	})
 end
 
-function HUDSystem:createAbilityBar(parent)
-	local abilityFrame = Instance.new("Frame")
-	abilityFrame.Name = "AbilityBar"
-	abilityFrame.Size = UDim2.new(0, 400, 0, 60)
-	abilityFrame.Position = UDim2.new(0.5, -200, 1, -70)
-	abilityFrame.BackgroundTransparency = 0.5
-	abilityFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	abilityFrame.BorderSizePixel = 0
-	abilityFrame.Parent = parent
-	
-	self.abilityBar = abilityFrame
-	
-	for i = 1, 4 do
-		local abilityButton = Instance.new("TextButton")
-		abilityButton.Name = "Ability" .. i
-		abilityButton.Size = UDim2.new(0, 80, 0, 50)
-		abilityButton.Position = UDim2.new(0, (i - 1) * 90 + 10, 0, 5)
-		abilityButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-		abilityButton.BorderSizePixel = 2
-		abilityButton.BorderColor3 = Color3.fromRGB(200, 200, 200)
-		abilityButton.Text = i
-		abilityButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		abilityButton.Font = Enum.Font.GothamBold
-		abilityButton.Parent = abilityFrame
+function HUD:buildDamageFlash()
+	self.damageFlash = makeFrame(self.gui, {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Color3.fromRGB(200, 0, 0),
+		BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 50,
+	})
+	self.lastHP = nil
+end
+
+-- ── Update ─────────────────────────────────────────────────────────────────
+
+function HUD:update(_dt)
+	if not self.stats then return end
+	local s = self.stats
+
+	-- HP bar
+	local hp    = math.max(0, s.realHP or 0) + (s.tempHP or 0)
+	local maxHp = s.maxHP or 100
+	local hpPct = math.clamp(hp / maxHp, 0, 1)
+	self.hpFill.Size = UDim2.new(hpPct, 0, 1, 0)
+	self.hpFill.BackgroundColor3 = hpPct > 0.5 and Color3.fromRGB(210, 40, 40)
+		or hpPct > 0.25 and Color3.fromRGB(220, 130, 0) or Color3.fromRGB(255, 40, 40)
+	self.hpLabel.Text = math.ceil(hp) .. " / " .. maxHp
+
+	-- Damage flash
+	if self.lastHP and hp < self.lastHP then
+		self.damageFlash.BackgroundTransparency = 0.4
+		TweenService:Create(self.damageFlash, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+	end
+	self.lastHP = hp
+
+	-- Shield bar
+	if s.maxShield and s.maxShield > 0 then
+		self.shBg.Visible = true
+		self.shFill.Size = UDim2.new(math.clamp((s.shield or 0) / s.maxShield, 0, 1), 0, 1, 0)
+	else
+		self.shBg.Visible = false
+	end
+
+	-- XP bar
+	local xp    = s.xp or 0
+	local xpReq = s.xpNeeded or 100
+	self.xpFill.Size = UDim2.new(math.clamp(xp / xpReq, 0, 1), 0, 1, 0)
+	self.xpLabel.Text = "Level " .. (s.level or 1) .. "  •  " .. xp .. " / " .. xpReq .. " XP"
+
+	-- Hotbar highlight
+	if self.input then
+		for mode, data in pairs(self.hotbarSlots) do
+			local active = (self.input.weaponMode == mode)
+			data.slot.BackgroundColor3 = active and Color3.fromRGB(90, 80, 30) or Color3.fromRGB(40, 40, 55)
+			data.nameLabel.TextColor3  = active and Color3.fromRGB(255, 220, 60) or Color3.fromRGB(180, 180, 200)
+		end
+
+		-- Ammo
+		if self.input.weaponMode == "Ranged" then
+			self.ammoLabel.Visible = true
+			self.ammoLabel.Text = "🏹 " .. (self.input.ammo or 0) .. " / " .. (self.input.maxAmmo or 0)
+		else
+			self.ammoLabel.Visible = false
+		end
+
+		-- Grenade cook timer
+		if self.input.isCookingGrenade then
+			local elapsed = tick() - (self.input.grenadeCookStart or 0)
+			local remain = math.max(0, 4 - elapsed)
+			self.cookLabel.Visible = true
+			self.cookLabel.Text = string.format("💣 %.1fs", remain)
+			self.cookLabel.TextColor3 = remain < 1
+				and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(255, 160, 30)
+		else
+			self.cookLabel.Visible = false
+		end
+	end
+
+	-- Objective banner
+	if self.missionText ~= "" then
+		self.objectiveBg.Visible = true
+		self.objectiveLabel.Text = "▶  " .. self.missionText
+	else
+		self.objectiveBg.Visible = false
 	end
 end
 
-function HUDSystem:createMinimap(parent)
-	local minimapFrame = Instance.new("Frame")
-	minimapFrame.Name = "Minimap"
-	minimapFrame.Size = UDim2.new(0, 150, 0, 150)
-	minimapFrame.Position = UDim2.new(1, -160, 0, 10)
-	minimapFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	minimapFrame.BorderSizePixel = 2
-	minimapFrame.BorderColor3 = Color3.fromRGB(100, 200, 100)
-	minimapFrame.Parent = parent
-	
-	self.minimap = minimapFrame
+function HUD:setObjective(text)
+	self.missionText = text or ""
 end
 
-function HUDSystem:createXPBar(parent)
-	local xpFrame = Instance.new("Frame")
-	xpFrame.Name = "XPBar"
-	xpFrame.Size = UDim2.new(0, 300, 0, 15)
-	xpFrame.Position = UDim2.new(0.5, -150, 1, -20)
-	xpFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	xpFrame.BorderSizePixel = 1
-	xpFrame.BorderColor3 = Color3.fromRGB(200, 200, 0)
-	xpFrame.Parent = parent
-	
-	local xpFill = Instance.new("Frame")
-	xpFill.Name = "Fill"
-	xpFill.Size = UDim2.new(0.5, 0, 1, 0)
-	xpFill.BackgroundColor3 = Color3.fromRGB(200, 200, 0)
-	xpFill.BorderSizePixel = 0
-	xpFill.Parent = xpFrame
-	
-	self.xpBar = xpFrame
-	self.xpFill = xpFill
+function HUD:setStats(playerStats)
+	self.stats = playerStats
+	self.lastHP = nil
 end
 
-function HUDSystem:createBuffDebuffPanel(parent)
-	local buffFrame = Instance.new("Frame")
-	buffFrame.Name = "BuffDebuffPanel"
-	buffFrame.Size = UDim2.new(0, 200, 0, 40)
-	buffFrame.Position = UDim2.new(0, 10, 0, 50)
-	buffFrame.BackgroundTransparency = 1
-	buffFrame.Parent = parent
-	
-	self.buffPanel = buffFrame
-end
-
-function HUDSystem:updateHUD()
-	local stats = self.characterSystem:getStats()
-	
-	local healthPercent = stats.health / stats.maxHealth
-	self.healthFill.Size = UDim2.new(healthPercent, 0, 1, 0)
-	self.healthText.Text = math.floor(stats.health) .. " / " .. stats.maxHealth
-	
-	local manaPercent = stats.mana / stats.maxMana
-	self.manaFill.Size = UDim2.new(manaPercent, 0, 1, 0)
-	self.manaText.Text = math.floor(stats.mana) .. " / " .. stats.maxMana
-	
-	local xpPercent = stats.experience / (100 * stats.level)
-	self.xpFill.Size = UDim2.new(math.min(1, xpPercent), 0, 1, 0)
-end
-
-return HUDSystem
+return HUD

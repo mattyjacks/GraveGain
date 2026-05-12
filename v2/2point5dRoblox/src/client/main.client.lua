@@ -12,10 +12,14 @@ local Darkvision = require(ClientFolder:WaitForChild("darkvision"))
 local PlayerStats = require(ClientFolder:WaitForChild("player_stats"))
 local CombatSystem = require(ClientFolder:WaitForChild("combat_system"))
 local RaceStats = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("race_stats"))
-local WeaponGenerator = require(ClientFolder:WaitForChild("weapon_generator"))
+local WeaponGenerator   = require(ClientFolder:WaitForChild("weapon_generator"))
 local AnimationController = require(ClientFolder:WaitForChild("animation_controller"))
-local InventoryManager = require(ClientFolder:WaitForChild("inventory_manager"))
-local InventoryUI = require(ClientFolder:WaitForChild("inventory_ui"))
+local InventoryManager  = require(ClientFolder:WaitForChild("inventory_manager"))
+local InventoryUI       = require(ClientFolder:WaitForChild("inventory_ui"))
+local HUDSystem         = require(ClientFolder:WaitForChild("hud_system"))
+local SM                = require(ClientFolder:WaitForChild("sound_manager"))
+local SpaceEnv          = require(ClientFolder:WaitForChild("space_environment"))
+local DropPod           = require(ClientFolder:WaitForChild("drop_pod"))
 
 print("GraveGain 2.5D Client Started")
 
@@ -31,10 +35,11 @@ local gameState = "lobby"
 local cameraController = CameraController.new()
 cameraController:setCharacter(character)
 
-local combatSystem = CombatSystem.new()
+local combatSystem       = CombatSystem.new()
 local movementController = MovementController.new()
-local inputHandler = InputHandler.new(combatSystem)
-local darkvision = Darkvision.new()
+local inputHandler       = InputHandler.new(combatSystem)
+local darkvision         = Darkvision.new()
+local hud                = nil  -- created after dungeon init
 
 print("Player spawned as:", selectedRace)
 applyRaceScale = function(char, raceName)
@@ -42,6 +47,9 @@ applyRaceScale = function(char, raceName)
 	raceChangedEvent:FireServer(raceName)
 end
 applyRaceScale(character, selectedRace)
+
+-- Apply space skybox as soon as the client loads in the lobby
+task.defer(function() SpaceEnv.applyLobby() end)
 
 local function setupReticule()
 	local playerGui = player:WaitForChild("PlayerGui")
@@ -95,6 +103,20 @@ local function initializeDungeon()
 	gameState = "dungeon"
 	print("Entering dungeon as:", selectedRace)
 
+	-- Switch environment to dungeon
+	SpaceEnv.applyDungeon()
+
+	-- Hide lobby while in dungeon
+	local lobby = workspace:FindFirstChild("Lobby")
+	if lobby then
+		for _, d in ipairs(lobby:GetDescendants()) do
+			if d:IsA("BasePart") then
+				d.LocalTransparencyModifier = 1
+				d.CanCollide = false
+			end
+		end
+	end
+
 	playerStats = PlayerStats.new(character, selectedRace)
 	combatSystem:setCharacter(character, playerStats)
 
@@ -107,12 +129,15 @@ local function initializeDungeon()
 	if selectedRace == "Dwarf" then
 		darkvision:activate(character)
 	elseif selectedRace == "Human" then
-		local shoulder = character:FindFirstChild("LeftUpperArm") or character:FindFirstChild("Left Arm")
-		if shoulder then
+		local head = character:FindFirstChild("Head")
+		if head then
 			local light = Instance.new("SpotLight")
-			light.Brightness = 3; light.Range = 40; light.Angle = 45
-			light.Color = Color3.fromRGB(255, 240, 200)
-			light.Parent = shoulder
+			light.Brightness = 4
+			light.Range = 50
+			light.Angle = 40
+			light.Color = Color3.fromRGB(255, 245, 210)
+			light.Face = Enum.NormalId.Front
+			light.Parent = head
 		end
 	elseif selectedRace == "Elf" then
 		local head = character:FindFirstChild("Head")
@@ -190,6 +215,32 @@ local function initializeDungeon()
 	UserInputService.MouseIconEnabled = true
 	inputHandler.isEnabled = true
 
+	-- Create HUD (requires playerStats to already exist)
+	local oldGui = player.PlayerGui:FindFirstChild("GameHUD")
+	if oldGui then oldGui:Destroy() end
+	hud = HUDSystem.new(playerStats, inputHandler)
+	hud:setObjective("Reach the dungeon portal to start a mission")
+
+	-- Footstep sounds tied to movement
+	local stepTimer = 0
+	task.spawn(function()
+		while gameState == "dungeon" do
+			task.wait(0.016)
+			local hrp2 = character:FindFirstChild("HumanoidRootPart")
+			local hum2 = character:FindFirstChild("Humanoid")
+			if hrp2 and hum2 and hum2.MoveDirection.Magnitude > 0.1 then
+				local spd = hum2.WalkSpeed > 26 and 0.28 or 0.45
+				stepTimer = stepTimer + 0.016
+				if stepTimer >= spd then
+					stepTimer = 0
+					SM.Footstep()
+				end
+			else
+				stepTimer = 0
+			end
+		end
+	end)
+
 	print("All client systems initialized")
 	print("Controls: WASD-Move | Shift-Sprint | 1-4 Weapons | I-Inventory | F-Light")
 end
@@ -251,11 +302,29 @@ local function showMissionSelectionUI(difficulty)
 		btn.Parent = frame
 		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 		btn.MouseButton1Click:Connect(function()
+			SM.MenuSelect()
 			ui:Destroy()
 			local event = ReplicatedStorage:WaitForChild("EnterDungeon")
 			event:FireServer(selectedRace, difficulty, missionType)
-			gameState = "dungeon"
-			initializeDungeon()
+
+			-- Play drop pod cinematic, then init dungeon on landing
+			local landingPos = Vector3.new(0, 2, 1850) -- exterior approach area
+			DropPod.launch(landingPos, function()
+				-- Teleport player to dungeon exterior landing zone
+				local char = player.Character
+				if char then
+					local hrp = char:FindFirstChild("HumanoidRootPart")
+					if hrp then hrp.CFrame = CFrame.new(landingPos + Vector3.new(0, 5, 0)) end
+				end
+				initializeDungeon()
+				if hud then
+					if missionType == "Boss" then
+						hud:setObjective("Kill the Giant Skull Boss!")
+					elseif missionType == "Fetch" then
+						hud:setObjective("Retrieve the Artifact deep in the dungeon")
+					end
+				end
+			end)
 		end)
 	end
 

@@ -3,7 +3,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local CombatHandler = require(script.Parent:WaitForChild("combat_handler"))
-local ItemHandler = require(script.Parent:WaitForChild("item_handler"))
+local ItemHandler   = require(script.Parent:WaitForChild("item_handler"))
+local SM            = require(script.Parent:WaitForChild("sound_manager"))
 
 local InputHandler = {}
 InputHandler.__index = InputHandler
@@ -11,24 +12,25 @@ InputHandler.__index = InputHandler
 function InputHandler.new(combatSystem)
 	local self = setmetatable({}, InputHandler)
 
-	self.isBlocking = false
-	self.isAttacking = false
-	self.attackHoldTime = 0
-	self.pushCooldown = 0
-	self.isEnabled = false
-	self.weaponMode = "Melee"
+	self.isBlocking       = false
+	self.isAttacking      = false
+	self.attackHoldTime   = 0
+	self.pushCooldown     = 0
+	self.pushAttackCooldown = 0   -- ← was missing, caused combat_handler:15 crash
+	self.isEnabled        = false
+	self.weaponMode       = "Melee"
 	self.animationController = nil
-	self.ammo = 20
-	self.maxAmmo = 30
-	self.bowChargeStart = 0
-	self.isDrawingBow = false
-	self.blockShield = nil
-	self.character = nil
-	self.rightHand = nil
+	self.ammo             = 20
+	self.maxAmmo          = 30
+	self.bowChargeStart   = 0
+	self.isDrawingBow     = false
+	self.blockShield      = nil
+	self.character        = nil
+	self.rightHand        = nil
 	self.isCookingGrenade = false
 	self.grenadeCookStart = 0
-	self.combatSystem = combatSystem
-	self.inventoryUI = nil
+	self.combatSystem     = combatSystem
+	self.inventoryUI      = nil
 
 	self.combatHandler = CombatHandler.new(self)
 	self.itemHandler = ItemHandler.new(self)
@@ -118,17 +120,20 @@ function InputHandler:setupInputs()
 			if self.weaponMode == "Melee" then
 				self.isAttacking = true
 				self.attackHoldTime = 0
+				SM.Swing()
 				if self.animationController then self.animationController:playSwing() end
 				self.combatHandler:performMeleeAttack()
 			elseif self.weaponMode == "Ranged" then
 				if self.ammo > 0 then
 					self.isDrawingBow = true
 					self.bowChargeStart = tick()
+					SM.BowDraw()
 					if self.animationController then self.animationController:setBowDraw(true) end
 				else
 					print("Out of ammo!")
 				end
 			elseif self.weaponMode == "Potion" then
+				SM.PotionDrink()
 				self.itemHandler:consumeBuffItem()
 				self:setWeaponMode("Melee")
 			elseif self.weaponMode == "Grenade" then
@@ -151,6 +156,7 @@ function InputHandler:setupInputs()
 			elseif self.weaponMode == "Ranged" and self.isDrawingBow then
 				self.isDrawingBow = false
 				local chargeTime = math.min(5, tick() - self.bowChargeStart)
+				SM.BowRelease()
 				if self.animationController then
 					self.animationController:setBowDraw(false)
 					self.animationController:playBowFire()
@@ -183,7 +189,7 @@ function InputHandler:update(dt)
 		local cookTime = tick() - self.grenadeCookStart
 		if cookTime >= 4 then
 			self.isCookingGrenade = false
-			print("Grenade exploded in hand!")
+			SM.Explosion()
 			local equipData = self.inventoryUI and self.inventoryUI.equips["Throwable"]
 			self.itemHandler:throwGrenade(0, 0, equipData)
 			self:setWeaponMode("Melee")

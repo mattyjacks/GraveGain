@@ -10,6 +10,7 @@ print("GraveGain 2.5D Server Started")
 
 local ServerFolder = script.Parent
 local gameManager = require(ServerFolder:WaitForChild("game_manager"))
+local ExteriorGenerator = require(ServerFolder:WaitForChild("exterior_generator"))
 
 local remoteEvents = Networking:createRemoteEvents()
 local remoteFunctions = Networking:createRemoteFunctions()
@@ -75,6 +76,10 @@ RunService.Heartbeat:Connect(function(deltaTime)
 end)
 
 print("Server systems initialized")
+
+-- Generate the exterior wasteland terrain at startup
+ExteriorGenerator.generate(workspace)
+print("Exterior terrain generated")
 
 local raceNames = {}
 for race, _ in pairs(GameData.RACES) do

@@ -3,10 +3,11 @@ local DungeonDecorator = require(script.Parent:WaitForChild("dungeon_decorator")
 local DungeonRenderer = {}
 DungeonRenderer.__index = DungeonRenderer
 
-local TILE = 4
-local WALL_HEIGHT = 6
+local TILE          = 4
+local WALL_HEIGHT   = 6
 local FLOOR_THICKNESS = 1
-local SUB_LAYERS = 3
+local SUB_LAYERS    = 3
+local DX, DZ       = 0, 2000   -- dungeon world offset
 
 local BIOME_PALETTES = {
 	Crypt = {
@@ -91,9 +92,9 @@ function DungeonRenderer:renderSubLayers(parent)
 		part.Color = pick[1]
 		part.Material = pick[2]
 		part.CFrame = CFrame.new(
-			(self.dungeon.width / 2) * TILE,
+			DX + (self.dungeon.width / 2) * TILE,
 			yPos - FLOOR_THICKNESS / 2,
-			(self.dungeon.height / 2) * TILE
+			DZ + (self.dungeon.height / 2) * TILE
 		)
 		part.Parent = sub
 	end
@@ -124,7 +125,7 @@ function DungeonRenderer:renderFloor(parent)
 				end
 				part.Color = pick[1]
 				part.Material = pick[2]
-				part.CFrame = CFrame.new(x * TILE, -FLOOR_THICKNESS / 2, y * TILE)
+				part.CFrame = CFrame.new(DX + x * TILE, -FLOOR_THICKNESS / 2, DZ + y * TILE)
 				part.Parent = floorFolder
 
 				if self.rng:NextNumber() < 0.03 then
@@ -154,7 +155,7 @@ function DungeonRenderer:renderWalls(parent)
 					wall.CanCollide = true
 					wall.Color = wallPick[1]
 					wall.Material = wallPick[2]
-					wall.CFrame = CFrame.new(x * TILE, WALL_HEIGHT / 2, y * TILE)
+					wall.CFrame = CFrame.new(DX + x * TILE, WALL_HEIGHT / 2, DZ + y * TILE)
 					wall.Parent = wallFolder
 
 					local topPick = self:pick(self.palette.wallTop)
@@ -165,7 +166,7 @@ function DungeonRenderer:renderWalls(parent)
 					top.CanCollide = true
 					top.Color = topPick[1]
 					top.Material = topPick[2]
-					top.CFrame = CFrame.new(x * TILE, WALL_HEIGHT + 0.25, y * TILE)
+					top.CFrame = CFrame.new(DX + x * TILE, WALL_HEIGHT + 0.25, DZ + y * TILE)
 					top.Parent = wallFolder
 
 					if self.rng:NextNumber() < 0.08 then
@@ -197,6 +198,32 @@ function DungeonRenderer:renderLighting(parent)
 	lighting.ClockTime = 0
 	lighting.FogEnd = 400
 	lighting.FogColor = Color3.fromRGB(40, 40, 60)
+end
+
+-- Toggle lobby visibility
+function DungeonRenderer.setLobbyVisible(visible)
+	local lobby = workspace:FindFirstChild("Lobby")
+	if lobby then
+		for _, desc in ipairs(lobby:GetDescendants()) do
+			if desc:IsA("BasePart") then
+				desc.LocalTransparencyModifier = visible and 0 or 1
+				desc.CanCollide = visible
+			end
+		end
+	end
+end
+
+-- Toggle dungeon visibility
+function DungeonRenderer.setDungeonVisible(visible)
+	local dungeon = workspace:FindFirstChild("Dungeon")
+	if dungeon then
+		for _, desc in ipairs(dungeon:GetDescendants()) do
+			if desc:IsA("BasePart") then
+				desc.LocalTransparencyModifier = visible and 0 or 1
+				desc.CanCollide = visible
+			end
+		end
+	end
 end
 
 return DungeonRenderer

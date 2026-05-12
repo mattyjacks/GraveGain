@@ -1,6 +1,7 @@
-local Players = game:GetService("Players")
+local Players          = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
+local TweenService     = game:GetService("TweenService")
+local SM               = require(script.Parent:WaitForChild("sound_manager"))
 
 local ItemHandler = {}
 ItemHandler.__index = ItemHandler
@@ -91,6 +92,7 @@ function ItemHandler:throwGrenade(cookTime, fuseRemaining, equipData)
 		projectile:Destroy()
 
 		if grenadeType == "Frag" then
+			SM.Explosion()
 			local explosion = Instance.new("Explosion")
 			explosion.Position = pos
 			explosion.BlastRadius = 15
@@ -114,6 +116,7 @@ function ItemHandler:throwGrenade(cookTime, fuseRemaining, equipData)
 			end
 
 		elseif grenadeType == "Flash" then
+			SM.Flashbang()
 			-- Flash the screen if player is looking toward it
 			local lookDir = hrp.CFrame.LookVector
 			local toFlash = (pos - hrp.Position).Unit
@@ -139,6 +142,8 @@ function ItemHandler:throwGrenade(cookTime, fuseRemaining, equipData)
 			end
 
 		elseif grenadeType == "Molotov" then
+			SM.MolotovBreak()
+			SM.FireLoop()
 			-- Fire pool on the ground
 			local firePool = Instance.new("Part")
 			firePool.Size = Vector3.new(10, 0.4, 10)

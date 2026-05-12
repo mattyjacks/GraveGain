@@ -353,57 +353,87 @@ end
 
 function WeaponGenerator.createArrow()
 	local arrow = Instance.new("Model")
-	arrow.Name = "WoodenArrow"
-	
+	arrow.Name = "GlowArrow"
+
+	-- Shaft
 	local shaft = Instance.new("Part")
-	shaft.Name = "Shaft"
-	shaft.Shape = Enum.PartType.Cylinder
-	shaft.Size = Vector3.new(3, 0.1, 0.1)
-	shaft.Color = Color3.fromRGB(150, 100, 50)
+	shaft.Name     = "Shaft"
+	shaft.Shape    = Enum.PartType.Cylinder
+	shaft.Size     = Vector3.new(3.5, 0.12, 0.12)
+	shaft.Color    = Color3.fromRGB(140, 95, 45)
 	shaft.Material = Enum.Material.Wood
-	shaft.CanCollide = false
-	shaft.Massless = true
+	shaft.CanCollide = false; shaft.Massless = true
 	shaft.Parent = arrow
-	
+
+	-- Arrowhead: glowing silver Neon cone
+	local head = Instance.new("Part")
+	head.Name     = "Head"
+	head.Shape    = Enum.PartType.Block
+	head.Size     = Vector3.new(0.6, 0.18, 0.18)
+	head.Color    = Color3.fromRGB(220, 235, 255)  -- silver-white
+	head.Material = Enum.Material.Neon
+	head.CanCollide = false; head.Massless = true
+	head.CFrame   = shaft.CFrame * CFrame.new(2.05, 0, 0)
+	head.Parent   = arrow
+
+	local headWeld = Instance.new("WeldConstraint")
+	headWeld.Part0 = shaft; headWeld.Part1 = head; headWeld.Parent = shaft
+
+	-- Glow on the arrowhead
+	local pl = Instance.new("PointLight", head)
+	pl.Color      = Color3.fromRGB(180, 210, 255)
+	pl.Brightness = 2.5
+	pl.Range      = 12
+
+	-- Secondary silver tip (SpecialMesh wedge shape)
 	local tip = Instance.new("Part")
-	tip.Name = "Tip"
-	tip.Shape = Enum.PartType.Block
-	tip.Size = Vector3.new(0.4, 0.2, 0.2)
-	tip.Color = Color3.fromRGB(100, 100, 100)
+	tip.Name     = "Tip"
+	tip.Shape    = Enum.PartType.Block
+	tip.Size     = Vector3.new(0.5, 0.10, 0.10)
+	tip.Color    = Color3.fromRGB(200, 220, 255)
 	tip.Material = Enum.Material.Metal
-	tip.CanCollide = false
-	tip.Massless = true
-	local tipMesh = Instance.new("SpecialMesh")
-	tipMesh.MeshType = Enum.MeshType.FileMesh
-	tipMesh.MeshId = "rbxassetid://1033714"
-	tipMesh.Parent = tip
-	tip.CFrame = shaft.CFrame * CFrame.new(1.5, 0, 0)
-	tip.Parent = arrow
-	
-	local tipWeld = Instance.new("WeldConstraint")
-	tipWeld.Part0 = shaft
-	tipWeld.Part1 = tip
-	tipWeld.Parent = shaft
-	
-	local fletching = Instance.new("Part")
-	fletching.Name = "Fletching"
-	fletching.Shape = Enum.PartType.Block
-	fletching.Size = Vector3.new(0.5, 0.3, 0.05)
-	fletching.Color = Color3.fromRGB(255, 255, 255)
-	fletching.Material = Enum.Material.Fabric
-	fletching.CanCollide = false
-	fletching.Massless = true
-	fletching.CFrame = shaft.CFrame * CFrame.new(-1.3, 0, 0)
-	fletching.Parent = arrow
-	
-	local fWeld = Instance.new("WeldConstraint")
-	fWeld.Part0 = shaft
-	fWeld.Part1 = fletching
-	fWeld.Parent = shaft
-	
+	tip.CanCollide = false; tip.Massless = true
+	tip.CFrame   = shaft.CFrame * CFrame.new(2.6, 0, 0)
+	tip.Parent   = arrow
+	local tw = Instance.new("WeldConstraint")
+	tw.Part0 = shaft; tw.Part1 = tip; tw.Parent = shaft
+	local sm = Instance.new("SpecialMesh", tip)
+	sm.MeshType = Enum.MeshType.Wedge
+	sm.Scale = Vector3.new(1, 1, 1)
+
+	-- Feathers (3 vanes, random bright colors)
+	local featherColors = {
+		Color3.fromRGB(255, 50, 50),
+		Color3.fromRGB(50, 220, 50),
+		Color3.fromRGB(50, 100, 255),
+		Color3.fromRGB(255, 200, 0),
+		Color3.fromRGB(255, 50, 200),
+		Color3.fromRGB(0, 220, 220),
+	}
+	local rng = Random.new()
+	for i = 0, 2 do
+		local angle = i * (math.pi * 2 / 3)
+		local feather = Instance.new("Part")
+		feather.Name     = "Feather" .. i
+		feather.Shape    = Enum.PartType.Block
+		feather.Size     = Vector3.new(0.7, 0.35, 0.04)
+		feather.Color    = featherColors[rng:NextInteger(1, #featherColors)]
+		feather.Material = Enum.Material.Fabric
+		feather.CanCollide = false; feather.Massless = true
+		feather.CFrame   = shaft.CFrame
+			* CFrame.new(-1.5, 0, 0)
+			* CFrame.Angles(angle, 0, 0)
+			* CFrame.new(0, 0.18, 0)
+		feather.Parent   = arrow
+
+		local fw = Instance.new("WeldConstraint")
+		fw.Part0 = shaft; fw.Part1 = feather; fw.Parent = shaft
+	end
+
 	arrow.PrimaryPart = shaft
 	anchorModel(arrow)
 	return arrow
 end
 
 return WeaponGenerator
+

@@ -14,9 +14,14 @@ function PlayerStats.new(character, raceName)
 
 	self.realHP = self.raceStats.hp
 	self.tempHP = 0
-	self.maxHP = self.raceStats.hp
+	self.maxHP  = self.raceStats.hp
 	self.regenRate = self.raceStats.regenRate
 	self.lastDamageTime = 0
+
+	-- XP / Levelling
+	self.xp       = 0
+	self.level    = 1
+	self.xpNeeded = 100
 
 	if self.raceStats.hasShield then
 		self.shield = self.raceStats.shieldMax
@@ -130,6 +135,22 @@ function PlayerStats:activateRage()
 	self.rageDuration = 5
 	self.rage = 0
 	print(self.raceName .. " RAGES!")
+end
+
+function PlayerStats:gainXP(amount)
+	self.xp = (self.xp or 0) + amount
+	while self.xp >= self.xpNeeded do
+		self.xp = self.xp - self.xpNeeded
+		self.level = self.level + 1
+		self.xpNeeded = math.floor(self.xpNeeded * 1.5)
+		self.maxHP = self.maxHP + 10
+		self.realHP = math.min(self.realHP + 20, self.maxHP)
+		if self.humanoid then
+			self.humanoid.MaxHealth = self.maxHP
+			self.humanoid.Health = self.realHP
+		end
+		print("Level up! Now level", self.level)
+	end
 end
 
 function PlayerStats:deactivateRage()
