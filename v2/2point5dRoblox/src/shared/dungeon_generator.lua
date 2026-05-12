@@ -1,4 +1,5 @@
 local GameData = require(script.Parent:WaitForChild("game_data"))
+local DungeonLootManager = require(script.Parent:WaitForChild("dungeon_loot_manager"))
 
 local DungeonGenerator = {}
 DungeonGenerator.__index = DungeonGenerator
@@ -27,7 +28,11 @@ function DungeonGenerator:generateDungeon()
 	self:generateRooms()
 	self:connectRooms()
 	self:placeEnemies()
-	self:placeLoot()
+	
+	self.lootManager = DungeonLootManager.new(self)
+	self.lootManager:placeLoot()
+	self.lootManager:placeAmmoCrates()
+	self.lootManager:placeLoreItems()
 end
 
 function DungeonGenerator:initializeTiles()
@@ -46,42 +51,110 @@ end
 
 function DungeonGenerator:generateRooms()
 	local config = GameData.DUNGEON_CONFIG
-	local numRooms = 8 + math.random(4)
+	-- Grid based layout
+	local gridSizeX = 4
+	local gridSizeY = 4
+	local cellWidth = math.floor(self.width / gridSizeX)
+	local cellHeight = math.floor(self.height / gridSizeY)
 	
-	for i = 1, numRooms do
-		local width = config.minRoomWidth + math.random(config.maxRoomWidth - config.minRoomWidth)
-		local height = config.minRoomHeight + math.random(config.maxRoomHeight - config.minRoomHeight)
-		local x = math.random(1, self.width - width - 1)
-		local y = math.random(1, self.height - height - 1)
-		
-		local room = {
-			x = x,
-			y = y,
-			width = width,
-			height = height,
-			centerX = x + width / 2,
-			centerY = y + height / 2,
-		}
-		
-		if self:canPlaceRoom(room) then
-			self:carveRoom(room)
-			table.insert(self.rooms, room)
-		end
-	end
-end
-
-function DungeonGenerator:canPlaceRoom(room)
-	local padding = 3
-	for x = room.x - padding, room.x + room.width + padding do
-		for y = room.y - padding, room.y + room.height + padding do
-			if x > 0 and x <= self.width and y > 0 and y <= self.height then
-				if self.tiles[x][y].type ~= "wall" then
-					return false
+	-- We always start at (1, 1) in the grid for the entrance
+	for gridX = 0, gridSizeX - 1 do
+		for gridY = 0, gridSizeY - 1 do
+			-- 70% chance to have a room in this cell, except (0,0) which is guaranteed
+			if (gridX == 0 and gridY == 0) or math.random() < 0.7 then
+				local roomWidth = config.minRoomWidth + math.random(config.maxRoomWidth - config.minRoomWidth)
+				local roomHeight = config.minRoomHeight + math.random(config.maxRoomHeight - config.minRoomHeight)
+				
+				local minX = gridX * cellWidth + 2
+				local maxX = (gridX + 1) * cellWidth - roomWidth - 2
+				local minY = gridY * cellHeight + 2
+				local maxY = (gridY + 1) * cellHeight - roomHeight - 2
+				
+				if maxX > minX and maxY > minY then
+					local x = math.random(minX, maxX)
+					local y = math.random(minY, maxY)
+					
+					local isCave = math.random() < 0.3 -- 30% chance for a natural cave part
+					
+					local room = {
+						x = x,
+						y = y,
+						width = roomWidth,
+						height = roomHeight,
+						centerX = x + roomWidth / 2,
+						centerY = y + roomHeight / 2,
+						isCave = isCave,
+						gridX = gridX,
+						gridY = gridY
+					}
+					
+					if self:canPlaceRoom(room) then
+						if isCave then
+							self:carveCaveRoom(room)
+						else
+							self:carveRoom(room)
+						end
+						table.insert(self.rooms, room)
+					end
 				end
 			end
 		end
 	end
-	return true
+end
+
+function DungeonGenerator:carveCaveRoom(room)
+	-- Cellular Automata approach for this local room
+	local map = {}
+	for x = 0, room.width - 1 do
+		map[x] = {}
+		for y = 0, room.height - 1 do
+			map[x][y] = math.random() > 0.45 and 1 or 0 -- 1 is wall, 0 is floor
+		end
+	end
+	
+	-- Smoothing
+	for step = 1, 4 do
+		local newMap = {}
+		for x = 0, room.width - 1 do
+			newMap[x] = {}
+			for y = 0, room.height - 1 do
+				local neighbors = 0
+				for dx = -1, 1 do
+					for dy = -1, 1 do
+						local nx, ny = x + dx, y + dy
+						if nx < 0 or nx >= room.width or ny < 0 or ny >= room.height then
+							neighbors = neighbors + 1
+						elseif map[nx][ny] == 1 then
+							neighbors = neighbors + 1
+						end
+					end
+				end
+				newMap[x][y] = neighbors > 4 and 1 or 0
+			end
+		end
+		map = newMap
+	end
+	
+	for x = 1, room.width - 2 do
+		for y = 1, room.height - 2 do
+			if map[x][y] == 0 then
+				local tx = room.x + x
+				local ty = room.y + y
+				if tx > 0 and tx <= self.width and ty > 0 and ty <= self.height then
+					self.tiles[tx][ty].type = "floor"
+					self.tiles[tx][ty].walkable = true
+				end
+			end
+		end
+	end
+	
+	-- Ensure center is clear for connections
+	self.tiles[math.floor(room.centerX)][math.floor(room.centerY)].type = "floor"
+	self.tiles[math.floor(room.centerX)][math.floor(room.centerY)].walkable = true
+end
+
+function DungeonGenerator:canPlaceRoom(room)
+	return true -- Grid guarantees no overlap if configured properly
 end
 
 function DungeonGenerator:carveRoom(room)
@@ -98,11 +171,26 @@ end
 function DungeonGenerator:connectRooms()
 	if #self.rooms < 2 then return end
 	
+	-- Sort rooms by grid position to ensure logical connections
+	table.sort(self.rooms, function(a, b)
+		if a.gridX == b.gridX then
+			return a.gridY < b.gridY
+		end
+		return a.gridX < b.gridX
+	end)
+	
 	for i = 1, #self.rooms - 1 do
 		local room1 = self.rooms[i]
 		local room2 = self.rooms[i + 1]
 		
-		self:carveCorridor(room1.centerX, room1.centerY, room2.centerX, room2.centerY)
+		-- Connect L-shape to avoid messy diagonals
+		if math.random() > 0.5 then
+			self:carveCorridor(room1.centerX, room1.centerY, room2.centerX, room1.centerY)
+			self:carveCorridor(room2.centerX, room1.centerY, room2.centerX, room2.centerY)
+		else
+			self:carveCorridor(room1.centerX, room1.centerY, room1.centerX, room2.centerY)
+			self:carveCorridor(room1.centerX, room2.centerY, room2.centerX, room2.centerY)
+		end
 	end
 end
 
@@ -110,38 +198,17 @@ function DungeonGenerator:carveCorridor(x1, y1, x2, y2)
 	local config = GameData.DUNGEON_CONFIG
 	local corridorWidth = config.corridorWidth
 	
-	local currentX = math.floor(x1)
-	local currentY = math.floor(y1)
-	local targetX = math.floor(x2)
-	local targetY = math.floor(y2)
+	local startX = math.min(math.floor(x1), math.floor(x2))
+	local endX = math.max(math.floor(x1), math.floor(x2))
+	local startY = math.min(math.floor(y1), math.floor(y2))
+	local endY = math.max(math.floor(y1), math.floor(y2))
 	
-	local maxIterations = 1000
-	local iterations = 0
-	
-	while (currentX ~= targetX or currentY ~= targetY) and iterations < maxIterations do
-		iterations = iterations + 1
-		
-		if currentX < targetX then
-			currentX = currentX + 1
-		elseif currentX > targetX then
-			currentX = currentX - 1
-		end
-		
-		if currentY < targetY then
-			currentY = currentY + 1
-		elseif currentY > targetY then
-			currentY = currentY - 1
-		end
-		
-		for dx = -corridorWidth, corridorWidth do
-			for dy = -corridorWidth, corridorWidth do
-				local tx = currentX + dx
-				local ty = currentY + dy
-				if tx > 0 and tx <= self.width and ty > 0 and ty <= self.height then
-					if self.tiles[tx] and self.tiles[tx][ty] and self.tiles[tx][ty].type == "wall" then
-						self.tiles[tx][ty].type = "corridor"
-						self.tiles[tx][ty].walkable = true
-					end
+	for x = startX - corridorWidth, endX + corridorWidth do
+		for y = startY - corridorWidth, endY + corridorWidth do
+			if x > 0 and x <= self.width and y > 0 and y <= self.height then
+				if self.tiles[x][y].type == "wall" then
+					self.tiles[x][y].type = "corridor"
+					self.tiles[x][y].walkable = true
 				end
 			end
 		end
@@ -186,25 +253,6 @@ function DungeonGenerator:placeEnemies()
 				damage = 10 * (1 + self.floor * 0.2),
 				xp = 500 * (1 + self.floor * 0.2),
 				isBoss = true,
-			})
-		end
-	end
-end
-
-function DungeonGenerator:placeLoot()
-	local numLoot = 3 + math.random(3)
-	
-	for i = 1, numLoot do
-		local x, y = self:findRandomWalkableTile()
-		if x and y then
-			local rarity = math.random() > 0.7 and "rare" or (math.random() > 0.5 and "uncommon" or "common")
-			
-			table.insert(self.loot, {
-				x = x,
-				y = y,
-				type = "weapon",
-				rarity = rarity,
-				value = 10 * (rarity == "common" and 1 or rarity == "uncommon" and 2 or 5),
 			})
 		end
 	end

@@ -1,3 +1,5 @@
+local DungeonDecorator = require(script.Parent:WaitForChild("dungeon_decorator"))
+
 local DungeonRenderer = {}
 DungeonRenderer.__index = DungeonRenderer
 
@@ -50,6 +52,7 @@ function DungeonRenderer.new(dungeon, parent)
 	local existing = self.parent:FindFirstChild("Dungeon")
 	if existing then existing:Destroy() end
 
+	self.decorator = DungeonDecorator.new(self)
 	self:renderDungeon()
 	return self
 end
@@ -67,7 +70,8 @@ function DungeonRenderer:renderDungeon()
 	self:renderSubLayers(folder)
 	self:renderFloor(folder)
 	self:renderWalls(folder)
-	self:renderDecorations(folder)
+	self.decorator:renderDecorations(folder)
+	self.decorator:renderLoot(folder)
 	self:renderLighting(folder)
 end
 
@@ -124,7 +128,7 @@ function DungeonRenderer:renderFloor(parent)
 				part.Parent = floorFolder
 
 				if self.rng:NextNumber() < 0.03 then
-					self:addFlowerOrDetail(x, y, floorFolder)
+					self.decorator:addFlowerOrDetail(x, y, floorFolder)
 				end
 			end
 		end
@@ -165,7 +169,7 @@ function DungeonRenderer:renderWalls(parent)
 					top.Parent = wallFolder
 
 					if self.rng:NextNumber() < 0.08 then
-						self:addVine(x, y, wallFolder)
+						self.decorator:addVine(x, y, wallFolder)
 					end
 				end
 			end
@@ -183,139 +187,6 @@ function DungeonRenderer:hasAdjacentWalkable(x, y)
 		end
 	end
 	return false
-end
-
-function DungeonRenderer:addFlowerOrDetail(x, y, parent)
-	local flower = Instance.new("Part")
-	flower.Shape = Enum.PartType.Ball
-	flower.Anchored = true
-	flower.CanCollide = false
-	flower.Size = Vector3.new(0.6, 0.6, 0.6)
-	local colors = {
-		Color3.fromRGB(255, 50, 50),
-		Color3.fromRGB(255, 255, 50),
-		Color3.fromRGB(255, 100, 200),
-		Color3.fromRGB(100, 200, 255),
-		Color3.fromRGB(255, 150, 0),
-	}
-	flower.Color = colors[self.rng:NextInteger(1, #colors)]
-	flower.Material = Enum.Material.SmoothPlastic
-	local ox = (self.rng:NextNumber() - 0.5) * TILE * 0.7
-	local oz = (self.rng:NextNumber() - 0.5) * TILE * 0.7
-	flower.CFrame = CFrame.new(x * TILE + ox, 0.3, y * TILE + oz)
-	flower.Parent = parent
-end
-
-function DungeonRenderer:addVine(x, y, parent)
-	local vine = Instance.new("Part")
-	vine.Shape = Enum.PartType.Block
-	vine.Anchored = true
-	vine.CanCollide = false
-	local h = self.rng:NextNumber() * 3 + 1
-	vine.Size = Vector3.new(0.4, h, 0.4)
-	vine.Color = Color3.fromRGB(20, 120 + self.rng:NextInteger(0, 40), 20)
-	vine.Material = Enum.Material.Grass
-	local side = self.rng:NextInteger(1, 4)
-	local ox, oz = 0, 0
-	if side == 1 then ox = TILE / 2 - 0.2
-	elseif side == 2 then ox = -TILE / 2 + 0.2
-	elseif side == 3 then oz = TILE / 2 - 0.2
-	else oz = -TILE / 2 + 0.2 end
-	vine.CFrame = CFrame.new(x * TILE + ox, WALL_HEIGHT - h / 2, y * TILE + oz)
-	vine.Parent = parent
-end
-
-function DungeonRenderer:renderDecorations(parent)
-	local decoFolder = Instance.new("Folder")
-	decoFolder.Name = "Decorations"
-	decoFolder.Parent = parent
-
-	for i, room in ipairs(self.dungeon.rooms) do
-		if self.rng:NextNumber() < 0.6 then
-			self:addTorch(room.centerX, room.centerY, decoFolder)
-		end
-
-		if self.rng:NextNumber() < 0.3 then
-			self:addCrystal(room, decoFolder)
-		end
-
-		if self.rng:NextNumber() < 0.4 then
-			self:addWaterPool(room, decoFolder)
-		end
-	end
-end
-
-function DungeonRenderer:addTorch(x, y, parent)
-	local pole = Instance.new("Part")
-	pole.Shape = Enum.PartType.Cylinder
-	pole.Anchored = true
-	pole.CanCollide = false
-	pole.Size = Vector3.new(3, 0.3, 0.3)
-	pole.Color = Color3.fromRGB(101, 67, 33)
-	pole.Material = Enum.Material.Wood
-	pole.CFrame = CFrame.new(x * TILE, 1.5, y * TILE) * CFrame.Angles(0, 0, math.rad(90))
-	pole.Parent = parent
-
-	local flame = Instance.new("Part")
-	flame.Shape = Enum.PartType.Ball
-	flame.Anchored = true
-	flame.CanCollide = false
-	flame.Size = Vector3.new(0.8, 0.8, 0.8)
-	flame.Color = Color3.fromRGB(255, 150, 0)
-	flame.Material = Enum.Material.Neon
-	flame.CFrame = CFrame.new(x * TILE, 3.2, y * TILE)
-	flame.Parent = parent
-
-	local light = Instance.new("PointLight")
-	light.Color = Color3.fromRGB(255, 180, 50)
-	light.Brightness = 2
-	light.Range = 20
-	light.Parent = flame
-end
-
-function DungeonRenderer:addCrystal(room, parent)
-	local cx = room.x + self.rng:NextInteger(1, math.max(1, room.width - 1))
-	local cy = room.y + self.rng:NextInteger(1, math.max(1, room.height - 1))
-
-	local crystal = Instance.new("Part")
-	crystal.Shape = Enum.PartType.Block
-	crystal.Anchored = true
-	crystal.CanCollide = false
-	local h = self.rng:NextNumber() * 2 + 1
-	crystal.Size = Vector3.new(0.6, h, 0.6)
-	local pick = self:pick(self.palette.accent)
-	crystal.Color = pick[1]
-	crystal.Material = pick[2]
-	crystal.CFrame = CFrame.new(cx * TILE, h / 2, cy * TILE) * CFrame.Angles(
-		math.rad(self.rng:NextNumber() * 20 - 10),
-		math.rad(self.rng:NextNumber() * 360),
-		math.rad(self.rng:NextNumber() * 20 - 10)
-	)
-	crystal.Parent = parent
-
-	local glow = Instance.new("PointLight")
-	glow.Color = pick[1]
-	glow.Brightness = 0.7
-	glow.Range = 6
-	glow.Parent = crystal
-end
-
-function DungeonRenderer:addWaterPool(room, parent)
-	local px = room.x + self.rng:NextInteger(1, math.max(1, room.width - 2))
-	local py = room.y + self.rng:NextInteger(1, math.max(1, room.height - 2))
-	local w = self.rng:NextInteger(2, math.min(4, room.width - 1))
-	local h = self.rng:NextInteger(2, math.min(4, room.height - 1))
-
-	local pool = Instance.new("Part")
-	pool.Shape = Enum.PartType.Block
-	pool.Anchored = true
-	pool.CanCollide = false
-	pool.Size = Vector3.new(w * TILE * 0.5, 0.3, h * TILE * 0.5)
-	pool.Color = Color3.fromRGB(30, 120, 200)
-	pool.Material = Enum.Material.Glass
-	pool.Transparency = 0.4
-	pool.CFrame = CFrame.new(px * TILE, -0.1, py * TILE)
-	pool.Parent = parent
 end
 
 function DungeonRenderer:renderLighting(parent)

@@ -2,6 +2,9 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
+local CombatHandler = require(script.Parent:WaitForChild("combat_handler"))
+local ItemHandler = require(script.Parent:WaitForChild("item_handler"))
+
 local InputHandler = {}
 InputHandler.__index = InputHandler
 
@@ -12,42 +15,156 @@ function InputHandler.new(combatSystem)
 	self.isAttacking = false
 	self.attackHoldTime = 0
 	self.pushCooldown = 0
-	self.pushAttackCooldown = 0
 	self.isEnabled = false
-	self.pushAttackCooldown = 0
+	self.weaponMode = "Melee"
+	self.animationController = nil
+	self.ammo = 20
+	self.maxAmmo = 30
+	self.bowChargeStart = 0
+	self.isDrawingBow = false
 	self.blockShield = nil
 	self.character = nil
-	self.hrp = nil
-	self.effectPool = {}
-	self.shieldCreated = false
+	self.rightHand = nil
+	self.isCookingGrenade = false
+	self.grenadeCookStart = 0
 	self.combatSystem = combatSystem
+	self.inventoryUI = nil
+
+	self.combatHandler = CombatHandler.new(self)
+	self.itemHandler = ItemHandler.new(self)
 
 	self:setupInputs()
 
+	local restoreAmmoEvent = ReplicatedStorage:WaitForChild("RestoreAmmo")
+	restoreAmmoEvent.OnClientEvent:Connect(function()
+		local amount = math.floor(self.maxAmmo * (0.25 + math.random() * 0.75))
+		self.ammo = math.min(self.maxAmmo, self.ammo + amount)
+		print("Restored Ammo! Current:", self.ammo, "/", self.maxAmmo)
+	end)
+
 	return self
+end
+
+-- Equip a weapon mode: hide all, show the active one, re-weld it to the hand
+function InputHandler:setWeaponMode(mode)
+	if not self.isEnabled then return end
+	self.weaponMode = mode
+	if self.animationController then self.animationController:setBowDraw(false) end
+
+	if not self.inventoryUI or not self.character or not self.rightHand then return end
+
+	local slotMap = {Melee = "Primary", Ranged = "Secondary", Potion = "Consumable", Grenade = "Throwable"}
+
+	-- Unparent all equipped models
+	for _, slotName in pairs(slotMap) do
+		local item = self.inventoryUI.equips[slotName]
+		if item and item.model then
+			item.model.Parent = nil
+		end
+	end
+
+	-- Parent and weld the active one
+	local activeSlot = slotMap[mode]
+	if activeSlot then
+		local item = self.inventoryUI.equips[activeSlot]
+		if item and item.model then
+			item.model.Parent = self.character
+			local primaryPart = item.model.PrimaryPart
+			if primaryPart then
+				-- Unanchor all parts so WeldConstraints work
+				for _, p in ipairs(item.model:GetDescendants()) do
+					if p:IsA("BasePart") then
+						p.Anchored = false
+						p.CanCollide = false
+						p.Massless = true
+					end
+				end
+				primaryPart.CFrame = self.rightHand.CFrame * (item.offset or CFrame.new())
+				-- Remove old welds to right hand from this model
+				for _, w in ipairs(primaryPart:GetChildren()) do
+					if w:IsA("WeldConstraint") then w:Destroy() end
+				end
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = self.rightHand
+				weld.Part1 = primaryPart
+				weld.Parent = primaryPart
+			end
+		end
+	end
+
+	print("Equipped", mode)
 end
 
 function InputHandler:setupInputs()
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed or not self.isEnabled then return end
 
+		if input.KeyCode == Enum.KeyCode.One then
+			self:setWeaponMode("Melee")
+		elseif input.KeyCode == Enum.KeyCode.Two then
+			self:setWeaponMode("Ranged")
+		elseif input.KeyCode == Enum.KeyCode.Three then
+			self:setWeaponMode("Potion")
+		elseif input.KeyCode == Enum.KeyCode.Four then
+			self:setWeaponMode("Grenade")
+		end
+
 		if input.UserInputType == Enum.UserInputType.MouseButton2 then
-			self:startBlock()
+			if self.weaponMode == "Melee" and not self.isBlocking then
+				self.isBlocking = true
+				if self.animationController then self.animationController:setBlocking(true) end
+			end
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-			if self.isBlocking then
-				self:startPushAttack()
+			if self.weaponMode == "Melee" then
+				self.isAttacking = true
+				self.attackHoldTime = 0
+				if self.animationController then self.animationController:playSwing() end
+				self.combatHandler:performMeleeAttack()
+			elseif self.weaponMode == "Ranged" then
+				if self.ammo > 0 then
+					self.isDrawingBow = true
+					self.bowChargeStart = tick()
+					if self.animationController then self.animationController:setBowDraw(true) end
+				else
+					print("Out of ammo!")
+				end
+			elseif self.weaponMode == "Potion" then
+				self.itemHandler:consumeBuffItem()
+				self:setWeaponMode("Melee")
+			elseif self.weaponMode == "Grenade" then
+				self.isCookingGrenade = true
+				self.grenadeCookStart = tick()
 			end
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input, gameProcessed)
 		if not self.isEnabled then return end
-		
+
 		if input.UserInputType == Enum.UserInputType.MouseButton2 then
-			self:stopBlock()
+			self.isBlocking = false
+			if self.animationController then self.animationController:setBlocking(false) end
 		elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-			if self.isAttacking then
-				self:releasePushAttack()
+			if self.weaponMode == "Melee" then
+				self.isAttacking = false
+				self.attackHoldTime = 0
+			elseif self.weaponMode == "Ranged" and self.isDrawingBow then
+				self.isDrawingBow = false
+				local chargeTime = math.min(5, tick() - self.bowChargeStart)
+				if self.animationController then
+					self.animationController:setBowDraw(false)
+					self.animationController:playBowFire()
+				end
+				self.combatHandler:performRangedAttack(chargeTime)
+			elseif self.weaponMode == "Grenade" and self.isCookingGrenade then
+				self.isCookingGrenade = false
+				local cookTime = tick() - self.grenadeCookStart
+				if cookTime < 4 then
+					local equipData = self.inventoryUI and self.inventoryUI.equips["Throwable"]
+					self.itemHandler:throwGrenade(cookTime, 4 - cookTime, equipData)
+				end
+				-- Switch back to melee after throwing
+				self:setWeaponMode("Melee")
 			end
 		end
 	end)
@@ -57,154 +174,28 @@ function InputHandler:update(dt)
 	if self.pushCooldown > 0 then
 		self.pushCooldown = self.pushCooldown - dt
 	end
-	if self.pushAttackCooldown > 0 then
-		self.pushAttackCooldown = self.pushAttackCooldown - dt
-	end
 
 	if self.isAttacking then
 		self.attackHoldTime = self.attackHoldTime + dt
 	end
 
-	self:updateShieldVisual()
-end
-
-function InputHandler:startBlock()
-	if self.isBlocking or self.shieldCreated then return end
-	self.isBlocking = true
-	self.shieldCreated = true
-
-	local player = Players.LocalPlayer
-	local character = player.Character
-	if not character then return end
-	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	if not self.blockShield then
-		local shield = Instance.new("Part")
-		shield.Name = "BlockShield"
-		shield.Shape = Enum.PartType.Block
-		shield.Size = Vector3.new(3, 4, 0.4)
-		shield.Color = Color3.fromRGB(80, 150, 255)
-		shield.Material = Enum.Material.ForceField
-		shield.Transparency = 0.4
-		shield.CanCollide = false
-		shield.Anchored = false
-		shield.Massless = true
-
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = hrp
-		weld.Part1 = shield
-		weld.Parent = shield
-
-		shield.CFrame = hrp.CFrame * CFrame.new(0, 0, -2.5)
-		shield.Parent = character
-		self.blockShield = shield
-	end
-end
-
-function InputHandler:stopBlock()
-	self.isBlocking = false
-	self.shieldCreated = false
-
-	if self.blockShield then
-		self.blockShield:Destroy()
-		self.blockShield = nil
-	end
-end
-
-function InputHandler:startPushAttack()
-	if self.pushCooldown > 0 then return end
-	self.isAttacking = true
-	self.attackHoldTime = 0
-end
-
-function InputHandler:releasePushAttack()
-	if not self.isAttacking then return end
-	self.isAttacking = false
-
-	if self.combatSystem then
-		local isPowerAttack = self.attackHoldTime >= 0.3
-		self.combatSystem:performPush(isPowerAttack)
-	end
-
-	self.attackHoldTime = 0
-end
-
-function InputHandler:createPushEffect(origin, direction, range, isCharged)
-	local effect
-	if #self.effectPool > 0 then
-		effect = table.remove(self.effectPool)
-		effect.Parent = workspace
-	else
-		effect = Instance.new("Part")
-		effect.Shape = Enum.PartType.Block
-		effect.Anchored = true
-		effect.CanCollide = false
-	end
-
-	if isCharged then
-		effect.Size = Vector3.new(4, 3, range)
-		effect.Color = Color3.fromRGB(255, 100, 0)
-		effect.Material = Enum.Material.Neon
-		effect.Transparency = 0.3
-	else
-		effect.Size = Vector3.new(3, 2, range * 0.6)
-		effect.Color = Color3.fromRGB(100, 200, 255)
-		effect.Material = Enum.Material.Neon
-		effect.Transparency = 0.5
-	end
-
-	effect.CFrame = CFrame.lookAt(origin + direction * range * 0.3, origin + direction * range)
-
-	local debris = game:GetService("Debris")
-	debris:AddItem(effect, 0.15)
-end
-
-function InputHandler:applyPushToEnemies(origin, direction, range, force, damage)
-	local enemyFolder = workspace:FindFirstChild("Enemies")
-	if not enemyFolder then return end
-
-	local rangeSq = range * range
-
-	for _, enemy in ipairs(enemyFolder:GetChildren()) do
-		local enemyHRP = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Root")
-		if enemyHRP then
-			local toEnemy = enemyHRP.Position - origin
-			local distSq = toEnemy.X * toEnemy.X + toEnemy.Y * toEnemy.Y + toEnemy.Z * toEnemy.Z
-
-			if distSq < rangeSq then
-				local dist = math.sqrt(distSq)
-				local dot = (toEnemy.X * direction.X + toEnemy.Y * direction.Y + toEnemy.Z * direction.Z) / dist
-
-				if dot > 0.5 then
-					local pushVec = direction * force + Vector3.new(0, force * 0.3, 0)
-					local bv = enemyHRP:FindFirstChild("BodyVelocity")
-					if not bv then
-						bv = Instance.new("BodyVelocity")
-						bv.MaxForce = Vector3.new(10000, 10000, 10000)
-						bv.Parent = enemyHRP
-					end
-					bv.Velocity = pushVec
-					game:GetService("Debris"):AddItem(bv, 0.25)
-
-					local enemyHumanoid = enemy:FindFirstChild("Humanoid")
-					if enemyHumanoid then
-						enemyHumanoid:TakeDamage(damage)
-					end
-				end
-			end
+	if self.isCookingGrenade then
+		local cookTime = tick() - self.grenadeCookStart
+		if cookTime >= 4 then
+			self.isCookingGrenade = false
+			print("Grenade exploded in hand!")
+			local equipData = self.inventoryUI and self.inventoryUI.equips["Throwable"]
+			self.itemHandler:throwGrenade(0, 0, equipData)
+			self:setWeaponMode("Melee")
 		end
 	end
-end
 
-function InputHandler:updateShieldVisual()
 	if not self.blockShield then return end
 	local player = Players.LocalPlayer
-	local character = player.Character
-	if not character then return end
-	local hrp = character:FindFirstChild("HumanoidRootPart")
+	local char = player.Character
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
-
 	self.blockShield.CFrame = hrp.CFrame * CFrame.new(0, 0, -2.5)
 end
 

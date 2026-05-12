@@ -79,9 +79,12 @@ function LobbyRacePicker:show()
 		raceButton.BackgroundTransparency = 0.4
 		raceButton.BorderSizePixel = 2
 		raceButton.BorderColor3 = raceStats.color
-		raceButton.Text = raceStats.name .. "\n\nHP: " .. raceStats.hp .. "\nRegen: " .. raceStats.regenRate .. "/s\n\n" .. raceStats.description
+		local shieldText = raceStats.hasShield and ("\nShield: " .. raceStats.shieldMax) or ""
+		raceButton.Text = raceStats.name .. "\n\nHP: " .. raceStats.hp .. shieldText .. "\nRegen: " .. raceStats.regenRate .. "/s\n\n" .. raceStats.description
 		raceButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		raceButton.TextSize = 16
+		raceButton.TextWrapped = true
+		raceButton.TextScaled = false
+		raceButton.TextSize = 18
 		raceButton.Font = Enum.Font.GothamBold
 		raceButton.Parent = container
 
