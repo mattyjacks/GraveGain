@@ -410,7 +410,10 @@ function GatewaySystem:reset_character()
 	camera.CameraType = Enum.CameraType.Custom
 	
 	-- Reset humanoid to default
-	humanoid.Health = humanoid.MaxHealth
+	local humanoid = character:FindFirstChild("Humanoid")
+	if humanoid then
+		humanoid.Health = humanoid.MaxHealth
+	end
 	
 	-- Teleport back to center
 	humanoid_root_part.CFrame = CFrame.new(Vector3.new(0, 3, 0))

@@ -168,7 +168,7 @@ function SettingsManager:create_settings_ui()
 		self:toggle_settings()
 	end)
 	
-	screen_gui:SetAttribute("ContentLabel", content_label)
+	self.content_label = content_label
 end
 
 function SettingsManager:toggle_settings()
@@ -182,14 +182,9 @@ function SettingsManager:toggle_settings()
 end
 
 function SettingsManager:switch_tab(tab_name)
-	local player = Players.LocalPlayer
-	local player_gui = player:WaitForChild("PlayerGui")
-	local settings_ui = player_gui:FindFirstChild("SettingsUI")
+	if not self.content_label then return end
 	
-	if not settings_ui then return end
-	
-	local content_label = settings_ui:GetAttribute("ContentLabel")
-	if not content_label then return end
+	local content_label = self.content_label
 	
 	if tab_name == "Graphics" then
 		content_label.Text = "Graphics Settings\n\nQuality: " .. self:_get_quality_name() ..

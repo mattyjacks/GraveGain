@@ -38,7 +38,7 @@ function MissionHUD:create_hud_screen(player_gui)
 	player_stats.BorderSizePixel = 0
 	player_stats.TextColor3 = Color3.fromRGB(200, 200, 200)
 	player_stats.TextSize = 14
-	player_stats.Font = Enum.Font.GothamMono
+	player_stats.Font = Enum.Font.Gotham
 	player_stats.TextXAlignment = Enum.TextXAlignment.Left
 	player_stats.TextYAlignment = Enum.TextYAlignment.Top
 	player_stats.Text = "HP: 100/100\nStamina: 100/100\nAmmo: 30/30"
@@ -54,7 +54,7 @@ function MissionHUD:create_hud_screen(player_gui)
 	mission_stats.BorderSizePixel = 0
 	mission_stats.TextColor3 = Color3.fromRGB(200, 200, 200)
 	mission_stats.TextSize = 14
-	mission_stats.Font = Enum.Font.GothamMonospace
+	mission_stats.Font = Enum.Font.Gotham
 	mission_stats.TextXAlignment = Enum.TextXAlignment.Right
 	mission_stats.TextYAlignment = Enum.TextYAlignment.Top
 	mission_stats.Text = "Wave: 1\nEnemies: 0\nIntensity: 0.3"
@@ -82,7 +82,7 @@ function MissionHUD:create_hud_screen(player_gui)
 	weapon_info.BorderSizePixel = 0
 	weapon_info.TextColor3 = Color3.fromRGB(200, 200, 200)
 	weapon_info.TextSize = 14
-	weapon_info.Font = Enum.Font.GothamMonospace
+	weapon_info.Font = Enum.Font.Gotham
 	weapon_info.TextXAlignment = Enum.TextXAlignment.Left
 	weapon_info.TextYAlignment = Enum.TextYAlignment.Bottom
 	weapon_info.Text = "Sword\nMelee"
@@ -103,13 +103,13 @@ function MissionHUD:create_hud_screen(player_gui)
 	minimap_text.BackgroundTransparency = 1
 	minimap_text.TextColor3 = Color3.fromRGB(200, 200, 200)
 	minimap_text.TextSize = 12
-	minimap_text.Font = Enum.Font.GothamMonospace
+	minimap_text.Font = Enum.Font.Gotham
 	minimap_text.Text = "MINIMAP"
 	minimap_text.Parent = minimap
 	
-	screen_gui:SetAttribute("PlayerStats", player_stats)
-	screen_gui:SetAttribute("MissionStats", mission_stats)
-	screen_gui:SetAttribute("WeaponInfo", weapon_info)
+	self.player_stats_label = player_stats
+	self.mission_stats_label = mission_stats
+	self.weapon_info_label = weapon_info
 end
 
 function MissionHUD:setup_update_loop()
@@ -119,13 +119,7 @@ function MissionHUD:setup_update_loop()
 end
 
 function MissionHUD:update_hud()
-	local screen_gui = player_gui:FindFirstChild("MissionHUD")
-	if not screen_gui then return end
-	
-	local player_stats = screen_gui:GetAttribute("PlayerStats")
-	local mission_stats = screen_gui:GetAttribute("MissionStats")
-	
-	if not player_stats or not mission_stats then return end
+	if not self.player_stats_label or not self.mission_stats_label then return end
 	
 	-- Update player stats
 	if player.Character and player.Character:FindFirstChild("Humanoid") then
@@ -135,7 +129,7 @@ function MissionHUD:update_hud()
 		local hp = math.floor(humanoid.Health)
 		local max_hp = math.floor(humanoid.MaxHealth)
 		
-		player_stats.Text = string.format(
+		self.player_stats_label.Text = string.format(
 			"HP: %d/%d\nStamina: 100/100\nAmmo: 30/30",
 			hp,
 			max_hp
@@ -143,7 +137,7 @@ function MissionHUD:update_hud()
 	end
 	
 	-- Update mission stats (placeholder)
-	mission_stats.Text = "Wave: 1\nEnemies: 5\nIntensity: 0.5"
+	self.mission_stats_label.Text = "Wave: 1\nEnemies: 5\nIntensity: 0.5"
 end
 
 return MissionHUD

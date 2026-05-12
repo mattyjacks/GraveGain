@@ -13,8 +13,8 @@ local humanoid
 local head
 local camera = workspace.CurrentCamera
 
-local MOVE_SPEED = 24
-local SPRINT_SPEED = 40
+local MOVE_SPEED = 16
+local SPRINT_SPEED = 24
 local MOUSE_SENSITIVITY = 0.002
 local is_sprinting = false
 
@@ -129,7 +129,8 @@ function GatewayFPSController:update_movement()
 	end
 
 	local speed = is_sprinting and SPRINT_SPEED or MOVE_SPEED
-	humanoid:Move(move_dir * speed)
+	-- Scale speed down for per-frame movement to prevent clipping through walls
+	humanoid:Move(move_dir * speed * 0.5)
 
 	-- Rotate character body to match yaw (horizontal only)
 	humanoid_root_part.CFrame = CFrame.new(humanoid_root_part.Position)

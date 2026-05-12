@@ -106,7 +106,7 @@ function Inventory:create_inventory_ui()
 		slot_label.BackgroundTransparency = 1
 		slot_label.TextColor3 = Color3.fromRGB(200, 200, 200)
 		slot_label.TextSize = 10
-		slot_label.Font = Enum.Font.GothamMonospace
+		slot_label.Font = Enum.Font.Gotham
 		slot_label.Text = ""
 		slot_label.Parent = slot
 	end
@@ -127,7 +127,7 @@ function Inventory:create_inventory_ui()
 	info_label.BackgroundTransparency = 1
 	info_label.TextColor3 = Color3.fromRGB(200, 200, 200)
 	info_label.TextSize = 12
-	info_label.Font = Enum.Font.GothamMonospace
+	info_label.Font = Enum.Font.Gotham
 	info_label.TextXAlignment = Enum.TextXAlignment.Left
 	info_label.TextYAlignment = Enum.TextYAlignment.Top
 	info_label.Text = "Select an item\nfor details"

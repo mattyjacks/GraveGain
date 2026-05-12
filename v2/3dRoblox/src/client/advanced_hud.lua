@@ -39,7 +39,7 @@ function AdvancedHUD:create_advanced_hud(player_gui)
 	player_stats.BorderColor3 = Color3.fromRGB(100, 100, 150)
 	player_stats.TextColor3 = Color3.fromRGB(200, 200, 200)
 	player_stats.TextSize = 12
-	player_stats.Font = Enum.Font.GothamMono
+	player_stats.Font = Enum.Font.Gotham
 	player_stats.TextXAlignment = Enum.TextXAlignment.Left
 	player_stats.TextYAlignment = Enum.TextYAlignment.Top
 	player_stats.Text = "HP: 100/100\nStamina: 100/100\nGold: 0\nLevel: 1"
@@ -56,7 +56,7 @@ function AdvancedHUD:create_advanced_hud(player_gui)
 	objectives.BorderColor3 = Color3.fromRGB(100, 100, 150)
 	objectives.TextColor3 = Color3.fromRGB(200, 200, 200)
 	objectives.TextSize = 12
-	objectives.Font = Enum.Font.GothamMonospace
+	objectives.Font = Enum.Font.Gotham
 	objectives.TextXAlignment = Enum.TextXAlignment.Right
 	objectives.TextYAlignment = Enum.TextYAlignment.Top
 	objectives.Text = "WAVE: 1\nENEMIES: 0\nINTENSITY: 0.3\nTIME: 0:00"
@@ -88,7 +88,7 @@ function AdvancedHUD:create_advanced_hud(player_gui)
 	distance.BackgroundTransparency = 1
 	distance.TextColor3 = Color3.fromRGB(150, 200, 100)
 	distance.TextSize = 10
-	distance.Font = Enum.Font.GothamMonospace
+	distance.Font = Enum.Font.Gotham
 	distance.Text = "0m"
 	distance.Parent = crosshair_frame
 	
@@ -103,7 +103,7 @@ function AdvancedHUD:create_advanced_hud(player_gui)
 	weapon_info.BorderColor3 = Color3.fromRGB(100, 100, 150)
 	weapon_info.TextColor3 = Color3.fromRGB(200, 200, 200)
 	weapon_info.TextSize = 12
-	weapon_info.Font = Enum.Font.GothamMonospace
+	weapon_info.Font = Enum.Font.Gotham
 	weapon_info.TextXAlignment = Enum.TextXAlignment.Left
 	weapon_info.TextYAlignment = Enum.TextYAlignment.Bottom
 	weapon_info.Text = "SWORD\nMelee | 25 DMG\n[1] [2] [3] [4]"
@@ -127,7 +127,7 @@ function AdvancedHUD:create_advanced_hud(player_gui)
 	minimap_canvas.BackgroundTransparency = 1
 	minimap_canvas.TextColor3 = Color3.fromRGB(100, 200, 100)
 	minimap_canvas.TextSize = 10
-	minimap_canvas.Font = Enum.Font.GothamMonospace
+	minimap_canvas.Font = Enum.Font.Gotham
 	minimap_canvas.Text = "MINIMAP"
 	minimap_canvas.Parent = minimap_frame
 	
@@ -148,7 +148,7 @@ function AdvancedHUD:create_advanced_hud(player_gui)
 	radar_label.BackgroundTransparency = 1
 	radar_label.TextColor3 = Color3.fromRGB(255, 100, 100)
 	radar_label.TextSize = 8
-	radar_label.Font = Enum.Font.GothamMonospace
+	radar_label.Font = Enum.Font.Gotham
 	radar_label.Text = "RADAR\n• • •"
 	radar_label.Parent = radar_frame
 	
@@ -169,11 +169,11 @@ function AdvancedHUD:create_advanced_hud(player_gui)
 	health_bar_fg.BorderSizePixel = 0
 	health_bar_fg.Parent = health_bar_bg
 	
-	screen_gui:SetAttribute("PlayerStats", player_stats)
-	screen_gui:SetAttribute("Objectives", objectives)
-	screen_gui:SetAttribute("Distance", distance)
-	screen_gui:SetAttribute("HealthBarFG", health_bar_fg)
-	screen_gui:SetAttribute("RadarLabel", radar_label)
+	self.player_stats_label = player_stats
+	self.objectives_label = objectives
+	self.distance_label = distance
+	self.health_bar_fg = health_bar_fg
+	self.radar_label = radar_label
 end
 
 function AdvancedHUD:setup_update_loop()
@@ -183,16 +183,7 @@ function AdvancedHUD:setup_update_loop()
 end
 
 function AdvancedHUD:update_hud()
-	local screen_gui = player_gui:FindFirstChild("AdvancedHUD")
-	if not screen_gui then return end
-	
-	local player_stats = screen_gui:GetAttribute("PlayerStats")
-	local objectives = screen_gui:GetAttribute("Objectives")
-	local distance_label = screen_gui:GetAttribute("Distance")
-	local health_bar_fg = screen_gui:GetAttribute("HealthBarFG")
-	local radar_label = screen_gui:GetAttribute("RadarLabel")
-	
-	if not player_stats then return end
+	if not self.player_stats_label then return end
 	
 	-- Update player stats
 	if player.Character and player.Character:FindFirstChild("Humanoid") then
@@ -210,7 +201,7 @@ function AdvancedHUD:update_hud()
 			end
 		end
 		
-		player_stats.Text = string.format(
+		self.player_stats_label.Text = string.format(
 			"HP: %d/%d\nStamina: 100/100\nGold: %d\nLevel: 1",
 			hp,
 			max_hp,
@@ -219,8 +210,8 @@ function AdvancedHUD:update_hud()
 		
 		-- Update health bar
 		local health_ratio = hp / max_hp
-		health_bar_fg.Size = UDim2.new(health_ratio, 0, 1, 0)
-		health_bar_fg.BackgroundColor3 = Color3.fromRGB(
+		self.health_bar_fg.Size = UDim2.new(health_ratio, 0, 1, 0)
+		self.health_bar_fg.BackgroundColor3 = Color3.fromRGB(
 			255 * (1 - health_ratio),
 			255 * health_ratio,
 			0
@@ -228,13 +219,13 @@ function AdvancedHUD:update_hud()
 	end
 	
 	-- Update objectives (placeholder)
-	objectives.Text = "WAVE: 1\nENEMIES: 5\nINTENSITY: 0.5\nTIME: 0:30"
+	self.objectives_label.Text = "WAVE: 1\nENEMIES: 5\nINTENSITY: 0.5\nTIME: 0:30"
 	
 	-- Update distance (placeholder)
-	distance_label.Text = "25m"
+	self.distance_label.Text = "25m"
 	
 	-- Update radar (placeholder)
-	radar_label.Text = "RADAR\n• • •"
+	self.radar_label.Text = "RADAR\n• • •"
 end
 
 return AdvancedHUD

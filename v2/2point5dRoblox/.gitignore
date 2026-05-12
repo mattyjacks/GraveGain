@@ -1,0 +1,24 @@
+# Rojo
+.rojo/
+*.rbxl
+*.rbxm
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if using npm packages)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
