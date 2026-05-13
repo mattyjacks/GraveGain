@@ -22,7 +22,6 @@ local SpaceEnv        = require(ClientFolder:WaitForChild("space_environment"))
 local UtilityHandler  = require(ClientFolder:WaitForChild("utility_handler"))
 local TalentUI        = require(ClientFolder:WaitForChild("talent_ui"))
 local LobbyRacePicker = require(ClientFolder:WaitForChild("lobby_race_picker"))
-local ParachuteHandler = require(ClientFolder:WaitForChild("parachute_handler"))
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameData = require(Shared:WaitForChild("game_data"))
@@ -31,7 +30,7 @@ local Minimap           = require(ClientFolder:WaitForChild("minimap"))
 local EnemyHealthbars   = require(ClientFolder:WaitForChild("enemy_healthbars"))
 local DeathScreen       = require(ClientFolder:WaitForChild("death_screen"))
 local ZoneRenderer      = require(ClientFolder:WaitForChild("zone_renderer"))
-local DropPod           = require(ClientFolder:WaitForChild("drop_pod"))
+local EntranceController = require(ClientFolder:WaitForChild("entrance_controller"))
 
 -- ── State ──────────────────────────────────────────────────────────────────
 
@@ -44,12 +43,15 @@ local gameState = "lobby"
 local cameraController = CameraController.new()
 local combatSystem       = CombatSystem.new()
 local movementController = MovementController.new()
+local inventoryManager  = InventoryManager.new()
 local inputHandler       = InputHandler.new(combatSystem)
+local inventoryUI       = InventoryUI.new(inventoryManager, inputHandler)
+inputHandler.inventoryUI = inventoryUI
+
 local utilityHandler     = nil
 local playerStats        = nil
 local hud                = nil
 local talentUI           = nil
-local parachuteHandler   = nil
 
 -- ── Initialization ─────────────────────────────────────────────────────────
 
@@ -111,7 +113,43 @@ local function initializeOpenWorld()
 	applyRaceScale(character, selectedRace)
 	
 	talentUI = TalentUI.new(playerStats)
-	parachuteHandler = ParachuteHandler.new(character)
+	
+	-- Setup Weapons
+	inputHandler.character = character
+	inputHandler.rightHand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+	
+	if not inventoryUI.equips.Primary then
+		inventoryUI.equips.Primary = { 
+			name = "Old Stick", w = 1, h = 3, 
+			model = WeaponGenerator.createStick(), 
+			color = Color3.fromRGB(130, 100, 60),
+			offset = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(90), 0, 0)
+		}
+	end
+	if not inventoryUI.equips.Secondary then
+		inventoryUI.equips.Secondary = { 
+			name = "Recurve Bow", w = 2, h = 4, 
+			model = WeaponGenerator.createBow(), 
+			color = Color3.fromRGB(100, 80, 50),
+			offset = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(90), 0)
+		}
+	end
+	if not inventoryUI.equips.Consumable then
+		inventoryUI.equips.Consumable = { 
+			name = "Health Pot", w = 1, h = 1, 
+			model = WeaponGenerator.createPotion(), 
+			color = Color3.fromRGB(50, 200, 50) 
+		}
+	end
+	if not inventoryUI.equips.Throwable then
+		inventoryUI.equips.Throwable = { 
+			name = "Grenade", w = 1, h = 1, 
+			model = WeaponGenerator.createFragGrenade(), 
+			color = Color3.fromRGB(80, 90, 80) 
+		}
+	end
+	
+	inputHandler:setWeaponMode("Melee")
 end
 
 local function initializeDungeon()
@@ -153,6 +191,9 @@ player.CharacterAdded:Connect(function(newCharacter)
 	if utilityHandler then
 		utilityHandler.darkvisionActive = false -- Reset effects
 	end
+	inputHandler.character = character
+	inputHandler.rightHand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+	inputHandler:setWeaponMode(inputHandler.weaponMode) -- Refresh weld
 	applyRaceScale(character, selectedRace)
 end)
 
@@ -192,14 +233,12 @@ end)
 
 -- Launch Drop Pod sequence
 ReplicatedStorage:WaitForChild("StartDropPodLaunch").OnClientEvent:Connect(function(landingPos, difficulty)
-	print("Launching drop pod to:", landingPos)
+	print("Launching entrance sequence to:", landingPos)
 	LoadingScreen.show("Initializing Drop Sequence...")
+	task.wait(0.5)
+	LoadingScreen.hide(0.2)
 	
-	DropPod.launch(landingPos, function()
-		if character and character:FindFirstChild("HumanoidRootPart") then
-			character:SetPivot(CFrame.new(landingPos + Vector3.new(0, 5, 0)))
-		end
-		LoadingScreen.hide(0.5)
+	EntranceController.launch(selectedRace, landingPos, function()
 		initializeOpenWorld()
 		
 		-- Set mission based on difficulty (placeholder)

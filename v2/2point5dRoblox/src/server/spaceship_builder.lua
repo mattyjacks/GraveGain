@@ -103,32 +103,8 @@ function SpaceshipBuilder.build(parent, origin)
 		})
 	end
 
-	-- ── Open Bridge (No roof) ──────────────────────────────────────────
-	-- Inner deck base (Modular Ring)
-	for i = 1, 8 do
-		local angle = math.rad((i-1) * (360 / 8))
-		local midAngle = angle + math.rad(180 / 8)
-		part(model, {
-			Name = "DomeBaseSegment_" .. i,
-			Size = Vector3.new(15, 8, 15),
-			Color = HULL_COLOR, Material = METAL,
-			CFrame = CFrame.new(ox + math.cos(midAngle) * 15, oy + 8, oz + math.sin(midAngle) * 15)
-				* CFrame.Angles(0, -midAngle, 0)
-		})
-	end
-	-- Guard rails around the open top
-	for i = 1, 16 do
-		local rad = math.rad(i * (360/16))
-		local r = 22
-		local rx = ox + math.cos(rad) * r
-		local rz = oz + math.sin(rad) * r
-		part(model, {
-			Name = "Rail", Shape = Enum.PartType.Block,
-			Size = Vector3.new(1, 6, 4),
-			Color = DETAIL_COLOR, Material = METAL,
-			CFrame = CFrame.new(rx, oy + 12, rz) * CFrame.Angles(0, -rad, 0),
-		})
-	end
+	-- ── Open Bridge (Cleared of obstructions) ──────────────────────────
+	-- Exterior hull detail only
 
 	-- ── Engine pods (×4, Massive) ────────────────────────────────
 	local angles = {0, 90, 180, 270}
@@ -226,8 +202,8 @@ function SpaceshipBuilder.build(parent, origin)
 	local pillarCount = 6
 	for i = 1, pillarCount do
 		local angle = math.rad((i-1) * (360 / pillarCount))
-		local px = ox + math.cos(angle) * 40
-		local pz = oz + math.sin(angle) * 40
+		local px = ox + math.cos(angle) * 65
+		local pz = oz + math.sin(angle) * 65
 		
 		part(model, {
 			Name = "Pillar_" .. i, Shape = Enum.PartType.Cylinder,

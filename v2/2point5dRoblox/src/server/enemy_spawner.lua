@@ -2,6 +2,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameData = require(Shared:WaitForChild("game_data"))
+local PathfindingService = game:GetService("PathfindingService")
 
 local EnemySpawner = {}
 EnemySpawner.__index = EnemySpawner
@@ -12,9 +13,9 @@ function EnemySpawner.new()
 	local self = setmetatable({}, EnemySpawner)
 
 	self.enemies = {}
-	self.maxEnemies = 12
+	self.maxEnemies = 20
 	self.spawnCooldown = 0
-	self.spawnRate = 3
+	self.spawnRate = 2.5
 
 	local folder = workspace:FindFirstChild("Enemies")
 	if not folder then
@@ -29,8 +30,12 @@ end
 
 function EnemySpawner:spawnInDungeon(dungeon)
 	self.dungeon = dungeon
-	for i = 1, math.min(6, self.maxEnemies) do
-		self:spawnSkull()
+	for i = 1, math.min(8, self.maxEnemies) do
+		if math.random() > 0.5 then
+			self:spawnSkull()
+		else
+			self:spawnSkeleton()
+		end
 	end
 end
 
@@ -39,9 +44,9 @@ function EnemySpawner:update(dt)
 
 	if self.spawnCooldown <= 0 and #self.enemies < self.maxEnemies then
 		if self.dungeon then
-			self:spawnSkull()
+			if math.random() > 0.4 then self:spawnSkull() else self:spawnSkeleton() end
 		else
-			self:spawnOpenWorldSkull()
+			if math.random() > 0.4 then self:spawnOpenWorldSkull() else self:spawnOpenWorldSkeleton() end
 		end
 		self.spawnCooldown = self.spawnRate
 	end
@@ -51,7 +56,7 @@ function EnemySpawner:update(dt)
 		if not enemy.model or not enemy.model.Parent then
 			table.remove(self.enemies, i)
 		else
-			self:updateSkullAI(enemy, dt)
+			self:updateEnemyAI(enemy, dt, gameManager)
 		end
 	end
 end
@@ -101,7 +106,36 @@ function EnemySpawner:spawnOpenWorldSkull()
 		state = "wander",
 		wanderDir = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit,
 		wanderTimer = math.random() * 3,
-		aggroRange = 35,
+		aggroRange = 100,
+		path = nil,
+		pathIndex = 1,
+		pathPoints = {},
+		lastPathTime = 0,
+		attackCooldown = 0,
+	})
+end
+
+function EnemySpawner:spawnOpenWorldSkeleton()
+	local pos = self:getRandomOpenWorldSpawnPosition()
+	if not pos then return end
+	local skeleton = self:buildSkeletonModel(pos)
+	table.insert(self.enemies, {
+		type = "Skeleton",
+		model = skeleton,
+		root = skeleton.PrimaryPart,
+		health = 50,
+		maxHealth = 50,
+		speed = 10 + math.random() * 3,
+		target = nil,
+		state = "wander",
+		wanderDir = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit,
+		wanderTimer = math.random() * 3,
+		aggroRange = 100,
+		path = nil,
+		pathIndex = 1,
+		pathPoints = {},
+		lastPathTime = 0,
+		attackCooldown = 0,
 	})
 end
 
@@ -151,7 +185,35 @@ function EnemySpawner:spawnSkull()
 		state = "wander",
 		wanderDir = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit,
 		wanderTimer = math.random() * 3,
-		aggroRange = 25,
+		aggroRange = 80,
+		path = nil,
+		pathIndex = 1,
+		pathPoints = {},
+		lastPathTime = 0,
+		attackCooldown = 0,
+	})
+end
+
+function EnemySpawner:spawnSkeleton()
+	local pos = self:getRandomSpawnPosition()
+	local skeleton = self:buildSkeletonModel(pos)
+	table.insert(self.enemies, {
+		type = "Skeleton",
+		model = skeleton,
+		root = skeleton.PrimaryPart,
+		health = 50,
+		maxHealth = 50,
+		speed = 10 + math.random() * 3,
+		target = nil,
+		state = "wander",
+		wanderDir = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit,
+		wanderTimer = math.random() * 3,
+		aggroRange = 90,
+		path = nil,
+		pathIndex = 1,
+		pathPoints = {},
+		lastPathTime = 0,
+		attackCooldown = 0,
 	})
 end
 
@@ -160,6 +222,7 @@ function EnemySpawner:buildSkullModel(position)
 	model.Name = "Skull"
 
 	local rng = Random.new()
+	local scale = rng:NextNumber(0.8, 1.3)
 
 	local skullColor = Color3.fromRGB(
 		220 + rng:NextInteger(0, 35),
@@ -173,10 +236,35 @@ function EnemySpawner:buildSkullModel(position)
 	cranium.Size = Vector3.new(2.4, 2.2, 2.2)
 	cranium.Color = skullColor
 	cranium.Material = Enum.Material.SmoothPlastic
-	cranium.Anchored = true
+	cranium.Anchored = false
 	cranium.CanCollide = true
 	cranium.CFrame = CFrame.new(position)
 	cranium.Parent = model
+
+	local bgui = Instance.new("BillboardGui")
+	bgui.Name = "NameTag"
+	bgui.Adornee = cranium
+	bgui.Size = UDim2.new(0, 100, 0, 40)
+	bgui.StudsOffset = Vector3.new(0, 2, 0)
+	bgui.AlwaysOnTop = true
+	bgui.Parent = cranium
+	
+	local tl = Instance.new("TextLabel")
+	tl.BackgroundTransparency = 1
+	tl.Size = UDim2.new(1, 0, 1, 0)
+	tl.Text = "Skull"
+	tl.TextColor3 = Color3.new(1, 0.2, 0.2)
+	tl.TextStrokeTransparency = 0.5
+	tl.Font = Enum.Font.GothamBold
+	tl.TextScaled = true
+	tl.Parent = bgui
+
+	local hum = Instance.new("Humanoid")
+	hum.MaxHealth = 30
+	hum.Health = 30
+	hum.DisplayName = "Skull"
+	hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
+	hum.Parent = model
 
 	local jaw = Instance.new("Part")
 	jaw.Shape = Enum.PartType.Block
@@ -331,24 +419,116 @@ function EnemySpawner:buildSkullModel(position)
 		crackWeld.Parent = crack
 	end
 
-	local humanoid = Instance.new("Humanoid")
-	humanoid.MaxHealth = 30
-	humanoid.Health = 30
-	humanoid.Parent = model
-
 	model.PrimaryPart = cranium
+	model:ScaleTo(scale)
 	model.Parent = self.folder
 
 	return model
 end
 
-function EnemySpawner:updateSkullAI(enemy, dt)
+function EnemySpawner:buildSkeletonModel(position)
+	local model = Instance.new("Model")
+	model.Name = "Skeleton"
+
+	local boneColor = Color3.fromRGB(230, 225, 210)
+	
+	local function createPart(name, size, pos, parent)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.CFrame = CFrame.new(pos)
+		p.Color = boneColor
+		p.Material = Enum.Material.SmoothPlastic
+		p.Anchored = false
+		p.CanCollide = true
+		p.Parent = parent
+		return p
+	end
+
+	local hrp = createPart("HumanoidRootPart", Vector3.new(2, 2, 1), position, model)
+	hrp.Transparency = 1
+	model.PrimaryPart = hrp
+
+	local torso = createPart("Torso", Vector3.new(0.6, 2.2, 0.6), position, model) -- Spine
+	local pelvis = createPart("Pelvis", Vector3.new(1.8, 0.4, 0.8), position + Vector3.new(0, -1, 0), model)
+	
+	local head = createPart("Head", Vector3.new(1.1, 1.2, 1.1), position + Vector3.new(0, 1.6, 0), model)
+	
+	local function weld(p0, p1, offset)
+		local w = Instance.new("Weld")
+		w.Part0 = p0
+		w.Part1 = p1
+		w.C0 = offset
+		w.Parent = p0
+	end
+
+	weld(hrp, torso, CFrame.new())
+	weld(torso, pelvis, CFrame.new(0, -1, 0))
+	weld(torso, head, CFrame.new(0, 1.6, 0))
+
+	-- Ribcage
+	for i = 1, 4 do
+		local ribY = 0.8 - (i * 0.4)
+		local ribSize = 2.0 - (i * 0.2)
+		local rib = createPart("Rib"..i, Vector3.new(ribSize, 0.15, 0.7), position + Vector3.new(0, ribY, 0), model)
+		weld(torso, rib, CFrame.new(0, ribY, 0))
+	end
+
+	-- Arms and Legs
+	local ra = createPart("Right Arm", Vector3.new(0.4, 2.2, 0.4), position + Vector3.new(1.2, 0.4, 0), model)
+	local la = createPart("Left Arm", Vector3.new(0.4, 2.2, 0.4), position + Vector3.new(-1.2, 0.4, 0), model)
+	local rl = createPart("Right Leg", Vector3.new(0.5, 2.4, 0.5), position + Vector3.new(0.5, -2.2, 0), model)
+	local ll = createPart("Left Leg", Vector3.new(0.5, 2.4, 0.5), position + Vector3.new(-0.5, -2.2, 0), model)
+
+	weld(torso, ra, CFrame.new(1.2, 0.4, 0))
+	weld(torso, la, CFrame.new(-1.2, 0.4, 0))
+	weld(pelvis, rl, CFrame.new(0.5, -1.2, 0))
+	weld(pelvis, ll, CFrame.new(-0.5, -1.2, 0))
+
+	-- Glowing Eyes
+	for i = -1, 1, 2 do
+		local eye = Instance.new("Part")
+		eye.Name = (i == -1 and "Left" or "Right") .. "Eye"
+		eye.Shape = Enum.PartType.Ball
+		eye.Size = Vector3.new(0.25, 0.25, 0.25)
+		eye.Color = Color3.fromRGB(255, 0, 0)
+		eye.Material = Enum.Material.Neon
+		eye.CanCollide = false
+		eye.Parent = model
+		
+		local ew = Instance.new("WeldConstraint")
+		ew.Part0 = head; ew.Part1 = eye; ew.Parent = eye
+		eye.CFrame = head.CFrame * CFrame.new(i * 0.25, 0.1, -0.45)
+		
+		local l = Instance.new("PointLight")
+		l.Color = Color3.new(1, 0, 0)
+		l.Brightness = 2
+		l.Range = 4
+		l.Parent = eye
+	end
+
+	local humanoid = Instance.new("Humanoid")
+	humanoid.MaxHealth = 50
+	humanoid.Health = 50
+	humanoid.DisplayName = "Skeleton"
+	humanoid.HipHeight = 2.4
+	humanoid.JumpPower = 50
+	humanoid.Parent = model
+
+	model.Parent = self.folder
+	return model
+end
+
+function EnemySpawner:updateEnemyAI(enemy, dt)
 	local root = enemy.root
-	if not root then return end
+	if not root or not root.Parent then return end
+	local humanoid = enemy.model:FindFirstChild("Humanoid")
+	if not humanoid then return end
 
 	local players = game:GetService("Players"):GetPlayers()
 	local nearestDist = math.huge
 	local nearestPos = nil
+	local nearestPlayer = nil
 
 	for _, player in ipairs(players) do
 		local char = player.Character
@@ -359,6 +539,7 @@ function EnemySpawner:updateSkullAI(enemy, dt)
 				if dist < nearestDist then
 					nearestDist = dist
 					nearestPos = hrp.Position
+					nearestPlayer = player
 				end
 			end
 		end
@@ -369,8 +550,106 @@ function EnemySpawner:updateSkullAI(enemy, dt)
 		enemy.target = nearestPos
 	else
 		enemy.state = "wander"
+		enemy.target = nil
 	end
 
+	-- Attack logic
+	enemy.attackCooldown = math.max(0, (enemy.attackCooldown or 0) - dt)
+	if nearestPlayer and nearestDist < 6 and enemy.attackCooldown <= 0 then
+		enemy.attackCooldown = 1.5
+		local damage = (enemy.type == "Skeleton" and 15 or 8)
+		if gameManager then
+			gameManager:handlePlayerDamage(nearestPlayer, damage, "Physical", root.Position)
+		end
+	end
+
+	-- Pathfinding logic
+	if enemy.state == "chase" and enemy.target then
+		local now = tick()
+		if now - enemy.lastPathTime > 0.5 then
+			enemy.lastPathTime = now
+			local path = PathfindingService:CreatePath({
+				AgentRadius = 3,
+				AgentHeight = 5,
+				AgentCanJump = true,
+			})
+			
+			local success, errorMessage = pcall(function()
+				path:ComputeAsync(root.Position, enemy.target)
+			end)
+
+			if success and path.Status == Enum.PathStatus.Success then
+				enemy.pathPoints = path:GetWaypoints()
+				enemy.pathIndex = 2
+			else
+				-- Fallback to direct move if pathfinding fails
+				enemy.pathPoints = { {Position = enemy.target} }
+				enemy.pathIndex = 1
+			end
+		end
+
+		if #enemy.pathPoints > 0 and enemy.pathIndex <= #enemy.pathPoints then
+			local nextPoint = enemy.pathPoints[enemy.pathIndex]
+			local moveDir = (nextPoint.Position - root.Position)
+			
+			if moveDir.Magnitude < 3 then
+				enemy.pathIndex = enemy.pathIndex + 1
+			else
+				-- Jumping logic
+				-- Jumping logic: Better detection for 2.5D terrain
+				if nextPoint.Action == Enum.PathWaypointAction.Jump or (nextPoint.Position.Y - root.Position.Y) > 1.5 then
+					humanoid.Jump = true
+				end
+				
+				-- Procedural Wobble for Skeletons
+				if enemy.type == "Skeleton" then
+					enemy.wobbleTime = (enemy.wobbleTime or 0) + dt * 10
+					local wobble = math.sin(enemy.wobbleTime) * 0.15
+					local armWobble = math.cos(enemy.wobbleTime) * 0.3
+					
+					local ra = enemy.model:FindFirstChild("Right Arm")
+					local la = enemy.model:FindFirstChild("Left Arm")
+					if ra then ra.LocalTransparencyModifier = 0 end -- ensure visible
+					
+					-- We'll just let the Humanoid handle the move, but we can tilt the torso
+					local torso = enemy.model:FindFirstChild("Torso")
+					if torso then
+						-- Simple tilt based on movement
+						-- (This is hard with welds but we can try)
+					end
+				end
+				
+				-- Use moveDir to navigate
+				if enemy.type == "Skull" then
+					-- Hopping specialized logic
+					self:handleSkullMovement(enemy, moveDir.Unit, dt)
+				else
+					humanoid:MoveTo(nextPoint.Position)
+				end
+			end
+		end
+	else
+		-- Wander logic
+		enemy.wanderTimer = enemy.wanderTimer - dt
+		if enemy.wanderTimer <= 0 then
+			enemy.wanderDir = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit
+			enemy.wanderTimer = 2 + math.random() * 3
+		end
+		
+		if enemy.type == "Skull" then
+			self:handleSkullMovement(enemy, enemy.wanderDir, dt)
+		else
+			humanoid:MoveTo(root.Position + enemy.wanderDir * 5)
+		end
+	end
+
+	if humanoid.Health <= 0 then
+		self:killEnemy(enemy)
+	end
+end
+
+function EnemySpawner:handleSkullMovement(enemy, moveDir, dt)
+	local root = enemy.root
 	enemy.hopTimer = enemy.hopTimer + dt
 	if enemy.hopTimer >= enemy.hopInterval then
 		enemy.hopTimer = 0
@@ -380,51 +659,35 @@ function EnemySpawner:updateSkullAI(enemy, dt)
 
 	if enemy.isHopping then
 		enemy.hopPhase = enemy.hopPhase + dt * 8
-
 		local hopHeight = math.sin(enemy.hopPhase) * 1.5
 		if hopHeight < 0 then
 			hopHeight = 0
 			enemy.isHopping = false
 		end
 
-		local moveDir
-		if enemy.state == "chase" and enemy.target then
-			moveDir = (enemy.target - root.Position)
-			moveDir = Vector3.new(moveDir.X, 0, moveDir.Z)
-			if moveDir.Magnitude > 0.1 then
-				moveDir = moveDir.Unit
-			else
-				moveDir = Vector3.new(0, 0, 0)
-			end
-		else
-			enemy.wanderTimer = enemy.wanderTimer - dt
-			if enemy.wanderTimer <= 0 then
-				enemy.wanderDir = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit
-				enemy.wanderTimer = 2 + math.random() * 3
-			end
-			moveDir = enemy.wanderDir
-		end
-
 		local hopDist = enemy.speed * dt
-		local newPos = root.Position + moveDir * hopDist + Vector3.new(0, hopHeight - root.Position.Y + 2, 0)
+		local newPos = root.Position + moveDir * hopDist + Vector3.new(0, hopHeight - (root.Position.Y - getGroundY(root.Position)), 0)
 
+		-- Update CFrame for all parts
 		local lookTarget = root.Position + moveDir * 5
 		local newCFrame = CFrame.lookAt(newPos, Vector3.new(lookTarget.X, newPos.Y, lookTarget.Z))
-
+		
 		for _, part in ipairs(enemy.model:GetDescendants()) do
 			if part:IsA("BasePart") then
 				local offset = root.CFrame:ToObjectSpace(part.CFrame)
 				part.CFrame = newCFrame * offset
 			end
 		end
-
 		root.CFrame = newCFrame
 	end
+end
 
-	local hum = enemy.model:FindFirstChild("Humanoid")
-	if hum and hum.Health <= 0 then
-		self:killEnemy(enemy)
-	end
+function getGroundY(pos)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	-- Exclude characters/enemies for accurate ground detection
+	local result = workspace:Raycast(pos + Vector3.new(0, 10, 0), Vector3.new(0, -100, 0), rayParams)
+	return result and result.Position.Y or pos.Y
 end
 
 function EnemySpawner:killEnemy(enemy)

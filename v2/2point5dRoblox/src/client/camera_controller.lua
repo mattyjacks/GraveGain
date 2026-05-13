@@ -97,14 +97,29 @@ function CameraController:update(dt)
 		self.currentPosition = self.currentPosition:Lerp(targetPos, math.min(1, self.smoothSpeed * dt))
 	end
 
-	local offsetX = math.sin(self.rotationY) * math.cos(self.rotationX) * self.distance
-	local offsetY = math.sin(self.rotationX) * self.distance + self.height
-	local offsetZ = math.cos(self.rotationY) * math.cos(self.rotationX) * self.distance
+	-- Zoom-dependent behavior
+	local zoomProgress = (self.distance - self.zoomMin) / (self.zoomMax - self.zoomMin)
+	-- Drop height as we zoom in, and flatten the rotationX influence
+	local effectiveHeight = 2 + (self.height - 2) * math.sqrt(zoomProgress)
+	local effectiveRotationX = self.rotationX * math.clamp(zoomProgress * 1.5, 0, 1)
+
+	local offsetX = math.sin(self.rotationY) * math.cos(effectiveRotationX) * self.distance
+	local offsetY = math.sin(effectiveRotationX) * self.distance + effectiveHeight
+	local offsetZ = math.cos(self.rotationY) * math.cos(effectiveRotationX) * self.distance
 
 	local cameraPos = self.currentPosition + Vector3.new(offsetX, offsetY, offsetZ)
 
+	-- Raycast to prevent camera clipping through terrain
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = {self.character}
+	local rayResult = workspace:Raycast(self.currentPosition + Vector3.new(0, 2, 0), cameraPos - (self.currentPosition + Vector3.new(0, 2, 0)), rayParams)
+	if rayResult then
+		cameraPos = rayResult.Position + rayResult.Normal * 0.5
+	end
+
 	self.camera.CameraType = Enum.CameraType.Scriptable
-	self.camera.CFrame = CFrame.new(cameraPos, self.currentPosition + Vector3.new(0, 2, 0))
+	self.camera.CFrame = CFrame.new(cameraPos, self.currentPosition + Vector3.new(0, 2 + (1-zoomProgress), 0))
 end
 
 return CameraController

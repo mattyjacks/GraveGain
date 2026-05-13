@@ -53,6 +53,9 @@ function LobbyGenerator:generateLobby()
 	-- Interior lighting
 	self:buildInteriorLights(lobbyFolder)
 
+	-- Seating
+	self:buildSeats(lobbyFolder)
+
 	return lobbyFolder
 end
 
@@ -64,34 +67,114 @@ function LobbyGenerator:buildSolidDeck(parent)
 	-- Main Deck (Central and North)
 	local deck = Instance.new("Part")
 	deck.Name = "MainDeck"
-	deck.Size = Vector3.new(140, 1, 100)
-	deck.Position = Vector3.new(0, shipY + 8.5, -20)
+	deck.Size = Vector3.new(140, 1, 140)
+	deck.Position = Vector3.new(0, shipY + 8, 0)
 	deck.Color = Color3.fromRGB(20, 22, 28)
 	deck.Material = Enum.Material.Metal
 	deck.Anchored = true
 	deck.Parent = parent
-	Instance.new("UICorner", deck)
+
+	-- Central safe area (Spawn) - Raised for staircase
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "LobbySpawn"
+	spawn.Size = Vector3.new(30, 2, 30)
+	spawn.Color = Color3.fromRGB(40, 45, 65)
+	spawn.Material = Enum.Material.Metal
+	spawn.Anchored = true
+	spawn.CFrame = CFrame.new(0, shipY + 11.0, 0)
+	spawn.Parent = parent
+
+	-- 3 steps down from Spawn (at Y=11) to Deck (at Y=8)
+	local stepWidth = 40 -- Wider for easy exit
+	local stepDepth = 5
+	local startDist = 15
+	
+	-- Function to build a set of steps in a direction
+	local function buildStairs(offsetDir, rot)
+		for i = 1, 3 do
+			local step = Instance.new("Part")
+			step.Name = "Step_" .. i
+			step.Size = Vector3.new(stepWidth, 1, stepDepth)
+			local stepY = 11.0 - (i * 0.75)
+			local dist = startDist + (i-1) * stepDepth + stepDepth/2
+			step.CFrame = CFrame.new(0, shipY + 11.0, 0) * rot * CFrame.new(0, stepY - 11.0, dist)
+			step.Color = Color3.fromRGB(35, 38, 45)
+			step.Material = Enum.Material.Metal
+			step.Anchored = true
+			step.Parent = parent
+		end
+	end
+
+	buildStairs(Vector3.new(0, 0, 1), CFrame.Angles(0, 0, 0)) -- South
+	buildStairs(Vector3.new(0, 0, -1), CFrame.Angles(0, math.rad(180), 0)) -- North
+	buildStairs(Vector3.new(1, 0, 0), CFrame.Angles(0, math.rad(-90), 0)) -- East
+	buildStairs(Vector3.new(-1, 0, 0), CFrame.Angles(0, math.rad(90), 0)) -- West
 
 	-- South Walkway (around the holes)
 	local walkway = Instance.new("Part")
 	walkway.Name = "SouthWalkway"
-	walkway.Size = Vector3.new(140, 1, 20)
-	walkway.Position = Vector3.new(0, shipY + 8.5, 60)
+	walkway.Size = Vector3.new(140, 1, 30)
+	walkway.Position = Vector3.new(0, shipY + 8, 85)
 	walkway.Color = Color3.fromRGB(25, 27, 35)
 	walkway.Material = Enum.Material.Metal
 	walkway.Anchored = true
 	walkway.Parent = parent
+end
 
-	-- Central safe area (Spawn)
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "LobbySpawn"
-	spawn.Size = Vector3.new(30, 1.2, 30)
-	spawn.Color = Color3.fromRGB(40, 45, 65)
-	spawn.Material = Enum.Material.Metal
-	spawn.Anchored = true
-	spawn.CFrame = CFrame.new(0, shipY + 9.0, 0)
-	spawn.Parent = parent
-	Instance.new("UICorner", spawn)
+function LobbyGenerator:buildSeats(parent)
+	local shipY = GameData.WORLD_CONFIG.lobbyHeight
+	local seatColor = Color3.fromRGB(50, 55, 70)
+	
+	local function createSeat(pos, rotation)
+		local model = Instance.new("Model")
+		model.Name = "SciFiSeat"
+		
+		local base = Instance.new("Part")
+		base.Size = Vector3.new(4, 1, 4)
+		base.Position = pos + Vector3.new(0, 0.5, 0)
+		base.Color = seatColor
+		base.Material = Enum.Material.Metal
+		base.Anchored = true
+		base.Parent = model
+		
+		local back = Instance.new("Part")
+		back.Size = Vector3.new(4, 4, 1)
+		back.Position = pos + Vector3.new(0, 2.5, 1.5)
+		back.Color = seatColor
+		back.Material = Enum.Material.Metal
+		back.Anchored = true
+		back.Parent = model
+		
+		local cushion = Instance.new("Part")
+		cushion.Size = Vector3.new(3.5, 0.5, 3.5)
+		cushion.Position = pos + Vector3.new(0, 1.25, 0)
+		cushion.Color = Color3.fromRGB(20, 100, 255)
+		cushion.Material = Enum.Material.Neon
+		cushion.Transparency = 0.5
+		cushion.Anchored = true
+		cushion.Parent = model
+
+		local seat = Instance.new("Seat")
+		seat.Size = Vector3.new(2, 1, 2)
+		seat.Position = pos + Vector3.new(0, 1, 0)
+		seat.Transparency = 1
+		seat.Parent = model
+
+		model:PivotTo(CFrame.new(pos) * CFrame.Angles(0, math.rad(rotation), 0))
+		model.Parent = parent
+	end
+
+	-- Place seats along the North and South walls
+	for x = -60, 60, 15 do
+		createSeat(Vector3.new(x, shipY + 8, -65), 0) -- North wall
+		createSeat(Vector3.new(x, shipY + 8, 65), 180) -- South area
+	end
+
+	-- Place some on East/West walls
+	for z = -40, 40, 15 do
+		createSeat(Vector3.new(65, shipY + 8, z), 90) -- East
+		createSeat(Vector3.new(-65, shipY + 8, z), -90) -- West
+	end
 end
 
 -- ── Landing pad on the ground ──────────────────────────────────────────────

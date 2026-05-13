@@ -181,7 +181,9 @@ function GameManager:handleLaunchRequest(player, difficulty)
 	
 	local startDropPodEvent = ReplicatedStorage:FindFirstChild("StartDropPodLaunch")
 	if startDropPodEvent then
-		startDropPodEvent:FireClient(player, Vector3.new(landingX, 20, landingZ), difficulty)
+		-- Use Y=800 to ensure we start very high above the terrain, allowing the client
+		-- to raycast down and find the exact ground position for a seamless transition.
+		startDropPodEvent:FireClient(player, Vector3.new(landingX, 800, landingZ), difficulty)
 	end
 end
 
@@ -448,11 +450,25 @@ function GameManager:spawnSpaceElevator(dungeon, player)
 	end)
 end
 
-function GameManager:handlePlayerDamage(player, damage, damageType)
+function GameManager:handlePlayerDamage(player, damage, damageType, attackerPos)
 	local playerData = self.playerData[player.UserId]
 	if not playerData or not playerData.characterSystem then return end
 	
 	local isDead = playerData.characterSystem:takeDamage(damage, damageType)
+	
+	-- Physical Knockback for Player
+	if attackerPos and player.Character then
+		local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local dir = (hrp.Position - attackerPos).Unit
+			local bv = Instance.new("BodyVelocity")
+			bv.Velocity = Vector3.new(dir.X * 50, 15, dir.Z * 50)
+			bv.MaxForce = Vector3.new(100000, 100000, 100000)
+			bv.Parent = hrp
+			game:GetService("Debris"):AddItem(bv, 0.2)
+		end
+	end
+
 	if isDead then
 		playerData.isAlive = false
 		print("Player died:", player.Name)
@@ -513,7 +529,7 @@ function GameManager:handleActComplete(player)
 end
 
 function GameManager:updateGame(deltaTime)
-	self.enemySpawner:update(deltaTime)
+	self.enemySpawner:update(deltaTime, self)
 	
 	for userId, playerData in pairs(self.playerData) do
 		if playerData.characterSystem then
@@ -648,12 +664,12 @@ local function setupRemoteEvents()
 				if hl then hl.Enabled = false end
 			end)
 			
-			-- Physical Knockback
+			-- Physical Knockback (Increased for better feel)
 			local hrp = enemyModel:FindFirstChild("HumanoidRootPart") or enemyModel:FindFirstChild("Root")
 			if hrp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 				local dir = (hrp.Position - player.Character.HumanoidRootPart.Position).Unit
 				local bv = Instance.new("BodyVelocity")
-				bv.Velocity = Vector3.new(dir.X * 30, 10, dir.Z * 30)
+				bv.Velocity = Vector3.new(dir.X * 60, 20, dir.Z * 60)
 				bv.MaxForce = Vector3.new(100000, 100000, 100000)
 				bv.Parent = hrp
 				game:GetService("Debris"):AddItem(bv, 0.15)

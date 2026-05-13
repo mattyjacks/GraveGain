@@ -130,45 +130,65 @@ function CombatHandler:performRangedAttack(chargeTime)
 	end
 
 	local direction = (targetPos - origin).Unit
-	
 	local damage = 15 * chargeMultiplier
 	
-	local arrow = Instance.new("Part")
-	arrow.Name = "ArrowProjectile"
-	arrow.Size = Vector3.new(0.2, 0.2, 2)
-	arrow.Color = Color3.fromRGB(150, 100, 50)
-	arrow.Material = Enum.Material.Wood
-	arrow.CanCollide = false
-	arrow.CFrame = CFrame.lookAt(origin, targetPos)
+	local WeaponGenerator = require(script.Parent:WaitForChild("weapon_generator"))
+	local arrowModel = WeaponGenerator.createArrow()
+	local arrow = arrowModel.PrimaryPart
+	arrowModel.Name = "ArrowProjectile"
+	
+	-- Setup the arrow model for flight
+	for _, p in ipairs(arrowModel:GetDescendants()) do
+		if p:IsA("BasePart") then
+			p.Anchored = false
+			p.CanCollide = false
+			p.Massless = true
+		end
+	end
+	
+	arrowModel:SetPrimaryPartCFrame(CFrame.lookAt(origin, targetPos))
 	
 	local bv = Instance.new("BodyVelocity")
 	bv.Velocity = direction * arrowSpeed
 	bv.MaxForce = Vector3.new(1, 1, 1) * 1e6
 	bv.Parent = arrow
 	
-	arrow.Parent = workspace
-	game:GetService("Debris"):AddItem(arrow, 3)
+	arrowModel.Parent = workspace
+	game:GetService("Debris"):AddItem(arrowModel, 10) -- Cleanup if it misses everything
 	
+	local hasHit = false
 	arrow.Touched:Connect(function(hit)
-		if hit.Parent and hit.Parent.Name ~= character.Name then
+		if hasHit then return end
+		if hit.Parent and not character:IsAncestorOf(hit) then
+			hasHit = true
+			
 			local enemyHumanoid = hit.Parent:FindFirstChild("Humanoid")
 			if enemyHumanoid then
 				ReplicatedStorage.EnemyDamaged:FireServer(hit.Parent, damage)
+				-- If it's an enemy, we might not want it to be a permanent staircase, 
+				-- but let's stick to the wall anyway for coolness.
 			end
 			
 			-- STICK ARROW LOGIC
-			arrow.Anchored = true
 			if bv then bv:Destroy() end
+			
+			-- Important: Stop all movement and anchor
+			for _, p in ipairs(arrowModel:GetDescendants()) do
+				if p:IsA("BasePart") then
+					p.Anchored = true
+					p.CanCollide = true -- Make it collidable for jumping!
+				end
+			end
 			
 			local weld = Instance.new("WeldConstraint")
 			weld.Part0 = hit
 			weld.Part1 = arrow
 			weld.Parent = arrow
 			
-			-- Move slightly into the surface
-			arrow.CFrame = arrow.CFrame * CFrame.new(0, 0, 0.5)
+			-- Move slightly into the surface for better look
+			arrowModel:SetPrimaryPartCFrame(arrow.CFrame * CFrame.new(0, 0, 0.4))
 			
-			game:GetService("Debris"):AddItem(arrow, 10) -- Sticky arrows last 10s
+			game:GetService("Debris"):AddItem(arrowModel, 300) -- Arrows last 5 minutes (300s)
 		end
 	end)
 end
