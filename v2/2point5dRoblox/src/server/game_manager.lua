@@ -33,13 +33,20 @@ function GameManager:initializePlayer(player)
 	
 	local data = nil
 	local success, err = pcall(function()
-		-- Only attempt if not in Studio or if we're sure APIs are enabled
-		-- But the pcall handles it anyway, we just want to avoid noisy warnings
-		data = PlayerDataStore:GetAsync("User_" .. player.UserId)
+		-- Only attempt if APIs are likely to be available
+		if not RunService:IsStudio() then
+			data = PlayerDataStore:GetAsync("User_" .. player.UserId)
+		else
+			-- Mock data for Studio testing
+			print("Studio detected: Using mock data for", player.Name)
+			data = { level = 5, xp = 250, talentPoints = 2, talents = { MeleeDamage = 1 } }
+		end
 	end)
 	
-	if not success and not string.find(err, "Studio access to APIs is not allowed") then 
-		warn("Failed to load data for", player.Name, err) 
+	if not success then 
+		if not string.find(err, "Studio access to APIs is not allowed") then
+			warn("Failed to load data for", player.Name, err)
+		end
 	end
 
 	local playerData = {
@@ -131,23 +138,13 @@ function GameManager:spawnPlayerInLobby(player, character)
 	end
 	statsEvent:FireClient(player, playerData.level, playerData.xp, playerData.talentPoints, playerData.talents)
 	
-	-- Wait for world generation to stabilize, then unlock drop holes
-	task.delay(6, function()
-		if self.lobbyGenerator then
-			self.lobbyGenerator:unlockHoles()
-		end
-		local unlockEvent = ReplicatedStorage:FindFirstChild("UnlockLobbyHoles")
-		if unlockEvent then
-			unlockEvent:FireAllClients()
-		end
-	end)
-	
 	-- Generate 3 dungeon entrances in the world (invisible until explored)
 	if not self.dungeonsPlaced then
 		self.dungeonsPlaced = true
 		for i = 1, 3 do
-			local cx = math.random(-8, 8)
-			local cz = math.random(-8, 8)
+			-- Spawn further away from origin to avoid overlap with lobby view
+			local cx = math.random(3, 8) * (math.random() > 0.5 and 1 or -1)
+			local cz = math.random(3, 8) * (math.random() > 0.5 and 1 or -1)
 			self.worldManager:ensureChunk(cx, cz)
 			
 			local pos = Vector3.new(cx * 128 + math.random(-40, 40), 25, cz * 128 + math.random(-40, 40))
@@ -171,7 +168,21 @@ function GameManager:spawnPlayerInLobby(player, character)
 		end
 	end
 	
-	print("Player spawned in Spaceship Lobby at altitude", SHIP_Y)
+	print("Player spawned in Spaceship Lobby at altitude", GameData.WORLD_CONFIG.lobbyHeight)
+end
+
+function GameManager:handleLaunchRequest(player, difficulty)
+	print("Processing launch for", player.Name, "to", difficulty)
+	local landingX = math.random(-2, 2) * 128
+	local landingZ = math.random(-2, 2) * 128
+	
+	-- Ensure world chunk exists
+	self.worldManager:ensureChunk(math.floor(landingX/128), math.floor(landingZ/128))
+	
+	local startDropPodEvent = ReplicatedStorage:FindFirstChild("StartDropPodLaunch")
+	if startDropPodEvent then
+		startDropPodEvent:FireClient(player, Vector3.new(landingX, 20, landingZ), difficulty)
+	end
 end
 
 function GameManager:spawnPlayerInDungeon(player, character, difficulty, missionType)
@@ -513,8 +524,8 @@ function GameManager:updateGame(deltaTime)
 end
 
 function GameManager:generateLobby()
-	local lobbyGen = LobbyGenerator.new(workspace)
-	lobbyGen:generateLobby()
+	self.lobbyGenerator = LobbyGenerator.new(workspace)
+	self.lobbyGenerator:generateLobby()
 	print("Spaceship Lobby generated!")
 end
 
@@ -554,6 +565,26 @@ local function setupRemoteEvents()
 	respawnPlayerEvent.Name = "RespawnPlayer"
 	respawnPlayerEvent.Parent = ReplicatedStorage
 	
+	local requestLaunchEvent = Instance.new("RemoteEvent")
+	requestLaunchEvent.Name = "RequestLaunch"
+	requestLaunchEvent.Parent = ReplicatedStorage
+	
+	local startDropPodEvent = Instance.new("RemoteEvent")
+	startDropPodEvent.Name = "StartDropPodLaunch"
+	startDropPodEvent.Parent = ReplicatedStorage
+	
+	requestLaunchEvent.OnServerEvent:Connect(function(player, difficulty)
+		gameManager:handleLaunchRequest(player, difficulty)
+	end)
+	
+	-- Also listen for internal server-side requests (from drop holes)
+	local internalLaunchEvent = Instance.new("BindableEvent")
+	internalLaunchEvent.Name = "InternalRequestLaunch"
+	internalLaunchEvent.Parent = ReplicatedStorage
+	internalLaunchEvent.Event:Connect(function(player, difficulty)
+		gameManager:handleLaunchRequest(player, difficulty)
+	end)
+
 	local lorePickedUpEvent = Instance.new("RemoteEvent")
 	lorePickedUpEvent.Name = "LorePickedUp"
 	lorePickedUpEvent.Parent = ReplicatedStorage
@@ -684,9 +715,10 @@ end
 
 setupRemoteEvents()
 
-Players.PlayerAdded:Connect(function(player)
-	gameManager:initializePlayer(player)
-end)
+-- PlayerAdded is handled by main.server.lua to avoid duplicate initialization
+-- Players.PlayerAdded:Connect(function(player)
+-- 	gameManager:initializePlayer(player)
+-- end)
 
 Players.PlayerRemoving:Connect(function(p)
 	gameManager:onPlayerRemoving(p)

@@ -1,8 +1,8 @@
--- LuckyStarShip-420 Lobby Environment
+-- LuckyStarShip Lobby Environment
 local SpaceshipLobby = {}
 
 function SpaceshipLobby:create_lobby_environment()
-	print("[SpaceshipLobby] Creating LuckyStarShip-420 lobby environment...")
+	print("[SpaceshipLobby] Creating LuckyStarShip lobby environment...")
 	
 	-- Create main floor
 	local floor = Instance.new("Part")
@@ -189,7 +189,7 @@ function SpaceshipLobby:create_lobby_environment()
 	glow.Transparency = 0.7
 	glow.Parent = workspace
 	
-	print("[SpaceshipLobby] LuckyStarShip-420 lobby created!")
+	print("[SpaceshipLobby] LuckyStarShip lobby created!")
 end
 
 return SpaceshipLobby

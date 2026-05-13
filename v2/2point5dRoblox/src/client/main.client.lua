@@ -31,6 +31,7 @@ local Minimap           = require(ClientFolder:WaitForChild("minimap"))
 local EnemyHealthbars   = require(ClientFolder:WaitForChild("enemy_healthbars"))
 local DeathScreen       = require(ClientFolder:WaitForChild("death_screen"))
 local ZoneRenderer      = require(ClientFolder:WaitForChild("zone_renderer"))
+local DropPod           = require(ClientFolder:WaitForChild("drop_pod"))
 
 -- ── State ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,10 @@ local parachuteHandler   = nil
 LoadingScreen.show("Synchronizing Neural Link...")
 EnemyHealthbars.start()
 DeathScreen.setup()
+
+-- Disable the annoying built-in "Gameplay Paused" overlay for better streaming transition
+local GuiService = game:GetService("GuiService")
+GuiService:SetGameplayPausedNotificationEnabled(false)
 
 local function applyRaceScale(char, raceName)
 	local event = ReplicatedStorage:WaitForChild("RaceChanged")
@@ -183,20 +188,25 @@ ReplicatedStorage:WaitForChild("SyncPlayerStats").OnClientEvent:Connect(function
 	end
 end)
 
--- Visual unlock of holes
-ReplicatedStorage:WaitForChild("UnlockLobbyHoles").OnClientEvent:Connect(function()
-	local TweenService = game:GetService("TweenService")
-	local lobby = workspace:FindFirstChild("Lobby")
-	if not lobby then return end
+-- Visual unlock of holes (REMOVED: replaced by pods)
+
+-- Launch Drop Pod sequence
+ReplicatedStorage:WaitForChild("StartDropPodLaunch").OnClientEvent:Connect(function(landingPos, difficulty)
+	print("Launching drop pod to:", landingPos)
+	LoadingScreen.show("Initializing Drop Sequence...")
 	
-	for _, shield in ipairs(lobby:GetDescendants()) do
-		if shield.Name == "HoleShield" and shield:IsA("BasePart") then
-			TweenService:Create(shield, TweenInfo.new(1.5), {
-				Transparency = 1,
-				Color = Color3.fromRGB(50, 255, 100)
-			}):Play()
+	DropPod.launch(landingPos, function()
+		if character and character:FindFirstChild("HumanoidRootPart") then
+			character:SetPivot(CFrame.new(landingPos + Vector3.new(0, 5, 0)))
 		end
-	end
+		LoadingScreen.hide(0.5)
+		initializeOpenWorld()
+		
+		-- Set mission based on difficulty (placeholder)
+		if hud then
+			hud:setObjective("Mission: Explore " .. difficulty .. " Region")
+		end
+	end)
 end)
 
 print("GraveGain 2.5D Client Fully Initialized")

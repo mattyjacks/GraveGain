@@ -26,30 +26,32 @@ function ParachuteHandler:startLoop()
 	RunService.Heartbeat:Connect(function(dt)
 		if not self.hrp or not self.hrp.Parent then return end
 		
+		-- Don't deploy if in lobby or high altitude cinematic
+		if self.hrp.Position.Y > 500 then return end
+		
 		local velocity = self.hrp.Velocity
 		local pos = self.hrp.Position
 		
-		-- Check altitude using modern Raycast
+		-- Check altitude using modern Raycast (longer range)
 		local raycastParams = RaycastParams.new()
 		raycastParams.FilterDescendantsInstances = {self.character}
 		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 		
-		local raycastResult = workspace:Raycast(pos, Vector3.new(0, -1000, 0), raycastParams)
-		local altitude = raycastResult and (pos - raycastResult.Position).Magnitude or 1000
+		local raycastResult = workspace:Raycast(pos, Vector3.new(0, -2000, 0), raycastParams)
+		local altitude = raycastResult and (pos - raycastResult.Position).Magnitude or 2000
 		
 		-- Deploy chute if falling fast and close to ground
-		if not self.isDeployed and velocity.Y < -50 and altitude < self.deployHeight then
+		if not self.isDeployed and velocity.Y < -40 and altitude < self.deployHeight then
 			self:deploy()
 		end
 		
 		if self.isDeployed then
 			-- Apply upward force to slow fall
-			local force = 5000 -- adjust for weight
 			local targetVel = Vector3.new(velocity.X, -self.slowSpeed, velocity.Z)
 			self.hrp.Velocity = self.hrp.Velocity:Lerp(targetVel, 0.1)
 			
 			-- Remove if landed
-			if self.humanoid.FloorMaterial ~= Enum.Material.Air or altitude < 10 then
+			if self.humanoid.FloorMaterial ~= Enum.Material.Air or altitude < 5 then
 				self:destroy()
 			end
 		end

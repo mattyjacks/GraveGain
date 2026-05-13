@@ -34,7 +34,8 @@ local function createBase(pos, name)
 	local bg = Instance.new("BillboardGui")
 	bg.Size = UDim2.new(0, 200, 0, 50)
 	bg.StudsOffset = Vector3.new(0, 15, 0)
-	bg.AlwaysOnTop = true
+	bg.AlwaysOnTop = false -- Prevents showing through the lobby floor
+	bg.MaxDistance = 300
 	bg.Parent = root
 	local lbl = Instance.new("TextLabel", bg)
 	lbl.Size = UDim2.new(1, 0, 1, 0)

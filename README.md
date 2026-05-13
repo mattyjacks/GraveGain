@@ -776,7 +776,7 @@ A comprehensive dialogue system with ElevenLabs voice synthesis, speech bubbles,
 
 ### Overview
 
-Between missions on the "LuckyStarShip-420", players earn $UUSD (Universal United States Dollars) through skill-based activities. Skills include Item Repair and Botany, with expandable personal quarters.
+Between missions on the "LuckyStarShip", players earn $UUSD (Universal United States Dollars) through skill-based activities. Skills include Item Repair and Botany, with expandable personal quarters.
 
 ### Currency System
 

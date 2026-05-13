@@ -41,14 +41,14 @@ function LobbyGenerator:generateLobby()
 	-- Build the saucer (floats high for the drop holes)
 	SpaceshipBuilder.build(lobbyFolder, Vector3.new(0, shipY, 0))
 
-	-- Interior deck with holes
-	self:buildInteriorDeck(lobbyFolder)
+	-- Interior deck (SOLID)
+	self:buildSolidDeck(lobbyFolder)
 
 	-- Select Race Station
 	self:buildRaceSelectionStation(lobbyFolder)
 
-	-- Difficulty Drop Holes
-	self:buildPortal(lobbyFolder)
+	-- Launch Pads (Replacing drop holes at SOUTH)
+	self:buildSouthDropHoles(lobbyFolder)
 
 	-- Interior lighting
 	self:buildInteriorLights(lobbyFolder)
@@ -58,116 +58,106 @@ end
 
 -- ── Interior deck ──────────────────────────────────────────────────────────
 
-function LobbyGenerator:buildInteriorDeck(parent)
+function LobbyGenerator:buildSolidDeck(parent)
 	local shipY = GameData.WORLD_CONFIG.lobbyHeight
-	-- We build 5 deck segments that sit BETWEEN the 5 drop holes
-	local numHoles = 5
-	local radius = 55
 	
-	for i = 1, numHoles do
-		local holeAngle = (i-1) * (360 / numHoles)
-		local segmentAngle = math.rad(holeAngle + (180 / numHoles))
-		
-		local p = Instance.new("Part")
-		p.Name = "DeckPanel_" .. i
-		p.Size = Vector3.new(35, 1, 45) -- Narrower to ensure gaps
-		p.Position = Vector3.new(math.cos(segmentAngle) * 50, shipY + 8.5, math.sin(segmentAngle) * 50)
-		p.CFrame = CFrame.lookAt(p.Position, Vector3.new(0, shipY + 8.5, 0)) * CFrame.Angles(0, math.rad(90), 0)
-		p.Color = Color3.fromRGB(30, 32, 40)
-		p.Material = Enum.Material.Metal
-		p.Anchored = true
-		p.Parent = parent
-	end
+	-- Main Deck (Central and North)
+	local deck = Instance.new("Part")
+	deck.Name = "MainDeck"
+	deck.Size = Vector3.new(140, 1, 100)
+	deck.Position = Vector3.new(0, shipY + 8.5, -20)
+	deck.Color = Color3.fromRGB(20, 22, 28)
+	deck.Material = Enum.Material.Metal
+	deck.Anchored = true
+	deck.Parent = parent
+	Instance.new("UICorner", deck)
+
+	-- South Walkway (around the holes)
+	local walkway = Instance.new("Part")
+	walkway.Name = "SouthWalkway"
+	walkway.Size = Vector3.new(140, 1, 20)
+	walkway.Position = Vector3.new(0, shipY + 8.5, 60)
+	walkway.Color = Color3.fromRGB(25, 27, 35)
+	walkway.Material = Enum.Material.Metal
+	walkway.Anchored = true
+	walkway.Parent = parent
 
 	-- Central safe area (Spawn)
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "LobbySpawn"
 	spawn.Size = Vector3.new(30, 1.2, 30)
-	spawn.Color = Color3.fromRGB(50, 55, 75)
+	spawn.Color = Color3.fromRGB(40, 45, 65)
 	spawn.Material = Enum.Material.Metal
 	spawn.Anchored = true
 	spawn.CFrame = CFrame.new(0, shipY + 9.0, 0)
 	spawn.Parent = parent
 	Instance.new("UICorner", spawn)
-
-	-- Add a label to spawn
-	local bg = Instance.new("BillboardGui")
-	bg.Size = UDim2.new(0, 200, 0, 50)
-	bg.StudsOffset = Vector3.new(0, 15, 0)
-	bg.AlwaysOnTop = true
-	bg.Parent = spawn
-	local lbl = Instance.new("TextLabel", bg)
-	lbl.Size = UDim2.new(1, 0, 1, 0)
-	lbl.BackgroundTransparency = 1
-	lbl.TextColor3 = Color3.fromRGB(100, 255, 255)
-	lbl.Font = Enum.Font.GothamBold
-	lbl.TextSize = 24
-	lbl.Text = "COMMAND DECK"
 end
 
 -- ── Landing pad on the ground ──────────────────────────────────────────────
 
-function LobbyGenerator:buildPortal(parent)
+function LobbyGenerator:buildSouthDropHoles(parent)
 	local shipY = GameData.WORLD_CONFIG.lobbyHeight
-	-- Create five drop holes for different difficulties
 	local diffs = {"Beginner", "Easy", "Normal", "Hard", "Insane"}
-	local radius = 50
+	local startX = -40
+	local spacing = 20
+	local zPos = 40 -- South area gap
+
 	for i, diff in ipairs(diffs) do
-		local angle = math.rad((i-1) * (360 / #diffs))
-		local pos = Vector3.new(math.cos(angle) * radius, shipY + 8.5, math.sin(angle) * radius)
+		local pos = Vector3.new(startX + (i-1) * spacing, shipY + 8.5, zPos)
 		local color = GameData.DIFFICULTIES[diff].color
 		self:buildDropHole(parent, pos, diff, color)
 	end
 end
 
 function LobbyGenerator:buildDropHole(parent, pos, difficulty, color)
-	-- The hole itself
-	local hole = Instance.new("Part")
-	hole.Name = "DropHole_" .. difficulty
-	hole.Shape = Enum.PartType.Cylinder
-	hole.Size = Vector3.new(2, 18, 18)
-	hole.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
-	hole.Transparency = 1
-	hole.Anchored = true
-	hole.CanCollide = false
-	hole.Parent = parent
-
-	-- Shield (LOCKED STATE)
-	local shield = Instance.new("Part")
-	shield.Name = "HoleShield"
-	shield.Shape = Enum.PartType.Cylinder
-	shield.Size = Vector3.new(1.5, 18, 18)
-	shield.Color = Color3.fromRGB(255, 50, 50) -- Locked red
-	shield.Material = Enum.Material.ForceField
-	shield.Transparency = 0.5
-	shield.Anchored = true
-	shield.CanCollide = true -- BLOCKS FALLING
-	shield.CFrame = hole.CFrame
-	shield.Parent = parent
-
-	-- Glowing rim
+	-- The physical hole rim
 	local rim = Instance.new("Part")
-	rim.Name = "HoleRim"
+	rim.Name = "HoleRim_" .. difficulty
 	rim.Shape = Enum.PartType.Cylinder
-	rim.Size = Vector3.new(0.5, 20, 20)
+	rim.Size = Vector3.new(0.5, 14, 14)
+	rim.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
 	rim.Color = color
 	rim.Material = Enum.Material.Neon
 	rim.Anchored = true
-	rim.CanCollide = false
-	rim.CFrame = hole.CFrame
+	rim.CanCollide = true -- Walkable rim
 	rim.Parent = parent
-	
-	table.insert(self.holes, {hole = hole, shield = shield, rim = rim, difficulty = difficulty})
-	
-	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Brightness = 5; light.Range = 20
-	light.Parent = rim
 
-	-- Difficulty Label
+	-- Particle effect (falling energy)
+	local att = Instance.new("Attachment", rim)
+	local particles = Instance.new("ParticleEmitter")
+	particles.Texture = "rbxassetid://244221446"
+	particles.Color = ColorSequence.new(color)
+	particles.Size = NumberSequence.new(2, 0)
+	particles.Speed = NumberRange.new(10, 30)
+	particles.EmissionDirection = Enum.NormalId.Bottom
+	particles.Rate = 50
+	particles.Parent = att
+
+	-- Invisible Trigger (Fires cinematic)
+	local trigger = Instance.new("Part")
+	trigger.Name = "Trigger_" .. difficulty
+	trigger.Shape = Enum.PartType.Cylinder
+	trigger.Size = Vector3.new(2, 12, 12)
+	trigger.CFrame = rim.CFrame
+	trigger.Transparency = 1
+	trigger.Anchored = true
+	trigger.CanCollide = false -- FALL THROUGH
+	trigger.Parent = parent
+
+	trigger.Touched:Connect(function(hit)
+		local char = hit.Parent
+		local player = game:GetService("Players"):GetPlayerFromCharacter(char)
+		if player then
+			local ev = ReplicatedStorage:FindFirstChild("InternalRequestLaunch")
+			if ev then ev:Fire(player, difficulty) end
+		end
+	end)
+
+	-- Label
 	local bg = Instance.new("BillboardGui")
-	bg.Size = UDim2.new(0, 200, 0, 50)
-	bg.StudsOffset = Vector3.new(0, 10, 0)
+	bg.Size = UDim2.new(0, 150, 0, 40)
+	bg.StudsOffset = Vector3.new(0, 6, 0)
 	bg.AlwaysOnTop = true
 	bg.Parent = rim
 	local lbl = Instance.new("TextLabel", bg)
@@ -175,52 +165,8 @@ function LobbyGenerator:buildDropHole(parent, pos, difficulty, color)
 	lbl.BackgroundTransparency = 1
 	lbl.TextColor3 = color
 	lbl.Font = Enum.Font.GothamBold
-	lbl.TextSize = 22
+	lbl.TextSize = 18
 	lbl.Text = "DROP: " .. difficulty:upper()
-	lbl.Parent = bg
-
-	-- Particle effect (falling energy)
-	local att = Instance.new("Attachment", rim)
-	local particles = Instance.new("ParticleEmitter")
-	particles.Texture = "rbxassetid://244221446"
-	particles.Color = ColorSequence.new(color)
-	particles.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)})
-	particles.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 0)})
-	particles.Speed = NumberRange.new(20, 40)
-	particles.EmissionDirection = Enum.NormalId.Bottom
-	particles.Lifetime = NumberRange.new(2, 4)
-	particles.Rate = 50
-	particles.Parent = att
-
-	hole.Touched:Connect(function(hit)
-		if shield.Parent == nil then -- Only trigger if unlocked
-			local player = game:GetService("Players"):GetPlayerFromCharacter(hit.Parent)
-			if player then
-				local ev = game:GetService("ReplicatedStorage"):FindFirstChild("DungeonPortalEntered")
-				if ev then ev:FireClient(player, difficulty) end
-			end
-		end
-	end)
-end
-
-function LobbyGenerator:unlockHoles()
-	-- Server-side unlocking: Clear collisions and destroy shields
-	for _, data in ipairs(self.holes) do
-		if data.shield and data.shield.Parent then
-			data.shield.CanCollide = false
-			data.shield:Destroy()
-			
-			-- Update label to READY
-			local bg = data.rim:FindFirstChildWhichIsA("BillboardGui")
-			if bg then
-				local lbl = bg:FindFirstChildWhichIsA("TextLabel")
-				if lbl then
-					lbl.Text = "READY: " .. data.difficulty:upper()
-					lbl.TextColor3 = Color3.fromRGB(50, 255, 100)
-				end
-			end
-		end
-	end
 end
 
 function LobbyGenerator:buildRaceSelectionStation(parent)
@@ -267,6 +213,16 @@ function LobbyGenerator:buildRaceSelectionStation(parent)
 		podium.Material = Enum.Material.Metal
 		podium.Anchored = true
 		podium.Parent = station
+
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.ActionText = "Open Selection"
+		prompt.ObjectText = race:upper() .. " DATA"
+		prompt.HoldDuration = 0.5
+		prompt.Parent = podium
+		prompt.Triggered:Connect(function(player)
+			local ev = ReplicatedStorage:FindFirstChild("RaceSelectionRequested")
+			if ev then ev:FireClient(player) end
+		end)
 
 		local screen = Instance.new("Part")
 		screen.Size = Vector3.new(3, 2, 0.2)

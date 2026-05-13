@@ -46,22 +46,22 @@ function SpaceshipBuilder.build(parent, origin)
 	model.Name = "Spaceship"
 	model.Parent = parent
 
-	-- ── Main disk hull (Modular Ring to allow holes) ─────────────────────────────
-	local hullSegments = 12
-	local hullRadius = 75
-	for i = 1, hullSegments do
-		local angle = math.rad((i-1) * (360 / hullSegments))
-		local nextAngle = math.rad(i * (360 / hullSegments))
-		local midAngle = (angle + nextAngle) / 2
-		
-		local segment = part(model, {
-			Name = "HullSegment_" .. i,
-			Size = Vector3.new(50, 12, 40),
-			Color = HULL_COLOR, Material = METAL,
-			CFrame = CFrame.new(ox + math.cos(midAngle) * 50, oy, oz + math.sin(midAngle) * 50) 
-				* CFrame.Angles(0, -midAngle, 0)
-		})
-	end
+	-- ── Main hull (Solid disk base) ─────────────────────────────
+	local hull = part(model, {
+		Name = "HullBase", Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(4, 150, 150),
+		Color = HULL_COLOR, Material = METAL,
+		CFrame = CFrame.new(ox, oy, oz) * CFrame.Angles(0, 0, math.rad(90))
+	})
+
+	-- Glowing floor grid (Glass + Neon)
+	local floorGrid = part(model, {
+		Name = "FloorGrid", Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.5, 145, 145),
+		Color = Color3.fromRGB(20, 40, 80), Material = GLASS, Transparency = 0.5,
+		CFrame = CFrame.new(ox, oy + 2.1, oz) * CFrame.Angles(0, 0, math.rad(90)),
+		noCollide = true
+	})
 
 	-- Neon Deck Rings (Atmospheric Lighting)
 	local ringRadii = {150 * 0.15, 150 * 0.3, 150 * 0.42}
@@ -89,6 +89,7 @@ function SpaceshipBuilder.build(parent, origin)
 	light(rim, NEON_CYAN, 2, 100)
 
 	-- Under-disk (Modular Ring)
+	local hullSegments = 12
 	for i = 1, hullSegments do
 		local angle = math.rad((i-1) * (360 / hullSegments))
 		local midAngle = angle + math.rad(180 / hullSegments)
@@ -187,52 +188,65 @@ function SpaceshipBuilder.build(parent, origin)
 		})
 	end
 
-	-- ── Antenna array ───────────────────────────────────────────
-	part(model, {
-		Name = "Antenna", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(25, 2, 2),
-		Color = DETAIL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox, oy + 28, oz),
-	})
-	local antTip = part(model, {
-		Name = "AntTip", Shape = Enum.PartType.Ball,
-		Size = Vector3.new(4, 4, 4),
-		Color = NEON_PURPLE, Material = NEON,
-		CFrame = CFrame.new(ox, oy + 40, oz), noCollide = true,
-	})
-	light(antTip, NEON_PURPLE, 3, 40)
-
-	-- ── Windows ────────────────────────────────
-	for i = 1, 12 do
-		local wrad = math.rad(i * 30)
-		local wr = 55
-		local wx = ox + math.cos(wrad) * wr
-		local wz = oz + math.sin(wrad) * wr
-		local win = part(model, {
-			Name = "Window", Shape = Enum.PartType.Block,
-			Size = Vector3.new(0.5, 6, 6),
-			Color = GLASS_COLOR, Material = GLASS, Transparency = 0.5,
-			CFrame = CFrame.new(wx, oy + 2, wz) * CFrame.Angles(0, wrad, 0),
-			noCollide = true,
+	-- ── Interior Walls and Glass Windows ─────────────────────────────
+	local wallSegments = 24
+	local wallRadius = 72
+	for i = 1, wallSegments do
+		local angle = math.rad((i-1) * (360 / wallSegments))
+		local midAngle = angle + math.rad(180 / wallSegments)
+		local wx = ox + math.cos(midAngle) * wallRadius
+		local wz = oz + math.sin(midAngle) * wallRadius
+		
+		-- Solid wall base
+		part(model, {
+			Name = "WallBase_" .. i,
+			Size = Vector3.new(20, 4, wallRadius * 0.28),
+			Color = DETAIL_COLOR, Material = METAL,
+			CFrame = CFrame.new(wx, oy + 10, wz) * CFrame.Angles(0, -midAngle, 0)
 		})
-		light(win, GLASS_COLOR, 0.8, 20)
+		
+		-- Glass window
+		part(model, {
+			Name = "Window_" .. i,
+			Size = Vector3.new(0.5, 12, wallRadius * 0.28),
+			Color = Color3.fromRGB(150, 200, 255), Material = GLASS, Transparency = 0.6,
+			CFrame = CFrame.new(wx * 1.02, oy + 18, wz * 1.02) * CFrame.Angles(0, -midAngle, 0)
+		})
+		
+		-- Upper wall
+		part(model, {
+			Name = "WallTop_" .. i,
+			Size = Vector3.new(10, 4, wallRadius * 0.28),
+			Color = DETAIL_COLOR, Material = METAL,
+			CFrame = CFrame.new(wx, oy + 26, wz) * CFrame.Angles(0, -midAngle, 0)
+		})
 	end
 
-	-- ── Massive Sensor dish ─────────────────────────────────────────────────────
-	part(model, {
-		Name = "Dish", Shape = Enum.PartType.Ball,
-		Size = Vector3.new(4, 12, 12),
-		Color = HULL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox + 30, oy + 10, oz),
-	})
-	part(model, {
-		Name = "DishStem", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(6, 2, 2),
-		Color = DETAIL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox + 30, oy + 7, oz),
-	})
+	-- Support Pillars
+	local pillarCount = 6
+	for i = 1, pillarCount do
+		local angle = math.rad((i-1) * (360 / pillarCount))
+		local px = ox + math.cos(angle) * 40
+		local pz = oz + math.sin(angle) * 40
+		
+		part(model, {
+			Name = "Pillar_" .. i, Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(20, 4, 4),
+			Color = HULL_COLOR, Material = METAL,
+			CFrame = CFrame.new(px, oy + 18, pz)
+		})
+		
+		-- Neon pillar detail
+		part(model, {
+			Name = "PillarGlow_" .. i, Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(18, 4.2, 4.2),
+			Color = NEON_CYAN, Material = NEON, Transparency = 0.5,
+			CFrame = CFrame.new(px, oy + 18, pz),
+			noCollide = true
+		})
+	end
 
-	model.PrimaryPart = disk
+	model.PrimaryPart = rim
 	return model
 end
 
