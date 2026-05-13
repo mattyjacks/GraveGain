@@ -61,7 +61,7 @@ end
 
 function GameManager:spawnPlayerInLobby(player, character)
 	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-	humanoidRootPart.CFrame = CFrame.new(0, 3, 0)
+	humanoidRootPart.CFrame = CFrame.new(0, 40, 0)
 	
 	local playerData = self.playerData[player.UserId]
 	if playerData then
@@ -79,18 +79,36 @@ function GameManager:spawnPlayerInDungeon(player, character, difficulty, mission
 	
 	playerData.currentDungeon = dungeon
 	playerData.difficulty = difficulty or "Normal"
-	playerData.missionType = missionType or "Boss"
-	playerData.missionState = "InProgress"
-	self.dungeons[player.UserId] = dungeon
+	playerData.missionType = missionType
+	playerData.missionState = "In Progress"
+	
+	local enterDungeonEvent = ReplicatedStorage:FindFirstChild("EnterDungeon")
+	local hudInstructionEvent = ReplicatedStorage:FindFirstChild("ShowHUDInstruction")
+	if hudInstructionEvent then
+		hudInstructionEvent:FireClient(player, "Find the Dungeon entrance")
+	end
 	
 	local spawnX = dungeon.rooms[1].centerX * 4
-	local spawnY = dungeon.rooms[1].centerY * 4
-	
-	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-	humanoidRootPart.CFrame = CFrame.new(Vector3.new(spawnX, 3, spawnY))
+	local spawnZ = dungeon.rooms[1].centerY * 4
 	
 	DungeonRenderer.new(dungeon, workspace)
 	self.enemySpawner:spawnInDungeon(dungeon)
+	
+	-- Raycast to find the exact surface height
+	local rayOrigin = Vector3.new(spawnX, 100, spawnZ)
+	local rayDir = Vector3.new(0, -150, 0)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Include
+	local dungeonFolder = workspace:FindFirstChild("Dungeon")
+	if dungeonFolder then
+		rayParams.FilterDescendantsInstances = {dungeonFolder}
+	end
+	
+	local rayResult = workspace:Raycast(rayOrigin, rayDir, rayParams)
+	local groundY = rayResult and rayResult.Position.Y or 3
+	
+	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+	humanoidRootPart.CFrame = CFrame.new(Vector3.new(spawnX, groundY + 3, spawnZ))
 	
 	if playerData.missionType == "Boss" then
 		self:spawnBoss(dungeon, player)
@@ -206,23 +224,88 @@ function GameManager:spawnFetchArtifact(dungeon, player)
 						if hrp then
 							local ex = hrp.Position.X + math.random(-20, 20)
 							local ey = hrp.Position.Z + math.random(-20, 20)
-							local e = Instance.new("Part")
+							local e = Instance.new("Model")
 							e.Name = "Enemy"
-							e.Size = Vector3.new(3,4,3)
-							e.Color = Color3.new(1,0,0)
-							e.Position = Vector3.new(ex, 3, ey)
+							local body = Instance.new("Part")
+							body.Name = "Body"
+							body.Size = Vector3.new(3,4,3)
+							body.Color = Color3.new(1,0,0)
+							body.CFrame = CFrame.new(ex, 10, ey)
+							body.Parent = e
 							local hum = Instance.new("Humanoid")
 							hum.MaxHealth = 50; hum.Health = 50
 							hum.Parent = e
 							local rp = Instance.new("Part")
 							rp.Name = "HumanoidRootPart"
+							rp.Size = Vector3.new(3,4,3)
+							rp.Transparency = 1
+							rp.CanCollide = true
+							rp.CFrame = body.CFrame
 							rp.Parent = e
-							rp.CFrame = e.CFrame
 							e.PrimaryPart = rp
 							e.Parent = workspace:FindFirstChild("Enemies") or workspace
 						end
 					end
 				end)
+			end
+		end
+	end)
+end
+
+function GameManager:spawnSpaceElevator(dungeon, player)
+	local lastRoom = dungeon.rooms[#dungeon.rooms]
+	local bx, by = lastRoom.centerX * 4, lastRoom.centerY * 4
+	
+	local elevator = Instance.new("Model")
+	elevator.Name = "SpaceElevator"
+	
+	local base = Instance.new("Part")
+	base.Name = "HumanoidRootPart"
+	base.Size = Vector3.new(10, 1, 10)
+	base.Color = Color3.fromRGB(50, 50, 50)
+	base.Material = Enum.Material.Metal
+	base.Anchored = true
+	base.CFrame = CFrame.new(bx, 3, by)
+	base.Parent = elevator
+	elevator.PrimaryPart = base
+	
+	local beam = Instance.new("Part")
+	beam.Size = Vector3.new(8, 200, 8)
+	beam.Color = Color3.fromRGB(100, 200, 255)
+	beam.Material = Enum.Material.Neon
+	beam.Transparency = 0.5
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CFrame = base.CFrame + Vector3.new(0, 100, 0)
+	beam.Parent = elevator
+	
+	elevator.Parent = workspace
+	
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Extract"
+	prompt.HoldDuration = 2
+	prompt.Parent = base
+	
+	prompt.Triggered:Connect(function(trigPlayer)
+		if trigPlayer == player then
+			elevator:Destroy()
+			local pData = self.playerData[player.UserId]
+			if pData then
+				pData.missionState = "Completed"
+				
+				-- Compile stats
+				local stats = {
+					kills = pData.characterSystem.level * 3, -- Placeholder
+					xp = pData.characterSystem.experience,
+					damage = pData.characterSystem.level * 100,
+					gold = pData.characterSystem.level * 50
+				}
+				local loot = {"Epic Sword", "Health Potion"} -- Placeholder
+				
+				local missionCompleteEvent = ReplicatedStorage:FindFirstChild("MissionComplete")
+				if missionCompleteEvent then
+					missionCompleteEvent:FireClient(player, stats, loot)
+				end
 			end
 		end
 	end)
@@ -322,6 +405,14 @@ local function setupRemoteEvents()
 	restoreAmmoEvent.Name = "RestoreAmmo"
 	restoreAmmoEvent.Parent = ReplicatedStorage
 	
+	local missionCompleteEvent = Instance.new("RemoteEvent")
+	missionCompleteEvent.Name = "MissionComplete"
+	missionCompleteEvent.Parent = ReplicatedStorage
+	
+	local respawnPlayerEvent = Instance.new("RemoteEvent")
+	respawnPlayerEvent.Name = "RespawnPlayer"
+	respawnPlayerEvent.Parent = ReplicatedStorage
+	
 	local lorePickedUpEvent = Instance.new("RemoteEvent")
 	lorePickedUpEvent.Name = "LorePickedUp"
 	lorePickedUpEvent.Parent = ReplicatedStorage
@@ -350,6 +441,19 @@ local function setupRemoteEvents()
 		if playerData and playerData.characterSystem then
 			playerData.characterSystem:gainExperience(xpAmount)
 		end
+	end)
+	
+	respawnPlayerEvent.OnServerEvent:Connect(function(player)
+		local character = player.Character
+		if character then
+			local humanoid = character:FindFirstChild("Humanoid")
+			if humanoid then
+				humanoid.Health = 0
+			end
+		end
+		player:LoadCharacter()
+		local newChar = player.Character or player.CharacterAdded:Wait()
+		gameManager:spawnPlayerInLobby(player, newChar)
 	end)
 	
 	enemyDamagedEvent.OnServerEvent:Connect(function(player, enemyModel, damage)

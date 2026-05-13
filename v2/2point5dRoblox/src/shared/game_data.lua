@@ -93,12 +93,12 @@ GameData.STATUS_EFFECTS = {
 }
 
 GameData.ENEMY_TYPES = {
-	Skeleton = { name = "Skeleton", emoji = "💀", health = 10, damage = 2, xp = 25 },
-	Zombie = { name = "Zombie", emoji = "🧟", health = 15, damage = 3, xp = 35 },
+	Skeleton = { name = "Skeleton", emoji = "💀", health = 30, damage = 5, xp = 45 },
+	Zombie = { name = "Zombie", emoji = "🧟", health = 50, damage = 8, xp = 60 },
 	Spider = { name = "Spider", emoji = "�️", health = 8, damage = 2.5, xp = 30 },
-	Goblin = { name = "Goblin", emoji = "👹", health = 12, damage = 3.5, xp = 40 },
-	Demon = { name = "Demon", emoji = "😈", health = 25, damage = 5, xp = 75 },
-	Boss = { name = "Boss", emoji = "👹", health = 100, damage = 10, xp = 500 },
+	Goblin = { name = "Goblin", emoji = "👹", health = 35, damage = 7, xp = 50 },
+	Demon = { name = "Demon", emoji = "😈", health = 120, damage = 15, xp = 150 },
+	Boss = { name = "Boss", emoji = "👹", health = 800, damage = 25, xp = 1500 },
 }
 
 GameData.ENEMY_AFFIXES = {

@@ -54,49 +54,117 @@ end
 -- ── Build ──────────────────────────────────────────────────────────────────
 
 function HUD:buildBars()
-	local pad = 12
+	local pad = 16
 
-	-- HP bar
+	-- HP bar (Glassmorphism bg)
 	local hpBg = makeFrame(self.gui, {
-		Size = UDim2.new(0, 220, 0, 22), Position = UDim2.new(0, pad, 1, -pad - 22),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20), BorderSizePixel = 0,
+		Size = UDim2.new(0, 260, 0, 26), Position = UDim2.new(0, pad, 1, -pad - 26),
+		BackgroundColor3 = Color3.fromRGB(15, 10, 15), BorderSizePixel = 0,
+		BackgroundTransparency = 0.4,
 	})
-	makeCorner(hpBg, 4)
+	makeCorner(hpBg, 6)
+	
+	local hpStroke = Instance.new("UIStroke", hpBg)
+	hpStroke.Color = Color3.fromRGB(100, 30, 30)
+	hpStroke.Thickness = 1.5
+
 	self.hpFill = makeFrame(hpBg, {
-		Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(210, 40, 40), BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0,
 	})
-	makeCorner(self.hpFill, 4)
+	makeCorner(self.hpFill, 6)
+	
+	self.hpGrad = Instance.new("UIGradient", self.hpFill)
+	self.hpGrad.Color = ColorSequence.new(Color3.fromRGB(210, 40, 40), Color3.fromRGB(150, 20, 20))
+
 	self.hpLabel = makeLabel(hpBg, {
-		Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+		Size = UDim2.new(1, -10, 1, 0), Position = UDim2.new(0, 5, 0, 0), BackgroundTransparency = 1,
 		TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold,
-		TextSize = 13, ZIndex = 2,
+		TextSize = 14, ZIndex = 2, TextXAlignment = Enum.TextXAlignment.Left
+	})
+	
+	local hpIcon = makeLabel(hpBg, {
+		Size = UDim2.new(0, 26, 0, 26), Position = UDim2.new(1, 4, 0, 0), BackgroundTransparency = 1,
+		Text = "❤", TextColor3 = Color3.fromRGB(255, 60, 60), Font = Enum.Font.GothamBold, TextSize = 18, ZIndex = 3
 	})
 
 	-- Shield bar (shown only when shield > 0)
 	local shBg = makeFrame(self.gui, {
-		Size = UDim2.new(0, 220, 0, 10), Position = UDim2.new(0, pad, 1, -pad - 22 - 14),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20), BorderSizePixel = 0,
+		Size = UDim2.new(0, 260, 0, 12), Position = UDim2.new(0, pad, 1, -pad - 26 - 18),
+		BackgroundColor3 = Color3.fromRGB(10, 15, 25), BorderSizePixel = 0, BackgroundTransparency = 0.4,
 	})
-	makeCorner(shBg, 3)
+	makeCorner(shBg, 4)
 	self.shFill = makeFrame(shBg, {
-		Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(80, 160, 255), BorderSizePixel = 0,
+		Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0,
 	})
-	makeCorner(self.shFill, 3)
+	makeCorner(self.shFill, 4)
+	local shGrad = Instance.new("UIGradient", self.shFill)
+	shGrad.Color = ColorSequence.new(Color3.fromRGB(80, 160, 255), Color3.fromRGB(40, 100, 200))
 	self.shBg = shBg
 
-	-- XP bar (full width bottom strip)
+	-- XP bar (full width bottom strip with gradient)
 	local xpBg = makeFrame(self.gui, {
-		Size = UDim2.new(1, 0, 0, 5), Position = UDim2.new(0, 0, 1, -5),
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30), BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 1, -6),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20), BorderSizePixel = 0, BackgroundTransparency = 0.5,
 	})
 	self.xpFill = makeFrame(xpBg, {
-		Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(230, 210, 0), BorderSizePixel = 0,
+		Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0,
 	})
+	local xpGrad = Instance.new("UIGradient", self.xpFill)
+	xpGrad.Color = ColorSequence.new(Color3.fromRGB(255, 220, 50), Color3.fromRGB(200, 150, 20))
+	
 	self.xpLabel = makeLabel(self.gui, {
-		Size = UDim2.new(0, 100, 0, 14), Position = UDim2.new(0.5, -50, 1, -18),
-		BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(230, 210, 0),
-		Font = Enum.Font.Gotham, TextSize = 12,
+		Size = UDim2.new(0, 200, 0, 16), Position = UDim2.new(0.5, -100, 1, -26),
+		BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(255, 230, 100),
+		Font = Enum.Font.GothamBold, TextSize = 13,
 	})
+	Instance.new("UIStroke", self.xpLabel).Thickness = 1.5
+	
+	-- Low HP Pulse effect logic
+	self.pulseTime = 0
+end
+
+function HUD:showInstruction(text)
+	if self.instructionFrame then self.instructionFrame:Destroy() end
+
+	local frame = Instance.new("Frame")
+	frame.Name = "InstructionFrame"
+	frame.Size = UDim2.new(0, 400, 0, 40)
+	frame.Position = UDim2.new(0.5, -200, 0, -50)
+	frame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+	frame.BackgroundTransparency = 0.2
+	frame.BorderSizePixel = 0
+	frame.ZIndex = 10
+	frame.Parent = self.gui
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+	
+	local stroke = Instance.new("UIStroke", frame)
+	stroke.Color = Color3.fromRGB(80, 120, 255)
+	stroke.Thickness = 1.5
+	
+	local glow = Instance.new("Frame", frame)
+	glow.Size = UDim2.new(1, 4, 1, 4)
+	glow.Position = UDim2.new(0, -2, 0, -2)
+	glow.BackgroundColor3 = Color3.fromRGB(80, 120, 255)
+	glow.BackgroundTransparency = 0.8
+	glow.BorderSizePixel = 0
+	glow.ZIndex = 9
+	Instance.new("UICorner", glow).CornerRadius = UDim.new(0, 10)
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = " ✧ " .. string.upper(text)
+	label.TextColor3 = Color3.fromRGB(200, 220, 255)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 14
+	label.ZIndex = 11
+	label.Parent = frame
+
+	self.instructionFrame = frame
+	
+	TweenService:Create(frame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, -200, 0, 20)
+	}):Play()
 end
 
 function HUD:buildHotbar()
@@ -191,8 +259,19 @@ function HUD:update(_dt)
 	local maxHp = s.maxHP or 100
 	local hpPct = math.clamp(hp / maxHp, 0, 1)
 	self.hpFill.Size = UDim2.new(hpPct, 0, 1, 0)
-	self.hpFill.BackgroundColor3 = hpPct > 0.5 and Color3.fromRGB(210, 40, 40)
-		or hpPct > 0.25 and Color3.fromRGB(220, 130, 0) or Color3.fromRGB(255, 40, 40)
+	
+	if hpPct > 0.5 then
+		self.hpGrad.Color = ColorSequence.new(Color3.fromRGB(210, 40, 40), Color3.fromRGB(150, 20, 20))
+	elseif hpPct > 0.25 then
+		self.hpGrad.Color = ColorSequence.new(Color3.fromRGB(220, 130, 0), Color3.fromRGB(180, 80, 0))
+	else
+		-- Low HP Pulse
+		self.pulseTime = self.pulseTime + _dt * 5
+		local pulse = (math.sin(self.pulseTime) + 1) / 2
+		local col = Color3.fromRGB(255, 40, 40):Lerp(Color3.fromRGB(150, 0, 0), pulse)
+		self.hpGrad.Color = ColorSequence.new(col, Color3.fromRGB(100, 0, 0))
+	end
+	
 	self.hpLabel.Text = math.ceil(hp) .. " / " .. maxHp
 
 	-- Damage flash

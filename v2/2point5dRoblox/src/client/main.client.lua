@@ -20,11 +20,37 @@ local HUDSystem         = require(ClientFolder:WaitForChild("hud_system"))
 local SM                = require(ClientFolder:WaitForChild("sound_manager"))
 local SpaceEnv          = require(ClientFolder:WaitForChild("space_environment"))
 local DropPod           = require(ClientFolder:WaitForChild("drop_pod"))
+local ObjectiveIndicator = require(ClientFolder:WaitForChild("objective_indicator"))
+local ZoneRenderer      = require(ClientFolder:WaitForChild("zone_renderer"))
+local LoadingScreen     = require(ClientFolder:WaitForChild("loading_screen"))
+local Minimap           = require(ClientFolder:WaitForChild("minimap"))
+local KillFeed          = require(ClientFolder:WaitForChild("kill_feed"))
+local EnemyHealthbars   = require(ClientFolder:WaitForChild("enemy_healthbars"))
+local DeathScreen       = require(ClientFolder:WaitForChild("death_screen"))
+
+LoadingScreen.show("Initializing Neural Link...")
+ObjectiveIndicator.start()
+EnemyHealthbars.start()
+DeathScreen.setup()
+
+-- Apply space skybox and hide loading screen after world is ready
+task.spawn(function()
+	SpaceEnv.applyLobby()
+	
+	-- Wait for renderer and basic assets
+	local start = tick()
+	while not game:IsLoaded() or (tick() - start < 3) do
+		task.wait(0.1)
+	end
+	
+	LoadingScreen.hide(1)
+end)
 
 print("GraveGain 2.5D Client Started")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
+
 local selectedRace = "Human"
 local selectedDifficulty = nil
 local animationController = nil
@@ -42,14 +68,11 @@ local darkvision         = Darkvision.new()
 local hud                = nil  -- created after dungeon init
 
 print("Player spawned as:", selectedRace)
-applyRaceScale = function(char, raceName)
+local function applyRaceScale(char, raceName)
 	local raceChangedEvent = ReplicatedStorage:WaitForChild("RaceChanged")
 	raceChangedEvent:FireServer(raceName)
 end
 applyRaceScale(character, selectedRace)
-
--- Apply space skybox as soon as the client loads in the lobby
-task.defer(function() SpaceEnv.applyLobby() end)
 
 local function setupReticule()
 	local playerGui = player:WaitForChild("PlayerGui")
@@ -101,21 +124,12 @@ end
 
 local function initializeDungeon()
 	gameState = "dungeon"
-	print("Entering dungeon as:", selectedRace)
+	print("Entering dungeon zone")
 
-	-- Switch environment to dungeon
-	SpaceEnv.applyDungeon()
-
-	-- Hide lobby while in dungeon
-	local lobby = workspace:FindFirstChild("Lobby")
-	if lobby then
-		for _, d in ipairs(lobby:GetDescendants()) do
-			if d:IsA("BasePart") then
-				d.LocalTransparencyModifier = 1
-				d.CanCollide = false
-			end
-		end
-	end
+	-- Hide lobby using helper
+	ZoneRenderer.setLobbyVisible(false)
+	Minimap.start()
+	Minimap.show()
 
 	playerStats = PlayerStats.new(character, selectedRace)
 	combatSystem:setCharacter(character, playerStats)
@@ -307,21 +321,41 @@ local function showMissionSelectionUI(difficulty)
 			local event = ReplicatedStorage:WaitForChild("EnterDungeon")
 			event:FireServer(selectedRace, difficulty, missionType)
 
-			-- Play drop pod cinematic, then init dungeon on landing
-			local landingPos = Vector3.new(0, 2, 1850) -- exterior approach area
+			-- Show loading screen before launch
+			LoadingScreen.show("Synchronizing Drop Pod...")
+
+			-- Calculate true ground height for landing
+			local rayOrigin = Vector3.new(0, 200, 600)
+			local rayDir = Vector3.new(0, -250, 0)
+			local rayParams = RaycastParams.new()
+			rayParams.FilterType = Enum.RaycastFilterType.Exclude
+			rayParams.FilterDescendantsInstances = {player.Character or workspace}
+			
+			local rayResult = workspace:Raycast(rayOrigin, rayDir, rayParams)
+			local groundY = rayResult and rayResult.Position.Y or 2
+			
+			local landingPos = Vector3.new(0, groundY, 600)
+			
+			-- Hide loading screen immediately before the cinematic plays
+			task.delay(1, function() LoadingScreen.hide(0.5) end)
+
 			DropPod.launch(landingPos, function()
-				-- Teleport player to dungeon exterior landing zone
+				-- Teleport player to wasteland landing zone
 				local char = player.Character
 				if char then
 					local hrp = char:FindFirstChild("HumanoidRootPart")
 					if hrp then hrp.CFrame = CFrame.new(landingPos + Vector3.new(0, 5, 0)) end
 				end
+				
+				-- Switch to alien dawn environment
+				SpaceEnv.applyExterior()
+				
 				initializeDungeon()
 				if hud then
 					if missionType == "Boss" then
-						hud:setObjective("Kill the Giant Skull Boss!")
+						hud:setObjective("Trek to the Dungeon Entrance (👆 indicator)")
 					elseif missionType == "Fetch" then
-						hud:setObjective("Retrieve the Artifact deep in the dungeon")
+						hud:setObjective("Find the Dungeon entrance (👆 indicator)")
 					end
 				end
 			end)
@@ -433,6 +467,10 @@ player.CharacterAdded:Connect(function(newCharacter)
 	if gameState == "dungeon" then
 		playerStats = PlayerStats.new(character, selectedRace)
 		combatSystem:setCharacter(character, playerStats)
+	else
+		-- Ensure lobby is visible if we respawn in lobby
+		ZoneRenderer.setLobbyVisible(true)
+		Minimap.hide()
 	end
 	applyRaceScale(character, selectedRace)
 	print("Character respawned")

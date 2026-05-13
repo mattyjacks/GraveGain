@@ -11,6 +11,29 @@ function CombatHandler.new(inputHandler)
 	return self
 end
 
+function CombatHandler.new(inputHandler)
+	local self = setmetatable({}, CombatHandler)
+	self.inputHandler = inputHandler
+	self.effectPool = {}
+	self.camera = workspace.CurrentCamera
+	return self
+end
+
+function CombatHandler:getMouseTarget()
+	local mouse = Players.LocalPlayer:GetMouse()
+	local ray = self.camera:ViewportPointToRay(mouse.X, mouse.Y)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = {Players.LocalPlayer.Character}
+	
+	local result = workspace:Raycast(ray.Origin, ray.Direction * 500, rayParams)
+	if result then
+		return result.Position
+	else
+		return ray.Origin + ray.Direction * 100
+	end
+end
+
 function CombatHandler:performMeleeAttack()
 	if self.inputHandler.pushAttackCooldown > 0 then return end
 	self.inputHandler.pushAttackCooldown = 0.5
@@ -21,12 +44,10 @@ function CombatHandler:performMeleeAttack()
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 	
-	local mouse = player:GetMouse()
-	if not mouse.Hit then return end
-	
+	local targetPos = self:getMouseTarget()
 	local origin = hrp.Position
-	local direction = Vector3.new(mouse.Hit.Position.X - origin.X, 0, mouse.Hit.Position.Z - origin.Z).Unit
-	local range = 8
+	local direction = (targetPos - origin).Unit
+	local range = 10
 	local damage = 25
 	
 	self:applyPushToEnemies(origin, direction, range, 20, damage)
@@ -35,7 +56,6 @@ end
 
 function CombatHandler:performRangedAttack(chargeTime)
 	self.inputHandler.ammo = self.inputHandler.ammo - 1
-	print("Fired Bow. Ammo:", self.inputHandler.ammo, "/", self.inputHandler.maxAmmo)
 	
 	local player = Players.LocalPlayer
 	local character = player.Character
@@ -43,32 +63,29 @@ function CombatHandler:performRangedAttack(chargeTime)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 	
-	local mouse = player:GetMouse()
-	if not mouse.Hit then return end
+	local targetPos = self:getMouseTarget()
+	local origin = hrp.Position + Vector3.new(0, 1.5, 0) -- shoulder height
+	local direction = (targetPos - origin).Unit
 	
-	local origin = hrp.Position
-	local direction = Vector3.new(mouse.Hit.Position.X - origin.X, 0, mouse.Hit.Position.Z - origin.Z).Unit
-	
-	local chargeMultiplier = 1 + (chargeTime / 5)
-	local speed = 80 * chargeMultiplier
+	local chargeMultiplier = 1 + (chargeTime / 3)
+	local speed = 120 * chargeMultiplier
 	local damage = 15 * chargeMultiplier
 	
 	local arrow = Instance.new("Part")
 	arrow.Name = "ArrowProjectile"
-	arrow.Shape = Enum.PartType.Cylinder
-	arrow.Size = Vector3.new(2, 0.1, 0.1)
+	arrow.Size = Vector3.new(0.2, 0.2, 2)
 	arrow.Color = Color3.fromRGB(150, 100, 50)
 	arrow.Material = Enum.Material.Wood
 	arrow.CanCollide = false
-	arrow.CFrame = CFrame.lookAt(origin + direction * 2 + Vector3.new(0, 1, 0), origin + direction * 10 + Vector3.new(0, 1, 0)) * CFrame.Angles(0, math.rad(90), 0)
+	arrow.CFrame = CFrame.lookAt(origin, targetPos)
 	
 	local bv = Instance.new("BodyVelocity")
 	bv.Velocity = direction * speed
-	bv.MaxForce = Vector3.new(100000, 100000, 100000)
+	bv.MaxForce = Vector3.new(1, 1, 1) * 1e6
 	bv.Parent = arrow
 	
 	arrow.Parent = workspace
-	game:GetService("Debris"):AddItem(arrow, 2)
+	game:GetService("Debris"):AddItem(arrow, 3)
 	
 	arrow.Touched:Connect(function(hit)
 		if hit.Parent and hit.Parent.Name ~= character.Name then

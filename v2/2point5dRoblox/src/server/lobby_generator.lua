@@ -11,7 +11,7 @@ local LobbyGenerator = {}
 LobbyGenerator.__index = LobbyGenerator
 
 -- Lobby is centred at origin, floating ~14 studs up (struts land at Y=0)
-local SHIP_Y = 14
+local SHIP_Y = 30
 
 function LobbyGenerator.new(parent)
 	local self = setmetatable({}, LobbyGenerator)
@@ -36,12 +36,23 @@ function LobbyGenerator:generateLobby()
 	-- Interior deck (walkable surface inside the saucer hull)
 	self:buildInteriorDeck(lobbyFolder)
 
+	-- Add SpawnLocation on the deck (Inside the ship)
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "LobbySpawn"
+	spawn.Size = Vector3.new(10, 1, 10)
+	spawn.Anchored = true
+	spawn.Transparency = 1
+	spawn.CanCollide = true
+	spawn.Duration = 0
+	spawn.CFrame = CFrame.new(0, SHIP_Y + 9.5, 0)
+	spawn.Parent = lobbyFolder
+
 	-- Race-selection podiums & big lore book on the deck
 	self.furnitureGenerator = LobbyFurnitureGenerator.new(self)
-	self.furnitureGenerator:placeFurniture(lobbyFolder)
+	self.furnitureGenerator:placeFurniture(lobbyFolder, SHIP_Y + 8.5)
 
 	self.bookGenerator = LobbyBookGenerator.new(self)
-	self.bookGenerator:createBigBook(lobbyFolder, Vector3.new(0, SHIP_Y + 1, -20))
+	self.bookGenerator:createBigBook(lobbyFolder, Vector3.new(0, SHIP_Y + 9.5, -30))
 
 	-- Dungeon portal (teleporter ring on deck)
 	self:buildPortal(lobbyFolder)
@@ -59,25 +70,25 @@ function LobbyGenerator:buildInteriorDeck(parent)
 	local deck = Instance.new("Part")
 	deck.Name     = "InteriorDeck"
 	deck.Shape    = Enum.PartType.Cylinder
-	deck.Size     = Vector3.new(1.5, 90, 90)
+	deck.Size     = Vector3.new(1.0, 120, 120)
 	deck.Color    = Color3.fromRGB(45, 50, 65)
 	deck.Material = Enum.Material.SmoothPlastic
 	deck.Anchored = true
 	deck.TopSurface    = Enum.SurfaceType.Smooth
 	deck.BottomSurface = Enum.SurfaceType.Smooth
-	deck.CFrame   = CFrame.new(0, SHIP_Y + 4.5, 0) * CFrame.Angles(0, 0, math.rad(90))
+	deck.CFrame   = CFrame.new(0, SHIP_Y + 8.5, 0) * CFrame.Angles(0, 0, math.rad(90))
 	deck.Parent   = parent
 
 	-- Deck edge accent ring (Neon)
 	local ring = Instance.new("Part")
 	ring.Name     = "DeckRing"
 	ring.Shape    = Enum.PartType.Cylinder
-	ring.Size     = Vector3.new(0.5, 92, 92)
+	ring.Size     = Vector3.new(0.4, 122, 122)
 	ring.Color    = Color3.fromRGB(0, 200, 255)
 	ring.Material = Enum.Material.Neon
 	ring.Anchored = true
 	ring.CanCollide = false
-	ring.CFrame   = CFrame.new(0, SHIP_Y + 5, 0) * CFrame.Angles(0, 0, math.rad(90))
+	ring.CFrame   = CFrame.new(0, SHIP_Y + 8.6, 0) * CFrame.Angles(0, 0, math.rad(90))
 	ring.Parent   = parent
 end
 
@@ -87,7 +98,7 @@ function LobbyGenerator:buildLandingPad(parent)
 	local pad = Instance.new("Part")
 	pad.Name     = "LandingPad"
 	pad.Shape    = Enum.PartType.Cylinder
-	pad.Size     = Vector3.new(1, 160, 160)
+	pad.Size     = Vector3.new(1, 200, 200)
 	pad.Color    = Color3.fromRGB(30, 30, 40)
 	pad.Material = Enum.Material.Metal
 	pad.Anchored = true
@@ -98,7 +109,7 @@ function LobbyGenerator:buildLandingPad(parent)
 	for _, rot in ipairs({0, 90}) do
 		local stripe = Instance.new("Part")
 		stripe.Name     = "Stripe"
-		stripe.Size     = Vector3.new(0.3, 120, 6)
+		stripe.Size     = Vector3.new(0.4, 150, 6)
 		stripe.Color    = Color3.fromRGB(255, 200, 0)
 		stripe.Material = Enum.Material.Neon
 		stripe.Anchored = true
@@ -110,7 +121,7 @@ function LobbyGenerator:buildLandingPad(parent)
 	-- Ground plane extending out from pad
 	local ground = Instance.new("Part")
 	ground.Name     = "Ground"
-	ground.Size     = Vector3.new(1, 1200, 1200)
+	ground.Size     = Vector3.new(1, 2000, 2000)
 	ground.Color    = Color3.fromRGB(20, 20, 30)
 	ground.Material = Enum.Material.SmoothPlastic
 	ground.Anchored = true
@@ -125,22 +136,22 @@ function LobbyGenerator:buildPortal(parent)
 	local portalBase = Instance.new("Part")
 	portalBase.Name     = "PortalBase"
 	portalBase.Shape    = Enum.PartType.Cylinder
-	portalBase.Size     = Vector3.new(1, 14, 14)
+	portalBase.Size     = Vector3.new(1.0, 12, 12)
 	portalBase.Color    = Color3.fromRGB(10, 10, 20)
 	portalBase.Material = Enum.Material.SmoothPlastic
 	portalBase.Anchored = true
-	portalBase.CFrame   = CFrame.new(0, SHIP_Y + 5.5, 30) * CFrame.Angles(0, 0, math.rad(90))
+	portalBase.CFrame   = CFrame.new(0, SHIP_Y + 9.0, 40) * CFrame.Angles(0, 0, math.rad(90))
 	portalBase.Parent   = parent
 
 	local portalRing = Instance.new("Part")
 	portalRing.Name     = "PortalRing"
 	portalRing.Shape    = Enum.PartType.Cylinder
-	portalRing.Size     = Vector3.new(0.8, 16, 16)
+	portalRing.Size     = Vector3.new(0.8, 14, 14)
 	portalRing.Color    = Color3.fromRGB(100, 0, 255)
 	portalRing.Material = Enum.Material.Neon
 	portalRing.Anchored = true
 	portalRing.CanCollide = false
-	portalRing.CFrame   = CFrame.new(0, SHIP_Y + 5.8, 30) * CFrame.Angles(0, 0, math.rad(90))
+	portalRing.CFrame   = CFrame.new(0, SHIP_Y + 9.2, 40) * CFrame.Angles(0, 0, math.rad(90))
 	portalRing.Parent   = parent
 
 	local light = Instance.new("PointLight")

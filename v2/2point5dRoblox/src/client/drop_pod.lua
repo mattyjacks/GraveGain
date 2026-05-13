@@ -143,8 +143,9 @@ function DropPod.launch(landingPos, onLanded)
 
 			-- Speed up glow as it nears
 			local intensity = 1 + eased * 5
-			if shield.Parent then
-				shield.Parent:FindFirstChildWhichIsA("PointLight").Brightness = intensity * 4
+			local podLight = shield.Parent and shield.Parent:FindFirstChildWhichIsA("PointLight")
+			if podLight then
+				podLight.Brightness = intensity * 4
 			end
 		end
 

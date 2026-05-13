@@ -139,6 +139,9 @@ end
 
 function PlayerStats:gainXP(amount)
 	self.xp = (self.xp or 0) + amount
+	local KillFeed = require(script.Parent:WaitForChild("kill_feed"))
+	KillFeed.showXPGain(amount)
+
 	while self.xp >= self.xpNeeded do
 		self.xp = self.xp - self.xpNeeded
 		self.level = self.level + 1
@@ -150,6 +153,10 @@ function PlayerStats:gainXP(amount)
 			self.humanoid.Health = self.realHP
 		end
 		print("Level up! Now level", self.level)
+		
+		local SM = require(script.Parent:WaitForChild("sound_manager"))
+		KillFeed.showLevelUp(self.level)
+		SM.LevelUp()
 	end
 end
 
@@ -185,7 +192,9 @@ function PlayerStats:getStats()
 		maxRage = self.maxRage or 0,
 		rageActive = self.rageActive or false,
 		mana = self.mana or 0,
-		maxMana = self.maxMana or 0
+		maxMana = self.maxMana or 0,
+		level = self.level,
+		exp = self.xp
 	}
 end
 

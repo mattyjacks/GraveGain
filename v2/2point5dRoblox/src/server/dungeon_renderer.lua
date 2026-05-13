@@ -105,14 +105,27 @@ function DungeonRenderer:renderFloor(parent)
 	floorFolder.Name = "Floor"
 	floorFolder.Parent = parent
 
+	local LEVELS = 16
+	local MAX_HEIGHT = 40
+	local noiseScale = 0.08
+	local seed = self.dungeon.seed or 12345
+
 	for x = 1, self.dungeon.width do
 		for y = 1, self.dungeon.height do
 			local tile = self.dungeon:getTile(x, y)
 			if tile and tile.walkable then
+				-- Calculate noise-based height
+				local nx, ny = x * noiseScale, y * noiseScale
+				local h = math.noise(nx, ny, seed)
+				h = (h + 1) / 2
+				local level = math.floor(h * (LEVELS - 1))
+				local yPos = level * (MAX_HEIGHT / LEVELS)
+
 				local part = Instance.new("Part")
 				part.Shape = Enum.PartType.Block
 				part.Anchored = true
-				part.Size = Vector3.new(TILE, FLOOR_THICKNESS, TILE)
+				-- Part extends down 100 studs to hide gaps
+				part.Size = Vector3.new(TILE, 100, TILE)
 				part.CanCollide = true
 				part.TopSurface = Enum.SurfaceType.Smooth
 				part.BottomSurface = Enum.SurfaceType.Smooth
@@ -123,12 +136,17 @@ function DungeonRenderer:renderFloor(parent)
 				else
 					pick = self:pick(self.palette.floor)
 				end
-				part.Color = pick[1]
+				
+				-- Adjust color based on height for a "natural" gradient
+				local col = pick[1]
+				if level > 12 then col = Color3.fromRGB(180, 180, 180) end -- rocky peaks
+
+				part.Color = col
 				part.Material = pick[2]
-				part.CFrame = CFrame.new(DX + x * TILE, -FLOOR_THICKNESS / 2, DZ + y * TILE)
+				part.CFrame = CFrame.new(DX + x * TILE, yPos - 50, DZ + y * TILE)
 				part.Parent = floorFolder
 
-				if self.rng:NextNumber() < 0.03 then
+				if self.rng:NextNumber() < 0.05 then
 					self.decorator:addFlowerOrDetail(x, y, floorFolder)
 				end
 			end
@@ -151,11 +169,13 @@ function DungeonRenderer:renderWalls(parent)
 					local wall = Instance.new("Part")
 					wall.Shape = Enum.PartType.Block
 					wall.Anchored = true
-					wall.Size = Vector3.new(TILE, WALL_HEIGHT, TILE)
+					-- Tall walls to meet the terrain
+					wall.Size = Vector3.new(TILE, 100, TILE)
 					wall.CanCollide = true
 					wall.Color = wallPick[1]
 					wall.Material = wallPick[2]
-					wall.CFrame = CFrame.new(DX + x * TILE, WALL_HEIGHT / 2, DZ + y * TILE)
+					-- Center at y=10 (top at 60, bottom at -40)
+					wall.CFrame = CFrame.new(DX + x * TILE, 10, DZ + y * TILE)
 					wall.Parent = wallFolder
 
 					local topPick = self:pick(self.palette.wallTop)
@@ -166,7 +186,7 @@ function DungeonRenderer:renderWalls(parent)
 					top.CanCollide = true
 					top.Color = topPick[1]
 					top.Material = topPick[2]
-					top.CFrame = CFrame.new(DX + x * TILE, WALL_HEIGHT + 0.25, DZ + y * TILE)
+					top.CFrame = CFrame.new(DX + x * TILE, 60.25, DZ + y * TILE)
 					top.Parent = wallFolder
 
 					if self.rng:NextNumber() < 0.08 then

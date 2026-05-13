@@ -46,149 +46,170 @@ function SpaceshipBuilder.build(parent, origin)
 	model.Name = "Spaceship"
 	model.Parent = parent
 
-	-- ── Main disk hull (flattened cylinder) ─────────────────────────────
+	-- ── Main disk hull (Massive saucer) ─────────────────────────────
 	local disk = part(model, {
 		Name = "Disk", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(8, 120, 120),
+		Size = Vector3.new(12, 150, 150),
 		Color = HULL_COLOR, Material = METAL,
 		CFrame = CFrame.new(ox, oy, oz) * CFrame.Angles(0, 0, math.rad(90)),
 	})
+
+	-- Neon Deck Rings (Atmospheric Lighting)
+	local ringRadii = {150 * 0.15, 150 * 0.3, 150 * 0.42}
+	for i, r in ipairs(ringRadii) do
+		local ring = part(model, {
+			Name = "NeonRing", Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.2, r * 2, r * 2),
+			Color = Color3.fromRGB(40, 100, 255), Material = NEON,
+			CFrame = CFrame.new(ox, oy + 6, oz) * CFrame.Angles(0, 0, math.rad(90)),
+			noCollide = true,
+		})
+		if i == 1 or i == 3 then
+			light(ring, Color3.fromRGB(80, 140, 255), 0.5, i == 1 and 40 or 60)
+		end
+	end
+
 	-- Disk rim accent (glowing ring)
 	local rim = part(model, {
 		Name = "Rim", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1.5, 122, 122),
+		Size = Vector3.new(2.5, 152, 152),
 		Color = NEON_CYAN, Material = NEON,
 		CFrame = CFrame.new(ox, oy + 0.5, oz) * CFrame.Angles(0, 0, math.rad(90)),
 		noCollide = true,
 	})
-	light(rim, NEON_CYAN, 1.5, 80)
+	light(rim, NEON_CYAN, 2, 100)
 
-	-- Under-disk (slightly darker)
+	-- Under-disk (heavier detail)
 	part(model, {
 		Name = "Underbody", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(4, 100, 100),
+		Size = Vector3.new(6, 130, 130),
 		Color = DETAIL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox, oy - 1.5, oz) * CFrame.Angles(0, 0, math.rad(90)),
+		CFrame = CFrame.new(ox, oy - 2.5, oz) * CFrame.Angles(0, 0, math.rad(90)),
 	})
 
-	-- ── Dome (upper bridge) ──────────────────────────────────────────────
-	local dome = part(model, {
-		Name = "Dome", Shape = Enum.PartType.Ball,
-		Size = Vector3.new(30, 24, 30),
-		Color = GLASS_COLOR, Material = GLASS,
-		Transparency = 0.35,
-		CFrame = CFrame.new(ox, oy + 14, oz),
-	})
-	-- Inner dome structure
+	-- ── Open Bridge (No roof) ──────────────────────────────────────────
+	-- Inner deck base
 	part(model, {
 		Name = "DomeBase", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(6, 36, 36),
+		Size = Vector3.new(8, 45, 45),
 		Color = HULL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox, oy + 6, oz) * CFrame.Angles(0, 0, math.rad(90)),
+		CFrame = CFrame.new(ox, oy + 8, oz) * CFrame.Angles(0, 0, math.rad(90)),
 	})
+	-- Guard rails around the open top
+	for i = 1, 16 do
+		local rad = math.rad(i * (360/16))
+		local r = 22
+		local rx = ox + math.cos(rad) * r
+		local rz = oz + math.sin(rad) * r
+		part(model, {
+			Name = "Rail", Shape = Enum.PartType.Block,
+			Size = Vector3.new(1, 6, 4),
+			Color = DETAIL_COLOR, Material = METAL,
+			CFrame = CFrame.new(rx, oy + 12, rz) * CFrame.Angles(0, -rad, 0),
+		})
+	end
 
-	-- ── Engine pods (×4, equally spaced) ────────────────────────────────
+	-- ── Engine pods (×4, Massive) ────────────────────────────────
 	local angles = {0, 90, 180, 270}
 	for _, ang in ipairs(angles) do
 		local rad = math.rad(ang)
-		local ex = ox + math.cos(rad) * 50
-		local ez = oz + math.sin(rad) * 50
+		local ex = ox + math.cos(rad) * 65
+		local ez = oz + math.sin(rad) * 65
 
 		-- Nacelle body
 		local eng = part(model, {
 			Name = "Engine", Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(12, 14, 14),
+			Size = Vector3.new(15, 18, 18),
 			Color = DETAIL_COLOR, Material = METAL,
-			CFrame = CFrame.new(ex, oy - 2, ez) * CFrame.Angles(0, 0, math.rad(90)),
+			CFrame = CFrame.new(ex, oy - 3, ez) * CFrame.Angles(0, 0, math.rad(90)),
 		})
 		-- Thruster glow
 		local thrust = part(model, {
 			Name = "Thrust", Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(3, 10, 10),
+			Size = Vector3.new(4, 14, 14),
 			Color = NEON_ORANGE, Material = NEON,
-			CFrame = CFrame.new(ex, oy - 7, ez) * CFrame.Angles(0, 0, math.rad(90)),
+			CFrame = CFrame.new(ex, oy - 10, ez) * CFrame.Angles(0, 0, math.rad(90)),
 			noCollide = true,
 		})
-		light(thrust, NEON_ORANGE, 2, 40)
-		-- Pylon connecting to disk
-		local pylon = part(model, {
+		light(thrust, NEON_ORANGE, 3, 50)
+		-- Pylon
+		part(model, {
 			Name = "Pylon", Shape = Enum.PartType.Block,
-			Size = Vector3.new(2.5, 14, 30),
+			Size = Vector3.new(4, 15, 35),
 			Color = HULL_COLOR, Material = METAL,
 			CFrame = CFrame.lookAt(
 				Vector3.new((ox + ex) / 2, oy - 1, (oz + ez) / 2),
 				Vector3.new(ex, oy - 1, ez)
-			) * CFrame.new(0, 0, 0),
+			),
 		})
 	end
 
 	-- ── Landing struts (×3) ──────────────────────────────────────────────
 	for i = 1, 3 do
 		local rad = math.rad(i * 120)
-		local sx = ox + math.cos(rad) * 35
-		local sz = oz + math.sin(rad) * 35
+		local sx = ox + math.cos(rad) * 45
+		local sz = oz + math.sin(rad) * 45
 		-- Strut
 		part(model, {
 			Name = "Strut", Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(16, 2, 2),
+			Size = Vector3.new(25, 3, 3),
 			Color = DETAIL_COLOR, Material = METAL,
-			CFrame = CFrame.new((sx + ox) / 2, oy - 6, (sz + oz) / 2)
-				* CFrame.lookAt(Vector3.new(0,0,0), Vector3.new(sx - ox, -8, sz - oz).Unit)
+			CFrame = CFrame.new((sx + ox) / 2, oy - 8, (sz + oz) / 2)
+				* CFrame.lookAt(Vector3.new(0,0,0), Vector3.new(sx - ox, -12, sz - oz).Unit)
 				* CFrame.Angles(0, 0, math.rad(90)),
 		})
 		-- Foot pad
 		part(model, {
 			Name = "Pad", Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(1.5, 6, 6),
+			Size = Vector3.new(2, 8, 8),
 			Color = HULL_COLOR, Material = METAL,
-			CFrame = CFrame.new(sx, oy - 13.5, sz) * CFrame.Angles(0, 0, math.rad(90)),
+			CFrame = CFrame.new(sx, oy - 20, sz) * CFrame.Angles(0, 0, math.rad(90)),
 		})
 	end
 
-	-- ── Antenna / sensor array ───────────────────────────────────────────
+	-- ── Antenna array ───────────────────────────────────────────
 	part(model, {
 		Name = "Antenna", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(18, 1.5, 1.5),
+		Size = Vector3.new(25, 2, 2),
 		Color = DETAIL_COLOR, Material = METAL,
 		CFrame = CFrame.new(ox, oy + 28, oz),
 	})
 	local antTip = part(model, {
 		Name = "AntTip", Shape = Enum.PartType.Ball,
-		Size = Vector3.new(3, 3, 3),
+		Size = Vector3.new(4, 4, 4),
 		Color = NEON_PURPLE, Material = NEON,
-		CFrame = CFrame.new(ox, oy + 37, oz), noCollide = true,
+		CFrame = CFrame.new(ox, oy + 40, oz), noCollide = true,
 	})
-	light(antTip, NEON_PURPLE, 2.5, 35)
+	light(antTip, NEON_PURPLE, 3, 40)
 
-	-- ── Decorative hull panels & windows ────────────────────────────────
-	for i = 1, 8 do
-		local wrad = math.rad(i * 45)
-		local wr = 42
+	-- ── Windows ────────────────────────────────
+	for i = 1, 12 do
+		local wrad = math.rad(i * 30)
+		local wr = 55
 		local wx = ox + math.cos(wrad) * wr
 		local wz = oz + math.sin(wrad) * wr
 		local win = part(model, {
 			Name = "Window", Shape = Enum.PartType.Block,
-			Size = Vector3.new(0.5, 4, 4),
-			Color = GLASS_COLOR, Material = GLASS, Transparency = 0.2,
-			CFrame = CFrame.new(wx, oy + 1, wz)
-				* CFrame.Angles(0, wrad, 0),
+			Size = Vector3.new(0.5, 6, 6),
+			Color = GLASS_COLOR, Material = GLASS, Transparency = 0.5,
+			CFrame = CFrame.new(wx, oy + 2, wz) * CFrame.Angles(0, wrad, 0),
 			noCollide = true,
 		})
-		light(win, GLASS_COLOR, 0.5, 15)
+		light(win, GLASS_COLOR, 0.8, 20)
 	end
 
-	-- ── Sensor dish ─────────────────────────────────────────────────────
+	-- ── Massive Sensor dish ─────────────────────────────────────────────────────
 	part(model, {
 		Name = "Dish", Shape = Enum.PartType.Ball,
-		Size = Vector3.new(3, 8, 8),
+		Size = Vector3.new(4, 12, 12),
 		Color = HULL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox + 20, oy + 7, oz),
+		CFrame = CFrame.new(ox + 30, oy + 10, oz),
 	})
 	part(model, {
 		Name = "DishStem", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(4, 1.5, 1.5),
+		Size = Vector3.new(6, 2, 2),
 		Color = DETAIL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox + 20, oy + 5, oz),
+		CFrame = CFrame.new(ox + 30, oy + 7, oz),
 	})
 
 	model.PrimaryPart = disk

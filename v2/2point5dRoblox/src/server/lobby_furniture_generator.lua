@@ -7,16 +7,16 @@ function LobbyFurnitureGenerator.new(lobbyGenerator)
 	return self
 end
 
-function LobbyFurnitureGenerator:placeFurniture(parent)
+function LobbyFurnitureGenerator:placeFurniture(parent, baseHeight)
+	baseHeight = baseHeight or 0
 	local furnitureFolder = Instance.new("Folder")
 	furnitureFolder.Name = "Furniture"
 	furnitureFolder.Parent = parent
-
 	local dresserPositions = {
-		Vector3.new(-20, 1, -20),
-		Vector3.new(20, 1, -20),
-		Vector3.new(-20, 1, 20),
-		Vector3.new(20, 1, 20),
+		Vector3.new(-40, baseHeight + 1, -40),
+		Vector3.new(40, baseHeight + 1, -40),
+		Vector3.new(-40, baseHeight + 1, 40),
+		Vector3.new(40, baseHeight + 1, 40),
 	}
 
 	for i, pos in ipairs(dresserPositions) do
@@ -26,19 +26,19 @@ function LobbyFurnitureGenerator:placeFurniture(parent)
 	local spawnPad = Instance.new("Part")
 	spawnPad.Name = "SpawnPad"
 	spawnPad.Shape = Enum.PartType.Block
-	spawnPad.Size = Vector3.new(10, 1, 10)
+	spawnPad.Size = Vector3.new(15, 1, 15)
 	spawnPad.Color = Color3.fromRGB(100, 150, 200)
 	spawnPad.Material = Enum.Material.Neon
-	spawnPad.Transparency = 0.3
+	spawnPad.Transparency = 0.4
 	spawnPad.Anchored = true
 	spawnPad.CanCollide = false
-	spawnPad.CFrame = CFrame.new(0, 1, 0)
+	spawnPad.CFrame = CFrame.new(0, baseHeight + 0.5, 0)
 	spawnPad.Parent = furnitureFolder
 
-	self:createPortalWall(furnitureFolder)
+	self:createPortalWall(furnitureFolder, baseHeight)
 end
 
-function LobbyFurnitureGenerator:createPortalWall(parent)
+function LobbyFurnitureGenerator:createPortalWall(parent, baseHeight)
 	local portalFolder = Instance.new("Folder")
 	portalFolder.Name = "Portals"
 	portalFolder.Parent = parent
@@ -52,7 +52,7 @@ function LobbyFurnitureGenerator:createPortalWall(parent)
 	}
 
 	local wallX = -45
-	local baseY = 3
+	local baseY = baseHeight + 3
 	local baseZ = 0
 	local spacing = 8
 

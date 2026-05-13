@@ -105,73 +105,66 @@ function AnimationController:update(dt)
 		if N  then self.targetC0s.Neck      = N  * cf(0,0,0, sway*5, 0, 0) end
 
 	-- ── Swing: wind-up → strike → recover ───────────────────────────────
+	-- ── Swing: Overhead Slam ──────────────────────────────
 	elseif self.state == "Swing" then
 		self.timer = self.timer + dt
-		local p = self.timer / 0.38   -- total duration
+		local p = self.timer / 0.42
 
-		if p < 0.22 then
-			-- Wind-up: arm high-back, torso rotates away from strike
-			local t = p / 0.22
-			self.targetC0s.RightShoulder = R * cf(0,0,0, 160 - t*20, 40, 70)
-			if RJ then self.targetC0s.RootJoint = RJ * cf(0,0,0, 0,-55*t, 0) end
-			if N  then self.targetC0s.Neck = N * cf(0,0,0, 0, 30*t, 0) end
-
-		elseif p < 0.60 then
-			-- Strike: fast sweep across — arm drives forward and down
-			local t = (p - 0.22) / 0.38
-			self.targetC0s.RightShoulder = R * cf(0,0,0,
-				140 - t*170, 40 - t*90, 70 - t*130)
-			if RJ then self.targetC0s.RootJoint = RJ * cf(0,0,0, 0, -55 + t*125, 0) end
-			if N  then self.targetC0s.Neck = N * cf(0,0,0, 0, 30 - t*60, 0) end
-
-		elseif p < 1 then
-			-- Recovery: spring back to neutral
-			local t = (p - 0.60) / 0.40
-			self.targetC0s.RightShoulder = R * cf(0,0,0, -30 + t*30, -50 + t*50, -60 + t*60)
-			if RJ then self.targetC0s.RootJoint = RJ * cf(0,0,0, 0, 70 - t*70, 0) end
-			if N  then self.targetC0s.Neck = N * cf(0,0,0, 0, -30 + t*30, 0) end
-		else
-			self.state = "Idle"
-		end
-
-	-- ── Block: shield raised, body angled ───────────────────────────────
-	elseif self.state == "Block" then
-		self.targetC0s.RightShoulder = R * cf(0,0,0, 30, 0, -20)
-		if self.joints.LeftShoulder then
-			self.targetC0s.LeftShoulder  = L * cf(0,0,0, 90, 0, 35)
-		end
-		if RJ then self.targetC0s.RootJoint = RJ * cf(0,0,0, 8, 25, 0) end
-		if N  then self.targetC0s.Neck = N * cf(0,0,0, -5, -20, 0) end
-
-	-- ── BowDraw: left arm forward, right arm drawn back ─────────────────
-	elseif self.state == "BowDraw" then
-		local tension = 0.5 + math.sin(self.idleTime * 3) * 0.03  -- tiny tremble
-		self.targetC0s.RightShoulder = R * cf(0,0,0, 85*tension, -20, -65)
-		if self.joints.LeftShoulder then
-			self.targetC0s.LeftShoulder  = L * cf(0,0,0, 85*tension, 15, 10)
-		end
-		if RJ then self.targetC0s.RootJoint = RJ * cf(0,0,0, 0, -40, 0) end
-		if N  then self.targetC0s.Neck = N * cf(0,0,0, 0, 35, 0) end
-
-	-- ── BowFire: snap release recoil ────────────────────────────────────
-	elseif self.state == "BowFire" then
-		self.timer = self.timer + dt
-		local p = self.timer / 0.18
-
-		if p < 0.4 then
-			-- Snap arms back
-			self.targetC0s.RightShoulder = R * cf(0,0,0, 100, -30, -80)
-			if self.joints.LeftShoulder then
-				self.targetC0s.LeftShoulder  = L * cf(0,0,0, 80, 30, 20)
-			end
+		if p < 0.25 then
+			-- Wind-up: Lift high
+			local t = p / 0.25
+			self.targetC0s.RightShoulder = R * cf(0, 0.5, 0, 165, 0, 10)
+			if RJ then self.targetC0s.RootJoint = RJ * cf(0, 0, 0, -10 * t, 0, 0) end
+		elseif p < 0.65 then
+			-- Strike: Slam down
+			local t = (p - 0.25) / 0.4
+			self.targetC0s.RightShoulder = R * cf(0, -0.5, -1, -40, 0, 0)
+			if RJ then self.targetC0s.RootJoint = RJ * cf(0, -0.2, 0, 20 * t, 0, 0) end
 		elseif p < 1 then
 			-- Recover
-			local t = (p - 0.4) / 0.6
-			self.targetC0s.RightShoulder = R * cf(0,0,0, 100 - t*100, -30 + t*30, -80 + t*80)
+			local t = (p - 0.65) / 0.35
+			self.targetC0s.RightShoulder = R * cf(0, -0.5 + 0.5*t, -1 + t, -40 + 40*t, 0, 0)
 		else
 			self.state = "Idle"
 		end
-		if RJ then self.targetC0s.RootJoint = RJ * cf(0,0,0, 0, -20, 0) end
+
+	-- ── Block: Hunker Down ────────────────────────────────
+	elseif self.state == "Block" then
+		self.targetC0s.RightShoulder = R * cf(0,0,0, 20, 0, -15)
+		if self.joints.LeftShoulder then
+			self.targetC0s.LeftShoulder  = L * cf(0.2, 0.2, -0.5, 95, 20, 45)
+		end
+		if RJ then self.targetC0s.RootJoint = RJ * cf(0, -0.4, 0, 5, 25, 0) end
+		if N  then self.targetC0s.Neck = N * cf(0,0,0, -10, -20, 0) end
+
+	-- ── BowDraw: Dynamic Pull ──────────────────────────────
+	elseif self.state == "BowDraw" then
+		local tremble = math.sin(tick() * 40) * 0.02
+		self.targetC0s.RightShoulder = R * cf(-0.5 + tremble, 0, -0.8, 90, -30, -85)
+		if self.joints.LeftShoulder then
+			self.targetC0s.LeftShoulder  = L * cf(0.5, 0, -0.5, 88, 10, 5)
+		end
+		if RJ then self.targetC0s.RootJoint = RJ * cf(0,0,0, 0, -45, 0) end
+		if N  then self.targetC0s.Neck = N * cf(0,0,0, 0, 40, 0) end
+
+	-- ── BowFire: Snap Release ─────────────────────────────
+	elseif self.state == "BowFire" then
+		self.timer = self.timer + dt
+		local p = self.timer / 0.22
+
+		if p < 0.3 then
+			-- Recoil
+			self.targetC0s.RightShoulder = R * cf(0.2, 0, 0.2, 70, -10, -30)
+			if self.joints.LeftShoulder then
+				self.targetC0s.LeftShoulder = L * cf(0, 0, 0.5, 100, 40, 10)
+			end
+		elseif p < 1 then
+			local t = (p - 0.3) / 0.7
+			self.targetC0s.RightShoulder = R * cf(0.2 - 0.2*t, 0, 0.2 - 0.2*t, 70 - 70*t, -10 + 10*t, -30 + 30*t)
+		else
+			self.state = "Idle"
+		end
+		if RJ then self.targetC0s.RootJoint = RJ * cf(0, 0, 0, 0, -20, 0) end
 	end
 
 	-- ── Lerp all joints to targets ───────────────────────────────────────

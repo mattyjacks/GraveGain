@@ -11,8 +11,8 @@ function DungeonGenerator.new(seed, biome, floor)
 	self.seed = seed
 	self.biome = biome or "Crypt"
 	self.floor = floor or 1
-	self.width = 100
-	self.height = 100
+	self.width = 150
+	self.height = 150
 	self.tiles = {}
 	self.rooms = {}
 	self.enemies = {}

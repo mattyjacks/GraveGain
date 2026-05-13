@@ -145,14 +145,62 @@ function EnemySpawner:buildSkullModel(position)
 	rightEye.Material = Enum.Material.Neon
 	rightEye.Anchored = false
 	rightEye.CanCollide = false
-	rightEye.TopSurface = Enum.SurfaceType.Smooth
-	rightEye.BottomSurface = Enum.SurfaceType.Smooth
 	rightEye.CFrame = CFrame.new(position + Vector3.new(0.45, 0.1, -1.0))
 	rightEye.Parent = model
+	
 	local rightEyeWeld = Instance.new("WeldConstraint")
 	rightEyeWeld.Part0 = cranium
 	rightEyeWeld.Part1 = rightEye
 	rightEyeWeld.Parent = rightEye
+
+	-- ── Skeleton Weapons ──
+	local weaponTypes = {"Sword", "Axe", "Mace", "Hammer"}
+	local weaponType = weaponTypes[math.random(#weaponTypes)]
+	local weapon = Instance.new("Model")
+	weapon.Name = weaponType .. "Weapon"
+	
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(0.4, 2.5, 0.4)
+	handle.Color = Color3.fromRGB(100, 70, 40)
+	handle.Material = Enum.Material.Wood
+	handle.Parent = weapon
+	
+	local blade = Instance.new("Part")
+	blade.Color = Color3.fromRGB(150, 150, 160)
+	blade.Material = Enum.Material.Metal
+	blade.Parent = weapon
+	
+	if weaponType == "Sword" then
+		blade.Size = Vector3.new(0.2, 4, 0.6)
+		blade.CFrame = handle.CFrame * CFrame.new(0, 3, 0)
+	elseif weaponType == "Axe" then
+		blade.Size = Vector3.new(1.5, 1.2, 0.3)
+		blade.CFrame = handle.CFrame * CFrame.new(0.6, 1.2, 0)
+	elseif weaponType == "Mace" then
+		blade.Shape = Enum.PartType.Ball
+		blade.Size = Vector3.new(1.2, 1.2, 1.2)
+		blade.CFrame = handle.CFrame * CFrame.new(0, 1.2, 0)
+	elseif weaponType == "Hammer" then
+		blade.Size = Vector3.new(1.8, 1.0, 1.2)
+		blade.CFrame = handle.CFrame * CFrame.new(0, 1.2, 0)
+	end
+	
+	local bw = Instance.new("WeldConstraint")
+	bw.Part0 = handle; bw.Part1 = blade; bw.Parent = handle
+	
+	weapon.PrimaryPart = handle
+	weapon.Parent = model
+	
+	local ww = Instance.new("WeldConstraint")
+	ww.Part0 = cranium
+	ww.Part1 = handle
+	ww.Parent = handle
+	handle.CFrame = cranium.CFrame * CFrame.new(1.8, -0.5, -0.5) * CFrame.Angles(math.rad(-90), 0, 0)
+	
+	for _, p in ipairs(weapon:GetDescendants()) do
+		if p:IsA("BasePart") then p.CanCollide = false; p.Anchored = false end
+	end
 
 	local leftGlow = Instance.new("PointLight")
 	leftGlow.Color = Color3.fromRGB(255, 50, 0)
