@@ -135,6 +135,12 @@ end)
 player.CharacterAdded:Connect(function(newCharacter)
 	character = newCharacter
 	cameraController:setCharacter(character)
+	
+	-- If we spawned high in the air, we are back in the lobby
+	if character:GetPivot().Position.Y > 500 then
+		gameState = "lobby"
+	end
+	
 	if playerStats then
 		playerStats = PlayerStats.new(character, selectedRace)
 		combatSystem:setCharacter(character, playerStats)
@@ -147,15 +153,18 @@ end)
 
 -- ── Events ─────────────────────────────────────────────────────────────────
 
+local isPickerOpen = false
 ReplicatedStorage:WaitForChild("RaceSelectionRequested").OnClientEvent:Connect(function()
 	LoadingScreen.hide(0.5) -- Show lobby immediately for race picking
-	if gameState == "lobby" then
+	if (gameState == "lobby" or gameState == "openworld") and not isPickerOpen then
+		isPickerOpen = true
 		local racePicker = LobbyRacePicker.new()
 		racePicker:show()
 		
 		task.spawn(function()
 			while not racePicker:getSelectedRace() do task.wait(0.1) end
 			selectedRace = racePicker:getSelectedRace()
+			isPickerOpen = false
 			initializeOpenWorld()
 		end)
 	end

@@ -106,7 +106,7 @@ end
 function GameManager:spawnPlayerInLobby(player, character)
 	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 	local lobbyHeight = GameData.WORLD_CONFIG.lobbyHeight
-	humanoidRootPart.CFrame = CFrame.new(0, lobbyHeight + 15, 0) -- Spawns on spaceship deck
+	humanoidRootPart.CFrame = CFrame.new(0, lobbyHeight + 11, 0) -- Spawns on spaceship deck
 	
 	local playerData = self.playerData[player.UserId]
 	if playerData then
