@@ -166,6 +166,25 @@ function DungeonGenerator:carveRoom(room)
 			end
 		end
 	end
+	self:addRoomFeatures(room)
+end
+
+function DungeonGenerator:addRoomFeatures(room)
+	if room.type == "cave" then return end -- caves handle their own noise
+	
+	-- Large rooms get pillars
+	if room.width >= 10 and room.height >= 10 and math.random() > 0.4 then
+		local px, py = math.floor(room.centerX), math.floor(room.centerY)
+		-- 4 pillars around center
+		local offsets = {{ -2, -2}, { 2, -2}, { -2, 2}, { 2, 2}}
+		for _, off in ipairs(offsets) do
+			local x, y = px + off[1], py + off[2]
+			if self.tiles[x] and self.tiles[x][y] then
+				self.tiles[x][y].type = "wall"
+				self.tiles[x][y].walkable = false
+			end
+		end
+	end
 end
 
 function DungeonGenerator:connectRooms()

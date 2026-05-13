@@ -7,6 +7,7 @@
 local TweenService    = game:GetService("TweenService")
 local Players         = game:GetService("Players")
 local RunService      = game:GetService("RunService")
+local SpaceEnv        = require(script.Parent:WaitForChild("space_environment"))
 
 local DropPod = {}
 
@@ -113,6 +114,9 @@ function DropPod.launch(landingPos, onLanded)
 		-- Pod starts 800 studs above landing point
 		local startPos = landingPos + Vector3.new(0, 800, 0)
 		local pod, body, shield, eng = buildPodModel(startPos)
+		
+		-- Enable bright cinematic lighting
+		SpaceEnv.applyFullBright()
 
 		-- 3. Snap camera to above the pod looking down
 		camera.CFrame = CFrame.new(startPos + Vector3.new(20, 40, 20), startPos)

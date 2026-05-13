@@ -53,6 +53,17 @@ function ExteriorGenerator.buildDungeonEntrance(parent)
 	local l = Instance.new("PointLight", rune)
 	l.Color=Color3.fromRGB(150,0,255); l.Brightness=3; l.Range=35
 
+	-- Actual teleport detector
+	local detector = Instance.new("Part")
+	detector.Name = "DungeonEnterDetector"
+	detector.Size = Vector3.new(20, 25, 4)
+	detector.Transparency = 1
+	detector.Anchored = true
+	detector.CanCollide = false
+	detector.CFrame = CFrame.new(0, GROUND_Y + 12.5, ez)
+	detector.Parent = parent
+
+	-- Label
 	local bg = Instance.new("BillboardGui")
 	bg.Size = UDim2.new(0,160,0,40); bg.StudsOffset = Vector3.new(0,16,0)
 	bg.Parent = rune
@@ -61,6 +72,8 @@ function ExteriorGenerator.buildDungeonEntrance(parent)
 	lbl.TextColor3 = Color3.fromRGB(200,150,255)
 	lbl.Font = Enum.Font.GothamBold; lbl.TextScaled=true
 	lbl.Text = "☠  DUNGEON ENTRANCE"
+	
+	-- Note: The GameManager will connect to this detector's Touched event
 end
 
 return ExteriorGenerator

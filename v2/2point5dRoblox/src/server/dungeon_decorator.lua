@@ -1,4 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameData = require(Shared:WaitForChild("game_data"))
 
 local DungeonDecorator = {}
 DungeonDecorator.__index = DungeonDecorator
@@ -11,6 +13,7 @@ function DungeonDecorator.new(dungeonRenderer)
 	self.dungeon = dungeonRenderer.dungeon
 	self.rng = dungeonRenderer.rng
 	self.palette = dungeonRenderer.palette
+	self.offset = GameData.DUNGEON_CONFIG.offset
 	return self
 end
 
@@ -62,7 +65,7 @@ function DungeonDecorator:addFlowerOrDetail(x, y, parent)
 	flower.Material = Enum.Material.SmoothPlastic
 	local ox = (self.rng:NextNumber() - 0.5) * TILE * 0.7
 	local oz = (self.rng:NextNumber() - 0.5) * TILE * 0.7
-	flower.CFrame = CFrame.new(x * TILE + ox, 0.3, y * TILE + oz)
+	flower.CFrame = CFrame.new(self.offset.X + x * TILE + ox, 0.3, self.offset.Z + y * TILE + oz)
 	flower.Parent = parent
 end
 
@@ -81,7 +84,7 @@ function DungeonDecorator:addVine(x, y, parent)
 	elseif side == 2 then ox = -TILE / 2 + 0.2
 	elseif side == 3 then oz = TILE / 2 - 0.2
 	else oz = -TILE / 2 + 0.2 end
-	vine.CFrame = CFrame.new(x * TILE + ox, WALL_HEIGHT - h / 2, y * TILE + oz)
+	vine.CFrame = CFrame.new(self.offset.X + x * TILE + ox, WALL_HEIGHT - h / 2, self.offset.Z + y * TILE + oz)
 	vine.Parent = parent
 end
 
@@ -93,7 +96,7 @@ function DungeonDecorator:addTorch(x, y, parent)
 	pole.Size = Vector3.new(3, 0.4, 0.4)
 	pole.Color = Color3.fromRGB(101, 67, 33)
 	pole.Material = Enum.Material.Wood
-	pole.CFrame = CFrame.new(x * TILE, 1.5, y * TILE) * CFrame.Angles(0, 0, math.rad(90))
+	pole.CFrame = CFrame.new(self.offset.X + x * TILE, 1.5, self.offset.Z + y * TILE) * CFrame.Angles(0, 0, math.rad(90))
 	pole.Parent = parent
 
 	local flame = Instance.new("Part")
@@ -103,7 +106,7 @@ function DungeonDecorator:addTorch(x, y, parent)
 	flame.Size = Vector3.new(1.2, 1.2, 1.2)
 	flame.Color = Color3.fromRGB(255, 150, 0)
 	flame.Material = Enum.Material.Neon
-	flame.CFrame = CFrame.new(x * TILE, 3.3, y * TILE)
+	flame.CFrame = CFrame.new(self.offset.X + x * TILE, 3.3, self.offset.Z + y * TILE)
 	flame.Parent = parent
 
 	local light = Instance.new("PointLight")
@@ -121,7 +124,7 @@ function DungeonDecorator:addLantern(x, y, parent)
 	pole.Size = Vector3.new(4, 0.3, 0.3)
 	pole.Color = Color3.fromRGB(50, 50, 50)
 	pole.Material = Enum.Material.Metal
-	pole.CFrame = CFrame.new(x * TILE, 2, y * TILE) * CFrame.Angles(0, 0, math.rad(90))
+	pole.CFrame = CFrame.new(self.offset.X + x * TILE, 2, self.offset.Z + y * TILE) * CFrame.Angles(0, 0, math.rad(90))
 	pole.Parent = parent
 
 	local hook = Instance.new("Part")
@@ -131,7 +134,7 @@ function DungeonDecorator:addLantern(x, y, parent)
 	hook.Size = Vector3.new(1.5, 0.2, 0.2)
 	hook.Color = Color3.fromRGB(50, 50, 50)
 	hook.Material = Enum.Material.Metal
-	hook.CFrame = CFrame.new(x * TILE + 0.6, 3.9, y * TILE)
+	hook.CFrame = CFrame.new(self.offset.X + x * TILE + 0.6, 3.9, self.offset.Z + y * TILE)
 	hook.Parent = parent
 	
 	local lantern = Instance.new("Part")
@@ -142,7 +145,7 @@ function DungeonDecorator:addLantern(x, y, parent)
 	lantern.Color = Color3.fromRGB(200, 200, 100)
 	lantern.Material = Enum.Material.Glass
 	lantern.Transparency = 0.4
-	lantern.CFrame = CFrame.new(x * TILE + 1.2, 3.3, y * TILE)
+	lantern.CFrame = CFrame.new(self.offset.X + x * TILE + 1.2, 3.3, self.offset.Z + y * TILE)
 	lantern.Parent = parent
 
 	local light = Instance.new("PointLight")
@@ -160,7 +163,7 @@ function DungeonDecorator:addBrazier(x, y, parent)
 	base.Size = Vector3.new(1, 2, 2)
 	base.Color = Color3.fromRGB(60, 60, 60)
 	base.Material = Enum.Material.Metal
-	base.CFrame = CFrame.new(x * TILE, 0.5, y * TILE) * CFrame.Angles(0, 0, math.rad(90))
+	base.CFrame = CFrame.new(self.offset.X + x * TILE, 0.5, self.offset.Z + y * TILE) * CFrame.Angles(0, 0, math.rad(90))
 	base.Parent = parent
 	
 	local bowl = Instance.new("Part")
@@ -170,7 +173,7 @@ function DungeonDecorator:addBrazier(x, y, parent)
 	bowl.Size = Vector3.new(0.5, 2.5, 2.5)
 	bowl.Color = Color3.fromRGB(40, 40, 40)
 	bowl.Material = Enum.Material.Metal
-	bowl.CFrame = CFrame.new(x * TILE, 1.25, y * TILE) * CFrame.Angles(0, 0, math.rad(90))
+	bowl.CFrame = CFrame.new(self.offset.X + x * TILE, 1.25, self.offset.Z + y * TILE) * CFrame.Angles(0, 0, math.rad(90))
 	bowl.Parent = parent
 
 	local flame = Instance.new("Part")
@@ -180,7 +183,7 @@ function DungeonDecorator:addBrazier(x, y, parent)
 	flame.Size = Vector3.new(1.5, 1.5, 1.5)
 	flame.Color = Color3.fromRGB(255, 100, 0)
 	flame.Material = Enum.Material.Neon
-	flame.CFrame = CFrame.new(x * TILE, 1.8, y * TILE)
+	flame.CFrame = CFrame.new(self.offset.X + x * TILE, 1.8, self.offset.Z + y * TILE)
 	flame.Parent = parent
 
 	local light = Instance.new("PointLight")
@@ -198,7 +201,7 @@ function DungeonDecorator:addGlowingMushroom(x, y, parent)
 	stem.Size = Vector3.new(1.5, 0.4, 0.4)
 	stem.Color = Color3.fromRGB(200, 200, 200)
 	stem.Material = Enum.Material.Wood
-	stem.CFrame = CFrame.new(x * TILE, 0.75, y * TILE) * CFrame.Angles(0, 0, math.rad(90))
+	stem.CFrame = CFrame.new(self.offset.X + x * TILE, 0.75, self.offset.Z + y * TILE) * CFrame.Angles(0, 0, math.rad(90))
 	stem.Parent = parent
 
 	local cap = Instance.new("Part")
@@ -214,7 +217,7 @@ function DungeonDecorator:addGlowingMushroom(x, y, parent)
 	local c = colors[self.rng:NextInteger(1, #colors)]
 	cap.Color = c
 	cap.Material = Enum.Material.Neon
-	cap.CFrame = CFrame.new(x * TILE, 1.5, y * TILE)
+	cap.CFrame = CFrame.new(self.offset.X + x * TILE, 1.5, self.offset.Z + y * TILE)
 	cap.Parent = parent
 
 	local light = Instance.new("PointLight")
@@ -237,7 +240,7 @@ function DungeonDecorator:addCrystal(room, parent)
 	local pick = self:pick(self.palette.accent)
 	crystal.Color = pick[1]
 	crystal.Material = pick[2]
-	crystal.CFrame = CFrame.new(cx * TILE, h / 2, cy * TILE) * CFrame.Angles(
+	crystal.CFrame = CFrame.new(self.offset.X + cx * TILE, h / 2, self.offset.Z + cy * TILE) * CFrame.Angles(
 		math.rad(self.rng:NextNumber() * 20 - 10),
 		math.rad(self.rng:NextNumber() * 360),
 		math.rad(self.rng:NextNumber() * 20 - 10)
@@ -265,7 +268,7 @@ function DungeonDecorator:addWaterPool(room, parent)
 	pool.Color = Color3.fromRGB(30, 120, 200)
 	pool.Material = Enum.Material.Glass
 	pool.Transparency = 0.4
-	pool.CFrame = CFrame.new(px * TILE, -0.1, py * TILE)
+	pool.CFrame = CFrame.new(self.offset.X + px * TILE, -0.1, self.offset.Z + py * TILE)
 	pool.Parent = parent
 end
 
@@ -285,7 +288,7 @@ function DungeonDecorator:renderLoot(parent)
 			crate.Color = Color3.fromRGB(50, 200, 50)
 			crate.Material = Enum.Material.Wood
 			crate.Anchored = true
-			crate.CFrame = CFrame.new(item.x * TILE, 1.25, item.y * TILE)
+			crate.CFrame = CFrame.new(self.offset.X + item.x * TILE, 1.25, self.offset.Z + item.y * TILE)
 			crate.Parent = lootFolder
 			
 			local debounce = false
@@ -307,7 +310,7 @@ function DungeonDecorator:renderLoot(parent)
 			book.Color = Color3.fromRGB(150, 100, 50)
 			book.Material = Enum.Material.Wood
 			book.Anchored = true
-			book.CFrame = CFrame.new(item.x * TILE, 0.2, item.y * TILE)
+			book.CFrame = CFrame.new(self.offset.X + item.x * TILE, 0.2, self.offset.Z + item.y * TILE)
 			book.Parent = lootFolder
 			
 			local pages = Instance.new("Part")

@@ -1,3 +1,6 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameData = require(Shared:WaitForChild("game_data"))
 local DungeonDecorator = require(script.Parent:WaitForChild("dungeon_decorator"))
 
 local DungeonRenderer = {}
@@ -7,7 +10,7 @@ local TILE          = 4
 local WALL_HEIGHT   = 6
 local FLOOR_THICKNESS = 1
 local SUB_LAYERS    = 3
-local DX, DZ       = 0, 2000   -- dungeon world offset
+local OFFSET        = GameData.DUNGEON_CONFIG.offset
 
 local BIOME_PALETTES = {
 	Crypt = {
@@ -92,9 +95,9 @@ function DungeonRenderer:renderSubLayers(parent)
 		part.Color = pick[1]
 		part.Material = pick[2]
 		part.CFrame = CFrame.new(
-			DX + (self.dungeon.width / 2) * TILE,
+			OFFSET.X + (self.dungeon.width / 2) * TILE,
 			yPos - FLOOR_THICKNESS / 2,
-			DZ + (self.dungeon.height / 2) * TILE
+			OFFSET.Z + (self.dungeon.height / 2) * TILE
 		)
 		part.Parent = sub
 	end
@@ -143,7 +146,7 @@ function DungeonRenderer:renderFloor(parent)
 
 				part.Color = col
 				part.Material = pick[2]
-				part.CFrame = CFrame.new(DX + x * TILE, yPos - 50, DZ + y * TILE)
+				part.CFrame = CFrame.new(OFFSET.X + x * TILE, yPos - 50, OFFSET.Z + y * TILE)
 				part.Parent = floorFolder
 
 				if self.rng:NextNumber() < 0.05 then
@@ -175,7 +178,7 @@ function DungeonRenderer:renderWalls(parent)
 					wall.Color = wallPick[1]
 					wall.Material = wallPick[2]
 					-- Center at y=10 (top at 60, bottom at -40)
-					wall.CFrame = CFrame.new(DX + x * TILE, 10, DZ + y * TILE)
+					wall.CFrame = CFrame.new(OFFSET.X + x * TILE, 10, OFFSET.Z + y * TILE)
 					wall.Parent = wallFolder
 
 					local topPick = self:pick(self.palette.wallTop)
@@ -186,7 +189,7 @@ function DungeonRenderer:renderWalls(parent)
 					top.CanCollide = true
 					top.Color = topPick[1]
 					top.Material = topPick[2]
-					top.CFrame = CFrame.new(DX + x * TILE, 60.25, DZ + y * TILE)
+					top.CFrame = CFrame.new(OFFSET.X + x * TILE, 60.25, OFFSET.Z + y * TILE)
 					top.Parent = wallFolder
 
 					if self.rng:NextNumber() < 0.08 then

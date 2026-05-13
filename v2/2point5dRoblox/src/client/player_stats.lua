@@ -22,6 +22,8 @@ function PlayerStats.new(character, raceName)
 	self.xp       = 0
 	self.level    = 1
 	self.xpNeeded = 100
+	self.talentPoints = 0
+	self.talents = {}
 
 	if self.raceStats.hasShield then
 		self.shield = self.raceStats.shieldMax
@@ -145,6 +147,7 @@ function PlayerStats:gainXP(amount)
 	while self.xp >= self.xpNeeded do
 		self.xp = self.xp - self.xpNeeded
 		self.level = self.level + 1
+		self.talentPoints = self.talentPoints + 1
 		self.xpNeeded = math.floor(self.xpNeeded * 1.5)
 		self.maxHP = self.maxHP + 10
 		self.realHP = math.min(self.realHP + 20, self.maxHP)

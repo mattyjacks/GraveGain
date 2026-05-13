@@ -10,10 +10,14 @@ local RaceStats = require(Shared:WaitForChild("race_stats"))
 local ServerFolder = script.Parent
 local DungeonRenderer = require(ServerFolder:WaitForChild("dungeon_renderer"))
 local EnemySpawner = require(ServerFolder:WaitForChild("enemy_spawner"))
+local WorldManager = require(ServerFolder:WaitForChild("world_manager"))
+local EntranceStyles = require(ServerFolder:WaitForChild("dungeon_entrance_styles"))
 local LobbyGenerator = require(ServerFolder:WaitForChild("lobby_generator"))
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local DataStoreService = game:GetService("DataStoreService")
+local PlayerDataStore = DataStoreService:GetDataStore("GraveGain_PlayerData_v1")
 
 local GameManager = {}
 GameManager.playerData = {}
@@ -21,11 +25,23 @@ GameManager.dungeons = {}
 GameManager.combatSystem = CombatSystem.new()
 GameManager.lootSystem = LootSystem.new()
 GameManager.enemySpawner = EnemySpawner.new()
+GameManager.worldManager = WorldManager.new()
 GameManager.__index = GameManager
 
 function GameManager:initializePlayer(player)
 	print("Initializing player:", player.Name)
 	
+	local data = nil
+	local success, err = pcall(function()
+		-- Only attempt if not in Studio or if we're sure APIs are enabled
+		-- But the pcall handles it anyway, we just want to avoid noisy warnings
+		data = PlayerDataStore:GetAsync("User_" .. player.UserId)
+	end)
+	
+	if not success and not string.find(err, "Studio access to APIs is not allowed") then 
+		warn("Failed to load data for", player.Name, err) 
+	end
+
 	local playerData = {
 		player = player,
 		character = nil,
@@ -33,10 +49,38 @@ function GameManager:initializePlayer(player)
 		currentDungeon = nil,
 		currentFloor = 1,
 		isAlive = true,
+		level = data and data.level or 1,
+		xp = data and data.xp or 0,
+		talentPoints = data and data.talentPoints or 0,
+		talents = data and data.talents or {}
 	}
 	
 	self.playerData[player.UserId] = playerData
 	
+	-- Generate starting world chunk
+	self.worldManager:ensureChunk(0, 0)
+	
+	-- Talent spending event
+	local talentEvent = ReplicatedStorage:FindFirstChild("SpendTalentPoint")
+	if not talentEvent then
+		talentEvent = Instance.new("RemoteEvent")
+		talentEvent.Name = "SpendTalentPoint"
+		talentEvent.Parent = ReplicatedStorage
+	end
+	
+	talentEvent.OnServerEvent:Connect(function(p, talentName)
+		local data = self.playerData[p.UserId]
+		if data and data.talentPoints > 0 then
+			local talentConfig = GameData.TALENTS[talentName]
+			local currentLv = data.talents[talentName] or 0
+			if talentConfig and currentLv < talentConfig.max then
+				data.talentPoints = data.talentPoints - 1
+				data.talents[talentName] = currentLv + 1
+				print(p.Name, "spent point on", talentName, "Level:", data.talents[talentName])
+			end
+		end
+	end)
+
 	player.CharacterAdded:Connect(function(character)
 		self:onCharacterSpawned(player, character)
 	end)
@@ -61,14 +105,73 @@ end
 
 function GameManager:spawnPlayerInLobby(player, character)
 	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-	humanoidRootPart.CFrame = CFrame.new(0, 40, 0)
+	local lobbyHeight = GameData.WORLD_CONFIG.lobbyHeight
+	humanoidRootPart.CFrame = CFrame.new(0, lobbyHeight + 15, 0) -- Spawns on spaceship deck
 	
 	local playerData = self.playerData[player.UserId]
 	if playerData then
 		playerData.currentDungeon = nil
 	end
 	
-	print("Player spawned in lobby")
+	-- Request race selection from client
+	local raceEvent = ReplicatedStorage:FindFirstChild("RaceSelectionRequested")
+	if not raceEvent then
+		raceEvent = Instance.new("RemoteEvent")
+		raceEvent.Name = "RaceSelectionRequested"
+		raceEvent.Parent = ReplicatedStorage
+	end
+	raceEvent:FireClient(player)
+	
+	-- Sync stats to client
+	local statsEvent = ReplicatedStorage:FindFirstChild("SyncPlayerStats")
+	if not statsEvent then
+		statsEvent = Instance.new("RemoteEvent")
+		statsEvent.Name = "SyncPlayerStats"
+		statsEvent.Parent = ReplicatedStorage
+	end
+	statsEvent:FireClient(player, playerData.level, playerData.xp, playerData.talentPoints, playerData.talents)
+	
+	-- Wait for world generation to stabilize, then unlock drop holes
+	task.delay(6, function()
+		if self.lobbyGenerator then
+			self.lobbyGenerator:unlockHoles()
+		end
+		local unlockEvent = ReplicatedStorage:FindFirstChild("UnlockLobbyHoles")
+		if unlockEvent then
+			unlockEvent:FireAllClients()
+		end
+	end)
+	
+	-- Generate 3 dungeon entrances in the world (invisible until explored)
+	if not self.dungeonsPlaced then
+		self.dungeonsPlaced = true
+		for i = 1, 3 do
+			local cx = math.random(-8, 8)
+			local cz = math.random(-8, 8)
+			self.worldManager:ensureChunk(cx, cz)
+			
+			local pos = Vector3.new(cx * 128 + math.random(-40, 40), 25, cz * 128 + math.random(-40, 40))
+			local entrance = EntranceStyles.getRandomStyle(pos)
+			entrance.Parent = workspace
+			
+			local root = entrance:FindFirstChild("EntranceRoot")
+			if root then
+				local prompt = root:FindFirstChildWhichIsA("ProximityPrompt")
+				if not prompt then
+					prompt = Instance.new("ProximityPrompt")
+					prompt.ActionText = "Enter Dungeon"
+					prompt.ObjectText = "Ancient Portal"
+					prompt.HoldDuration = 1
+					prompt.Parent = root
+				end
+				prompt.Triggered:Connect(function(trigPlayer)
+					self:spawnPlayerInDungeon(trigPlayer, trigPlayer.Character, "Normal", "Fetch")
+				end)
+			end
+		end
+	end
+	
+	print("Player spawned in Spaceship Lobby at altitude", SHIP_Y)
 end
 
 function GameManager:spawnPlayerInDungeon(player, character, difficulty, missionType)
@@ -88,8 +191,9 @@ function GameManager:spawnPlayerInDungeon(player, character, difficulty, mission
 		hudInstructionEvent:FireClient(player, "Find the Dungeon entrance")
 	end
 	
-	local spawnX = dungeon.rooms[1].centerX * 4
-	local spawnZ = dungeon.rooms[1].centerY * 4
+	local offset = GameData.DUNGEON_CONFIG.offset
+	local spawnX = offset.X + dungeon.rooms[1].centerX * 4
+	local spawnZ = offset.Z + dungeon.rooms[1].centerY * 4
 	
 	DungeonRenderer.new(dungeon, workspace)
 	self.enemySpawner:spawnInDungeon(dungeon)
@@ -110,6 +214,24 @@ function GameManager:spawnPlayerInDungeon(player, character, difficulty, mission
 	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 	humanoidRootPart.CFrame = CFrame.new(Vector3.new(spawnX, groundY + 3, spawnZ))
 	
+	-- Connect exterior portal detector if it exists
+	task.spawn(function()
+		local exterior = workspace:WaitForChild("Exterior", 5)
+		if exterior then
+			local detector = exterior:WaitForChild("DungeonEnterDetector", 5)
+			if detector then
+				local connection
+				connection = detector.Touched:Connect(function(hit)
+					if hit.Parent == character then
+						print("Player entered dungeon via archway portal")
+						humanoidRootPart.CFrame = CFrame.new(Vector3.new(spawnX, groundY + 3, spawnZ))
+						connection:Disconnect() -- Only teleport once
+					end
+				end)
+			end
+		end
+	end)
+	
 	if playerData.missionType == "Boss" then
 		self:spawnBoss(dungeon, player)
 	elseif playerData.missionType == "Fetch" then
@@ -121,15 +243,16 @@ end
 
 function GameManager:spawnSpaceElevator(dungeon, player)
 	-- Spawn near start
-	local spawnX = dungeon.rooms[1].centerX * 4
-	local spawnY = dungeon.rooms[1].centerY * 4
+	local offset = GameData.DUNGEON_CONFIG.offset
+	local spawnX = offset.X + dungeon.rooms[1].centerX * 4
+	local spawnZ = offset.Z + dungeon.rooms[1].centerY * 4
 	
 	local beam = Instance.new("Part")
 	beam.Name = "SpaceElevator"
 	beam.Shape = Enum.PartType.Cylinder
 	beam.Size = Vector3.new(200, 10, 10)
 	beam.Orientation = Vector3.new(0, 0, 90)
-	beam.Position = Vector3.new(spawnX, 100, spawnY)
+	beam.Position = Vector3.new(spawnX, 100, spawnZ)
 	beam.Material = Enum.Material.Neon
 	beam.Color = Color3.fromRGB(100, 255, 255)
 	beam.Transparency = 0.3
@@ -155,8 +278,9 @@ function GameManager:spawnSpaceElevator(dungeon, player)
 end
 
 function GameManager:spawnBoss(dungeon, player)
+	local offset = GameData.DUNGEON_CONFIG.offset
 	local lastRoom = dungeon.rooms[#dungeon.rooms]
-	local bx, by = lastRoom.centerX * 4, lastRoom.centerY * 4
+	local bx, bz = offset.X + lastRoom.centerX * 4, offset.Z + lastRoom.centerY * 4
 	
 	local boss = Instance.new("Model")
 	boss.Name = "GiantSkullBoss"
@@ -168,7 +292,7 @@ function GameManager:spawnBoss(dungeon, player)
 	skull.Size = Vector3.new(6, 6, 6)
 	skull.Color = Color3.fromRGB(200, 200, 200)
 	skull.Material = Enum.Material.Slate
-	skull.CFrame = CFrame.new(bx, 5, by)
+	skull.CFrame = CFrame.new(bx, 5, bz)
 	skull.Parent = boss
 	boss.PrimaryPart = skull
 	
@@ -189,8 +313,9 @@ function GameManager:spawnBoss(dungeon, player)
 end
 
 function GameManager:spawnFetchArtifact(dungeon, player)
+	local offset = GameData.DUNGEON_CONFIG.offset
 	local lastRoom = dungeon.rooms[#dungeon.rooms]
-	local bx, by = lastRoom.centerX * 4, lastRoom.centerY * 4
+	local bx, bz = offset.X + lastRoom.centerX * 4, offset.Z + lastRoom.centerY * 4
 	
 	local artifact = Instance.new("Part")
 	artifact.Name = "ObjectiveArtifact"
@@ -198,7 +323,7 @@ function GameManager:spawnFetchArtifact(dungeon, player)
 	artifact.Size = Vector3.new(2, 2, 2)
 	artifact.Color = Color3.fromRGB(255, 215, 0)
 	artifact.Material = Enum.Material.Neon
-	artifact.CFrame = CFrame.new(bx, 3, by)
+	artifact.CFrame = CFrame.new(bx, 3, bz)
 	artifact.Anchored = true
 	artifact.Parent = workspace
 	
@@ -253,8 +378,9 @@ function GameManager:spawnFetchArtifact(dungeon, player)
 end
 
 function GameManager:spawnSpaceElevator(dungeon, player)
+	local offset = GameData.DUNGEON_CONFIG.offset
 	local lastRoom = dungeon.rooms[#dungeon.rooms]
-	local bx, by = lastRoom.centerX * 4, lastRoom.centerY * 4
+	local bx, bz = offset.X + lastRoom.centerX * 4, offset.Z + lastRoom.centerY * 4
 	
 	local elevator = Instance.new("Model")
 	elevator.Name = "SpaceElevator"
@@ -265,7 +391,7 @@ function GameManager:spawnSpaceElevator(dungeon, player)
 	base.Color = Color3.fromRGB(50, 50, 50)
 	base.Material = Enum.Material.Metal
 	base.Anchored = true
-	base.CFrame = CFrame.new(bx, 3, by)
+	base.CFrame = CFrame.new(bx, 3, bz)
 	base.Parent = elevator
 	elevator.PrimaryPart = base
 	
@@ -339,6 +465,21 @@ function GameManager:handleEnemyKill(player, enemyType)
 	return loot
 end
 
+function GameManager:onPlayerRemoving(player)
+	local data = self.playerData[player.UserId]
+	if data then
+		pcall(function()
+			PlayerDataStore:SetAsync("User_" .. player.UserId, {
+				level = data.level,
+				xp = data.xp,
+				talentPoints = data.talentPoints,
+				talents = data.talents
+			})
+		end)
+	end
+	self.playerData[player.UserId] = nil
+end
+
 function GameManager:handleFloorComplete(player)
 	local playerData = self.playerData[player.UserId]
 	if not playerData then return end
@@ -374,7 +515,7 @@ end
 function GameManager:generateLobby()
 	local lobbyGen = LobbyGenerator.new(workspace)
 	lobbyGen:generateLobby()
-	print("Lobby generated!")
+	print("Spaceship Lobby generated!")
 end
 
 local gameManager = setmetatable({}, GameManager)
@@ -547,8 +688,8 @@ Players.PlayerAdded:Connect(function(player)
 	gameManager:initializePlayer(player)
 end)
 
-Players.PlayerRemoving:Connect(function(player)
-	gameManager.playerData[player.UserId] = nil
+Players.PlayerRemoving:Connect(function(p)
+	gameManager:onPlayerRemoving(p)
 end)
 
 RunService.Heartbeat:Connect(function(deltaTime)

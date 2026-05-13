@@ -177,6 +177,10 @@ function InputHandler:setupInputs()
 end
 
 function InputHandler:update(dt)
+	if self.combatHandler and self.combatHandler.update then
+		self.combatHandler:update(dt)
+	end
+
 	if self.pushCooldown > 0 then
 		self.pushCooldown = self.pushCooldown - dt
 	end

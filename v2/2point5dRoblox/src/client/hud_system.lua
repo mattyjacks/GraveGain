@@ -101,6 +101,13 @@ function HUD:buildBars()
 	shGrad.Color = ColorSequence.new(Color3.fromRGB(80, 160, 255), Color3.fromRGB(40, 100, 200))
 	self.shBg = shBg
 
+	self.shLabel = makeLabel(shBg, {
+		Size = UDim2.new(1, -10, 1, 0), Position = UDim2.new(0, 5, 0, 0), BackgroundTransparency = 1,
+		TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBold,
+		TextSize = 10, ZIndex = 2, TextXAlignment = Enum.TextXAlignment.Right,
+		Text = ""
+	})
+
 	-- XP bar (full width bottom strip with gradient)
 	local xpBg = makeFrame(self.gui, {
 		Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 1, -6),
@@ -284,7 +291,14 @@ function HUD:update(_dt)
 	-- Shield bar
 	if s.maxShield and s.maxShield > 0 then
 		self.shBg.Visible = true
-		self.shFill.Size = UDim2.new(math.clamp((s.shield or 0) / s.maxShield, 0, 1), 0, 1, 0)
+		local shPct = math.clamp((s.shield or 0) / s.maxShield, 0, 1)
+		self.shFill.Size = UDim2.new(shPct, 0, 1, 0)
+		
+		if s.raceName == "Human" then
+			self.shLabel.Text = math.ceil(s.shield or 0) .. " / " .. s.maxShield
+		else
+			self.shLabel.Text = ""
+		end
 	else
 		self.shBg.Visible = false
 	end

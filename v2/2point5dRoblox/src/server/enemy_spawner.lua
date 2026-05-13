@@ -1,4 +1,7 @@
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameData = require(Shared:WaitForChild("game_data"))
 
 local EnemySpawner = {}
 EnemySpawner.__index = EnemySpawner
@@ -32,12 +35,14 @@ function EnemySpawner:spawnInDungeon(dungeon)
 end
 
 function EnemySpawner:update(dt)
-	if not self.dungeon then return end
-	
 	self.spawnCooldown = self.spawnCooldown - dt
 
 	if self.spawnCooldown <= 0 and #self.enemies < self.maxEnemies then
-		self:spawnSkull()
+		if self.dungeon then
+			self:spawnSkull()
+		else
+			self:spawnOpenWorldSkull()
+		end
 		self.spawnCooldown = self.spawnRate
 	end
 
@@ -52,14 +57,81 @@ function EnemySpawner:update(dt)
 end
 
 function EnemySpawner:getRandomSpawnPosition()
+	local offset = GameData.DUNGEON_CONFIG.offset
 	if not self.dungeon or not self.dungeon.rooms or #self.dungeon.rooms == 0 then
-		return Vector3.new(0, 2, 0)
+		return Vector3.new(offset.X, 40, offset.Z)
 	end
 
 	local room = self.dungeon.rooms[math.random(1, #self.dungeon.rooms)]
 	local x = room.x + math.random(1, math.max(1, room.width - 1))
 	local y = room.y + math.random(1, math.max(1, room.height - 1))
-	return Vector3.new(x * TILE, 2, y * TILE)
+	
+	local worldX = offset.X + x * TILE
+	local worldZ = offset.Z + y * TILE
+	
+	-- Raycast from high up to find the ground
+	local rayOrigin = Vector3.new(worldX, 200, worldZ)
+	local rayDir = Vector3.new(0, -250, 0)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	-- Exclude existing enemies to avoid stacking
+	rayParams.FilterDescendantsInstances = {self.folder}
+	
+	local result = workspace:Raycast(rayOrigin, rayDir, rayParams)
+	local groundY = result and (result.Position.Y + 2) or 20
+	
+	return Vector3.new(worldX, groundY, worldZ)
+end
+
+function EnemySpawner:spawnOpenWorldSkull()
+	local pos = self:getRandomOpenWorldSpawnPosition()
+	if not pos then return end
+	local skull = self:buildSkullModel(pos)
+	table.insert(self.enemies, {
+		model = skull,
+		root = skull:FindFirstChild("Root"),
+		health = 30,
+		maxHealth = 30,
+		speed = 8 + math.random() * 4,
+		hopTimer = 0,
+		hopInterval = 0.6 + math.random() * 0.4,
+		isHopping = false,
+		hopPhase = 0,
+		target = nil,
+		state = "wander",
+		wanderDir = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5).Unit,
+		wanderTimer = math.random() * 3,
+		aggroRange = 35,
+	})
+end
+
+function EnemySpawner:getRandomOpenWorldSpawnPosition()
+	local players = game:GetService("Players"):GetPlayers()
+	if #players == 0 then return nil end
+	
+	local targetPlayer = players[math.random(1, #players)]
+	local char = targetPlayer.Character
+	if not char then return nil end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return nil end
+	
+	-- Spawn around player but not too close
+	local angle = math.rad(math.random(0, 360))
+	local dist = 40 + math.random(0, 40)
+	local spawnX = hrp.Position.X + math.cos(angle) * dist
+	local spawnZ = hrp.Position.Z + math.sin(angle) * dist
+	
+	local rayOrigin = Vector3.new(spawnX, 200, spawnZ)
+	local rayDir = Vector3.new(0, -300, 0)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	
+	local result = workspace:Raycast(rayOrigin, rayDir, rayParams)
+	if result then
+		return result.Position + Vector3.new(0, 3, 0)
+	end
+	
+	return nil
 end
 
 function EnemySpawner:spawnSkull()

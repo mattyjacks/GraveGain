@@ -178,4 +178,18 @@ function SpaceEnv.applyDungeon()
 	Lighting.ClockTime = 0
 end
 
+function SpaceEnv.applyFullBright()
+	clearSky()
+	clearSpaceAssets()
+
+	tweenLighting({
+		Ambient        = Color3.fromRGB(255, 255, 255),
+		OutdoorAmbient = Color3.fromRGB(255, 255, 255),
+		Brightness     = 4,
+		FogEnd         = 5000,
+		FogColor       = Color3.fromRGB(255, 255, 255),
+	}, 0.5)
+	Lighting.ClockTime = 12
+end
+
 return SpaceEnv

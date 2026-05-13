@@ -46,13 +46,22 @@ function SpaceshipBuilder.build(parent, origin)
 	model.Name = "Spaceship"
 	model.Parent = parent
 
-	-- ── Main disk hull (Massive saucer) ─────────────────────────────
-	local disk = part(model, {
-		Name = "Disk", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(12, 150, 150),
-		Color = HULL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox, oy, oz) * CFrame.Angles(0, 0, math.rad(90)),
-	})
+	-- ── Main disk hull (Modular Ring to allow holes) ─────────────────────────────
+	local hullSegments = 12
+	local hullRadius = 75
+	for i = 1, hullSegments do
+		local angle = math.rad((i-1) * (360 / hullSegments))
+		local nextAngle = math.rad(i * (360 / hullSegments))
+		local midAngle = (angle + nextAngle) / 2
+		
+		local segment = part(model, {
+			Name = "HullSegment_" .. i,
+			Size = Vector3.new(50, 12, 40),
+			Color = HULL_COLOR, Material = METAL,
+			CFrame = CFrame.new(ox + math.cos(midAngle) * 50, oy, oz + math.sin(midAngle) * 50) 
+				* CFrame.Angles(0, -midAngle, 0)
+		})
+	end
 
 	-- Neon Deck Rings (Atmospheric Lighting)
 	local ringRadii = {150 * 0.15, 150 * 0.3, 150 * 0.42}
@@ -79,22 +88,33 @@ function SpaceshipBuilder.build(parent, origin)
 	})
 	light(rim, NEON_CYAN, 2, 100)
 
-	-- Under-disk (heavier detail)
-	part(model, {
-		Name = "Underbody", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(6, 130, 130),
-		Color = DETAIL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox, oy - 2.5, oz) * CFrame.Angles(0, 0, math.rad(90)),
-	})
+	-- Under-disk (Modular Ring)
+	for i = 1, hullSegments do
+		local angle = math.rad((i-1) * (360 / hullSegments))
+		local midAngle = angle + math.rad(180 / hullSegments)
+		
+		part(model, {
+			Name = "UnderSegment_" .. i,
+			Size = Vector3.new(45, 6, 35),
+			Color = DETAIL_COLOR, Material = METAL,
+			CFrame = CFrame.new(ox + math.cos(midAngle) * 45, oy - 2.5, oz + math.sin(midAngle) * 45)
+				* CFrame.Angles(0, -midAngle, 0)
+		})
+	end
 
 	-- ── Open Bridge (No roof) ──────────────────────────────────────────
-	-- Inner deck base
-	part(model, {
-		Name = "DomeBase", Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(8, 45, 45),
-		Color = HULL_COLOR, Material = METAL,
-		CFrame = CFrame.new(ox, oy + 8, oz) * CFrame.Angles(0, 0, math.rad(90)),
-	})
+	-- Inner deck base (Modular Ring)
+	for i = 1, 8 do
+		local angle = math.rad((i-1) * (360 / 8))
+		local midAngle = angle + math.rad(180 / 8)
+		part(model, {
+			Name = "DomeBaseSegment_" .. i,
+			Size = Vector3.new(15, 8, 15),
+			Color = HULL_COLOR, Material = METAL,
+			CFrame = CFrame.new(ox + math.cos(midAngle) * 15, oy + 8, oz + math.sin(midAngle) * 15)
+				* CFrame.Angles(0, -midAngle, 0)
+		})
+	end
 	-- Guard rails around the open top
 	for i = 1, 16 do
 		local rad = math.rad(i * (360/16))

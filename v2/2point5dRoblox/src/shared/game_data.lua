@@ -41,9 +41,11 @@ GameData.CLASSES = {
 }
 
 GameData.DIFFICULTIES = {
-	Normal = { multiplier = 1.0, emoji = "⭐" },
-	Nightmare = { multiplier = 1.5, emoji = "⭐⭐" },
-	Hell = { multiplier = 2.5, emoji = "⭐⭐⭐" },
+	Beginner = { multiplier = 0.5, healthMult = 0.5, damageMult = 0.5, xpMult = 0.5, color = Color3.fromRGB(150, 255, 150), emoji = "🌱" },
+	Easy     = { multiplier = 0.75, healthMult = 0.75, damageMult = 0.75, xpMult = 0.75, color = Color3.fromRGB(100, 255, 200), emoji = "⭐" },
+	Normal   = { multiplier = 1.0, healthMult = 1.0, damageMult = 1.0, xpMult = 1.0, color = Color3.fromRGB(100, 200, 255), emoji = "⭐⭐" },
+	Hard     = { multiplier = 1.5, healthMult = 1.5, damageMult = 1.4, xpMult = 1.5, color = Color3.fromRGB(255, 150, 0), emoji = "⭐⭐⭐" },
+	Insane   = { multiplier = 2.5, healthMult = 2.5, damageMult = 2.0, xpMult = 3.0, color = Color3.fromRGB(255, 0, 50), emoji = "💀" }
 }
 
 GameData.STAT_NAMES = { "str", "dex", "int", "vit", "lck" }
@@ -169,6 +171,78 @@ GameData.DUNGEON_CONFIG = {
 	corridorWidth = 3,
 	floorsPerAct = 4,
 	numActs = 4,
+	offset = Vector3.new(0, 0, 4000), -- Moved further to make room for huge world
+}
+
+GameData.WORLD_CONFIG = {
+	chunkSize = 128,        -- Studs per chunk
+	renderDistance = 4,    -- Chunks around player
+	worldRadius = 15,       -- Max chunks from origin
+	seed = 1337,
+	fenceHeight = 120,      -- High enough to prevent all jumping
+	biomeFrequency = 0.15,  -- Higher frequency = smaller biomes
+	lobbyHeight = 800,
+}
+
+GameData.TALENTS = {
+	MeleeDamage = { name = "Brute Force", desc = "+10% Melee Damage", max = 5, bonus = 0.1 },
+	Health = { name = "Vitality", desc = "+20 Max Health", max = 5, bonus = 20 },
+	RangedSpeed = { name = "Quick Draw", desc = "+15% Ranged Attack Speed", max = 5, bonus = 0.15 },
+	ShieldRegen = { name = "Hardened Plates", desc = "+10% Shield Regen", max = 5, bonus = 0.1 },
+	LootQuality = { name = "Scavenger", desc = "+5% Better Loot", max = 3, bonus = 0.05 }
+}
+
+GameData.BIOMES = {
+	Wasteland = {
+		id = 1,
+		color = Color3.fromRGB(80, 75, 70),
+		material = Enum.Material.Slate,
+		heightMod = 1.0,
+		props = {"Rock", "Scrap"},
+		ambient = Color3.fromRGB(100, 80, 120),
+	},
+	Forest = {
+		id = 2,
+		color = Color3.fromRGB(40, 90, 40),
+		material = Enum.Material.Grass,
+		heightMod = 0.6,
+		props = {"Tree", "Bush", "Flower"},
+		ambient = Color3.fromRGB(60, 120, 60),
+	},
+	CrystalPlains = {
+		id = 3,
+		color = Color3.fromRGB(60, 40, 100),
+		material = Enum.Material.Glass,
+		heightMod = 0.4,
+		props = {"Crystal", "GlowMushroom"},
+		ambient = Color3.fromRGB(100, 50, 200),
+	},
+	Inferno = {
+		id = 4,
+		color = Color3.fromRGB(40, 20, 10),
+		material = Enum.Material.Basalt,
+		heightMod = 1.2,
+		props = {"ObsidianRock", "LavaPond"},
+		ambient = Color3.fromRGB(200, 50, 20),
+	}
+}
+
+GameData.RACE_UTILITIES = {
+	Human = {
+		flashlight = { color = Color3.new(1,1,1), range = 60, brightness = 2 },
+		flare = { color = Color3.fromRGB(255, 80, 20), duration = 60, brightness = 5 }
+	},
+	Elf = {
+		brighteyes = { color = Color3.fromRGB(150, 200, 255), range = 40, brightness = 1.5 },
+		magicBall = { color = Color3.fromRGB(100, 150, 255), duration = 120, brightness = 3 }
+	},
+	Dwarf = {
+		glowstone = { color = Color3.fromRGB(200, 255, 100), duration = 90, brightness = 4 },
+		darkvision = { saturation = -1.0 } -- Full desaturation
+	},
+	Orc = {
+		torch = { color = Color3.fromRGB(255, 120, 30), duration = 180, brightness = 3.5 }
+	}
 }
 
 GameData.PLAYER_CONFIG = {

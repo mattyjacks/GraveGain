@@ -9,16 +9,10 @@ local TILE_SIZE = 8
 local LEVELS = 16
 local MAX_HEIGHT = 80  -- total height of 16 levels
 
--- ── Biome Colors ──────────────────────────────────────────────────────────
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local GameData = require(Shared:WaitForChild("game_data"))
 
-local PALETTE = {
-	Water   = {Color3.fromRGB(30, 100, 200), Enum.Material.Glass},
-	Sand    = {Color3.fromRGB(200, 180, 140), Enum.Material.Sand},
-	Road    = {Color3.fromRGB(80, 75, 70), Enum.Material.Cobblestone},
-	Grass   = {Color3.fromRGB(60, 120, 60), Enum.Material.Grass},
-	Rock    = {Color3.fromRGB(100, 100, 110), Enum.Material.Rock},
-	Snow    = {Color3.fromRGB(240, 245, 255), Enum.Material.Snow},
-}
+-- ── Biome Palettes extracted from GameData ───────────────────────────────
 
 -- ── Generator ──────────────────────────────────────────────────────────────
 
@@ -27,20 +21,23 @@ function TerrainGenerator.generate(parent, config)
 	folder.Name = config.Name or "GeneratedTerrain"
 	folder.Parent = parent
 
-	local width = config.Width or 40  -- in tiles
-	local length = config.Length or 100 -- in tiles
+	local width = config.Width or 16
+	local length = config.Length or 16
 	local ox, oz = config.OriginX or 0, config.OriginZ or 0
-	local seed = config.Seed or RNG:NextNumber()
+	local seed = config.Seed or 1337
+	local biomeName = config.Biome or "Wasteland"
+	local biomeData = GameData.BIOMES[biomeName]
 
 	-- Noise scales
 	local heightScale = 0.04
 	local detailScale = 0.12
+	local heightMod = biomeData.heightMod or 1.0
 
 	for x = 1, width do
 		for z = 1, length do
 			-- 1. Get Base Height (0 to 1)
-			local nx = (x + ox/TILE_SIZE) * heightScale
-			local nz = (z + oz/TILE_SIZE) * heightScale
+			local nx = (ox/TILE_SIZE + x) * heightScale
+			local nz = (oz/TILE_SIZE + z) * heightScale
 			local h = math.noise(nx, nz, seed)
 			h = (h + 1) / 2 -- normalize to 0-1
 
@@ -48,41 +45,34 @@ function TerrainGenerator.generate(parent, config)
 			local dh = math.noise(nx * 3, nz * 3, seed * 1.5) * 0.15
 			h = math.clamp(h + dh, 0, 1)
 
-			-- 3. Quantize to 16 levels
-			local level = math.floor(h * (LEVELS - 1))
+			-- 3. Quantize to 16 levels and apply biome modifier
+			local level = math.floor(h * (LEVELS - 1) * heightMod)
 			local yPos = level * (MAX_HEIGHT / LEVELS)
 
-			-- 4. Determine Material/Color based on level and "Road" noise
-			local mat, col
-			local isRoad = false
+			-- 4. Determine Material/Color based on biome and level
+			local mat = biomeData.material
+			local col = biomeData.color
 			
-			-- Simple road noise: a "river" of path through the terrain
-			local roadNoise = math.noise((x + ox/TILE_SIZE) * 0.05, (z + oz/TILE_SIZE) * 0.05, seed * 2)
-			if math.abs(roadNoise) < 0.06 and level > 1 then
-				isRoad = true
+			-- Add slight color variation
+			local colorVar = math.noise(nx * 5, nz * 5, seed * 3) * 0.1
+			col = Color3.new(
+				math.clamp(col.R + colorVar, 0, 1),
+				math.clamp(col.G + colorVar, 0, 1),
+				math.clamp(col.B + colorVar, 0, 1)
+			)
+
+			-- Biome-specific level behavior
+			if biomeName == "Inferno" and level <= 2 then
+				mat = Enum.Material.Neon
+				col = Color3.fromRGB(255, 60, 0) -- Lava
 			end
 
-			if level <= 1 then
-				mat, col = PALETTE.Water[2], PALETTE.Water[1]
-			elseif isRoad then
-				mat, col = PALETTE.Road[2], PALETTE.Road[1]
-			elseif level < 4 then
-				mat, col = PALETTE.Sand[2], PALETTE.Sand[1]
-			elseif level < 10 then
-				mat, col = PALETTE.Grass[2], PALETTE.Grass[1]
-			elseif level < 14 then
-				mat, col = PALETTE.Rock[2], PALETTE.Rock[1]
-			else
-				mat, col = PALETTE.Snow[2], PALETTE.Snow[1]
-			end
-
-			-- 5. Build the tile — position so TOP face = yPos
+			-- 5. Build the tile
 			local part = Instance.new("Part")
 			part.Anchored = true
 			part.Size = Vector3.new(TILE_SIZE, MAX_HEIGHT, TILE_SIZE)
 			part.Color = col
 			part.Material = mat
-			-- Top face should be AT yPos, so center = yPos - half height
 			part.CFrame = CFrame.new(
 				ox + (x - width/2) * TILE_SIZE,
 				yPos - (MAX_HEIGHT / 2),
@@ -91,12 +81,20 @@ function TerrainGenerator.generate(parent, config)
 			part.TopSurface = Enum.SurfaceType.Smooth
 			part.Parent = folder
 
-			-- 6. Add Details (Trees, Rocks)
-			if level >= 4 and level < 10 and not isRoad then
-				if RNG:NextNumber() < 0.03 then
-					TerrainGenerator.spawnTree(folder, part.Position + Vector3.new(0, MAX_HEIGHT/2, 0))
-				elseif RNG:NextNumber() < 0.02 then
-					TerrainGenerator.spawnRock(folder, part.Position + Vector3.new(0, MAX_HEIGHT/2, 0))
+			-- 6. Spawn Biome Props
+			local propChance = 0.04
+			if biomeName == "Forest" then propChance = 0.08 end
+			
+			if RNG:NextNumber() < propChance and level > 2 then
+				local surfacePos = part.Position + Vector3.new(0, MAX_HEIGHT/2, 0)
+				if biomeName == "Forest" then
+					TerrainGenerator.spawnTree(folder, surfacePos)
+				elseif biomeName == "CrystalPlains" then
+					TerrainGenerator.spawnCrystal(folder, surfacePos)
+				elseif biomeName == "Inferno" then
+					TerrainGenerator.spawnObsidian(folder, surfacePos)
+				else
+					TerrainGenerator.spawnRock(folder, surfacePos)
 				end
 			end
 		end
@@ -132,6 +130,36 @@ function TerrainGenerator.spawnRock(parent, pos)
 	rock.Color = Color3.fromRGB(110, 110, 110); rock.Material = Enum.Material.Rock
 	rock.Anchored = true; rock.CFrame = CFrame.new(pos + Vector3.new(0, rock.Size.Y/2, 0))
 	rock.Parent = parent
+end
+
+function TerrainGenerator.spawnCrystal(parent, pos)
+	local crystal = Instance.new("Part")
+	crystal.Size = Vector3.new(2, RNG:NextNumber(4, 8), 2)
+	crystal.Color = Color3.fromRGB(150, 100, 255)
+	crystal.Material = Enum.Material.Neon
+	crystal.Transparency = 0.3
+	crystal.Anchored = true
+	crystal.CFrame = CFrame.new(pos + Vector3.new(0, crystal.Size.Y/2, 0)) * CFrame.Angles(math.rad(RNG:NextNumber(-20, 20)), math.rad(RNG:NextNumber(0, 360)), math.rad(RNG:NextNumber(-20, 20)))
+	crystal.Parent = parent
+	
+	local light = Instance.new("PointLight", crystal)
+	light.Color = crystal.Color; light.Range = 15; light.Brightness = 2
+end
+
+function TerrainGenerator.spawnObsidian(parent, pos)
+	local rock = Instance.new("Part")
+	rock.Size = Vector3.new(RNG:NextNumber(3, 7), RNG:NextNumber(2, 5), RNG:NextNumber(3, 7))
+	rock.Color = Color3.fromRGB(20, 20, 25); rock.Material = Enum.Material.Basalt
+	rock.Anchored = true; rock.CFrame = CFrame.new(pos + Vector3.new(0, rock.Size.Y/2, 0))
+	rock.Parent = parent
+	
+	if RNG:NextNumber() < 0.3 then
+		local deco = Instance.new("Part")
+		deco.Size = Vector3.new(rock.Size.X * 0.8, 0.2, rock.Size.Z * 0.8)
+		deco.Color = Color3.fromRGB(255, 60, 0); deco.Material = Enum.Material.Neon
+		deco.CFrame = rock.CFrame * CFrame.new(0, rock.Size.Y/2, 0)
+		deco.Anchored = true; deco.Parent = rock
+	end
 end
 
 return TerrainGenerator

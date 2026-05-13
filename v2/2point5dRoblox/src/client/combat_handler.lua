@@ -8,14 +8,8 @@ function CombatHandler.new(inputHandler)
 	local self = setmetatable({}, CombatHandler)
 	self.inputHandler = inputHandler
 	self.effectPool = {}
-	return self
-end
-
-function CombatHandler.new(inputHandler)
-	local self = setmetatable({}, CombatHandler)
-	self.inputHandler = inputHandler
-	self.effectPool = {}
 	self.camera = workspace.CurrentCamera
+	self.enemyVelocities = {} -- [enemy] = {pos = Vector3, vel = Vector3}
 	return self
 end
 
@@ -54,6 +48,33 @@ function CombatHandler:performMeleeAttack()
 	self:createPushEffect(origin, direction, range, false)
 end
 
+function CombatHandler:update(dt)
+	local enemyFolder = workspace:FindFirstChild("Enemies")
+	if not enemyFolder then return end
+	
+	for _, enemy in ipairs(enemyFolder:GetChildren()) do
+		local hrp = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Root")
+		if hrp then
+			local data = self.enemyVelocities[enemy]
+			if not data then
+				self.enemyVelocities[enemy] = {pos = hrp.Position, vel = Vector3.new()}
+			else
+				local newVel = (hrp.Position - data.pos) / dt
+				-- Smooth velocity slightly
+				data.vel = data.vel:Lerp(newVel, 0.2)
+				data.pos = hrp.Position
+			end
+		end
+	end
+	
+	-- Clean up old entries
+	for enemy, _ in pairs(self.enemyVelocities) do
+		if not enemy.Parent then
+			self.enemyVelocities[enemy] = nil
+		end
+	end
+end
+
 function CombatHandler:performRangedAttack(chargeTime)
 	self.inputHandler.ammo = self.inputHandler.ammo - 1
 	
@@ -65,10 +86,51 @@ function CombatHandler:performRangedAttack(chargeTime)
 	
 	local targetPos = self:getMouseTarget()
 	local origin = hrp.Position + Vector3.new(0, 1.5, 0) -- shoulder height
-	local direction = (targetPos - origin).Unit
+	
+	-- Predictive Auto-Aim logic
+	local mouse = player:GetMouse()
+	local bestEnemy = nil
+	local minScreenDist = 60 -- Max distance in pixels to trigger snap
+	
+	local enemyFolder = workspace:FindFirstChild("Enemies")
+	if enemyFolder then
+		for _, enemy in ipairs(enemyFolder:GetChildren()) do
+			local ehrp = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Root")
+			if ehrp then
+				local screenPos, onScreen = self.camera:WorldToViewportPoint(ehrp.Position)
+				if onScreen then
+					local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+					if dist < minScreenDist then
+						minScreenDist = dist
+						bestEnemy = enemy
+					end
+				end
+			end
+		end
+	end
 	
 	local chargeMultiplier = 1 + (chargeTime / 3)
-	local speed = 120 * chargeMultiplier
+	local arrowSpeed = 120 * chargeMultiplier
+	
+	if bestEnemy then
+		local ehrp = bestEnemy:FindFirstChild("HumanoidRootPart") or bestEnemy:FindFirstChild("Root")
+		local eData = self.enemyVelocities[bestEnemy]
+		if ehrp and eData then
+			local ep = ehrp.Position
+			local ev = eData.vel
+			
+			-- Solve for time t: |ep + ev*t - origin| = arrowSpeed * t
+			local dist = (ep - origin).Magnitude
+			local timeToHit = dist / arrowSpeed -- simplified first-order prediction
+			
+			-- Adjust for relative motion
+			targetPos = ep + ev * timeToHit
+			print("Auto-aim snapped to", bestEnemy.Name, "with lead:", (targetPos - ep).Magnitude)
+		end
+	end
+
+	local direction = (targetPos - origin).Unit
+	
 	local damage = 15 * chargeMultiplier
 	
 	local arrow = Instance.new("Part")
@@ -80,7 +142,7 @@ function CombatHandler:performRangedAttack(chargeTime)
 	arrow.CFrame = CFrame.lookAt(origin, targetPos)
 	
 	local bv = Instance.new("BodyVelocity")
-	bv.Velocity = direction * speed
+	bv.Velocity = direction * arrowSpeed
 	bv.MaxForce = Vector3.new(1, 1, 1) * 1e6
 	bv.Parent = arrow
 	
@@ -92,8 +154,21 @@ function CombatHandler:performRangedAttack(chargeTime)
 			local enemyHumanoid = hit.Parent:FindFirstChild("Humanoid")
 			if enemyHumanoid then
 				ReplicatedStorage.EnemyDamaged:FireServer(hit.Parent, damage)
-				arrow:Destroy()
 			end
+			
+			-- STICK ARROW LOGIC
+			arrow.Anchored = true
+			if bv then bv:Destroy() end
+			
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = hit
+			weld.Part1 = arrow
+			weld.Parent = arrow
+			
+			-- Move slightly into the surface
+			arrow.CFrame = arrow.CFrame * CFrame.new(0, 0, 0.5)
+			
+			game:GetService("Debris"):AddItem(arrow, 10) -- Sticky arrows last 10s
 		end
 	end)
 end
