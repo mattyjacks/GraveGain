@@ -1,0 +1,12 @@
+"AddonInfo"
+{
+	addonSteamAppID			500
+	addonTitle				"GraveGain Melee Overhaul"
+	addonVersion			"1.0"
+	addonTagline			"GraveGain-style Melee & GraveGain Lore"
+	addonAuthor				"GraveGain Team"
+	addonDescription		"A complete melee overhaul adding pseudo-physics blocking, shoving, stamina mechanics, and custom GraveGain lore drops."
+
+	addonURL0				""
+	addonContent_Script		1
+}
