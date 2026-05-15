@@ -1,5 +1,71 @@
 # GraveGain Melee Overhaul - Installation Guide
 
+## Quick Install - Windows .exe (Easiest)
+
+1. Double-click **`build_installer.bat`** once to compile `GraveGainInstaller.exe`
+   - Requires .NET Framework 4.x (installed on every Windows 7+ machine by default)
+   - Compilation takes under 2 seconds
+2. Double-click **`GraveGainInstaller.exe`**
+   - Accepts the UAC prompt (admin rights needed to write into the L4D2 folder)
+   - The PowerShell installer opens and runs automatically
+
+> `GraveGainInstaller.exe` is just a launcher - it finds `install_gravegain.ps1` next to itself and runs it elevated. Keep all files in the same folder.
+
+---
+
+## Quick Install - Scripts
+
+1. Right-click `install_gravegain.ps1` -> **Run with PowerShell**
+   - If blocked by Execution Policy, open PowerShell as Administrator and run:
+     ```powershell
+     Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+     ```
+   - Then double-click again, or run: `powershell -ExecutionPolicy Bypass -File install_gravegain.ps1`
+2. The script auto-detects your Steam/L4D2 path. If it can't find it, it will ask.
+3. Done. Launch L4D2 and type `sm version` in console to verify.
+
+### macOS / Linux
+
+1. Open Terminal in the mod folder and run:
+   ```bash
+   chmod +x install_gravegain.command
+   ./install_gravegain.command
+   ```
+   On macOS you can also **double-click** `install_gravegain.command` in Finder.
+2. The script auto-detects your Steam library paths.
+3. Done.
+
+> Both scripts require an internet connection to download Metamod and SourceMod (~10 MB total).
+
+---
+
+## Uninstall
+
+### Windows
+Right-click `uninstall_gravegain.ps1` -> **Run with PowerShell**
+(or `powershell -ExecutionPolicy Bypass -File uninstall_gravegain.ps1`)
+
+### macOS / Linux
+```bash
+chmod +x uninstall_gravegain.command
+./uninstall_gravegain.command
+```
+Or double-click `uninstall_gravegain.command` in Finder.
+
+Both uninstallers offer three removal levels:
+
+| Option | What is removed |
+|---|---|
+| **1 - GraveGain only** | Plugin `.smx` + VScript `.nut` files only. Leaves SourceMod/Metamod intact. |
+| **2 - GraveGain + SourceMod** | Above + entire `addons/sourcemod/` and `cfg/sourcemod/` (removes all SM plugins). |
+| **3 - Full uninstall** | Above + `addons/metamod/` and `metamod.vdf` (complete removal). |
+
+---
+
+## Manual Install (Advanced)
+
+---
+
 ## What This Mod Does
 
 - **Block / Parry / Shove** - Hold Right Click to block. Left Click while blocking to shove.
@@ -11,7 +77,7 @@
 
 ---
 
-## Requirements
+## Manual Requirements
 
 | Dependency | Where to Get |
 |---|---|
@@ -178,11 +244,11 @@ Common infected spawn with randomised sizes and proportionally scaled HP:
 
 | Tier | Scale | HP Multiplier | Spawn Chance |
 |---|---|---|---|
-| **Tiny** | 0.60x | 0.5x HP | 15% |
-| **Small** | 0.80x | 0.75x HP | 15% |
+| **Tiny** | 0.80x | 0.85x HP | 15% |
+| **Small** | 0.90x | 0.92x HP | 15% |
 | **Normal** | 1.00x | 1.0x HP | 35% |
-| **Big** | 1.40x | 1.6x HP | 20% |
-| **Giant** | 1.80x | 2.5x HP | 15% |
+| **Big** | 1.10x | 1.10x HP | 20% |
+| **Giant** | 1.20x | 1.20x HP | 15% |
 
 ---
 

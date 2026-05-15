@@ -17,6 +17,10 @@
 #pragma semicolon 1
 #pragma newdecls required
 
+#if !defined IN_FLASHLIGHT
+#define IN_FLASHLIGHT (1 << 9)  // 0x200 - flashlight toggle button bit
+#endif
+
 #define PLUGIN_VERSION        "3.0 GraveGain"
 #define WEBSITE_URL           "https://mattyjacks.com"
 
@@ -46,12 +50,13 @@
 // We give weapon_pistol on spawn; player may swap freely.
 
 // === Enemy Size Tiers ===
+// All scales clamped to 0.80 - 1.20 range
 // Weights must sum to 100
-#define SIZE_TINY_SCALE    0.60
-#define SIZE_SMALL_SCALE   0.80
+#define SIZE_TINY_SCALE    0.80
+#define SIZE_SMALL_SCALE   0.90
 #define SIZE_NORMAL_SCALE  1.00
-#define SIZE_BIG_SCALE     1.40
-#define SIZE_GIANT_SCALE   1.80
+#define SIZE_BIG_SCALE     1.10
+#define SIZE_GIANT_SCALE   1.20
 // Weight table (cumulative): tiny=15, small=30, normal=65, big=85, giant=100
 #define SIZE_W_TINY   15
 #define SIZE_W_SMALL  30
@@ -300,12 +305,12 @@ void ApplyInfectedSize(int ent)
     if (roll <= SIZE_W_TINY)
     {
         scale  = SIZE_TINY_SCALE;
-        hpMult = 0.5;
+        hpMult = 0.85;
     }
     else if (roll <= SIZE_W_SMALL)
     {
         scale  = SIZE_SMALL_SCALE;
-        hpMult = 0.75;
+        hpMult = 0.92;
     }
     else if (roll <= SIZE_W_NORMAL)
     {
@@ -315,12 +320,12 @@ void ApplyInfectedSize(int ent)
     else if (roll <= SIZE_W_BIG)
     {
         scale  = SIZE_BIG_SCALE;
-        hpMult = 1.6;
+        hpMult = 1.10;
     }
     else
     {
         scale  = SIZE_GIANT_SCALE;
-        hpMult = 2.5;
+        hpMult = 1.20;
     }
 
     SetEntPropFloat(ent, Prop_Send, "m_flModelScale", scale);
@@ -786,7 +791,7 @@ public Action Timer_FireballTravel(Handle timer, DataPack pack)
 void FireballExplode(int client, float pos[3])
 {
     EmitSoundToAll("ambient/fire/gas_burst1.wav", SOUND_FROM_WORLD, SNDCHAN_AUTO,
-        SNDLEVEL_GUNFIRE, SND_NOFLAGS, 1.0, PITCHCON_NORMAL, _, pos);
+        SNDLEVEL_GUNFIRE, SND_NOFLAGS, 1.0, 100, _, pos);
 
     // Blast visual: spawn several env_fires in a burst pattern
     float offsets[5][3] = { {0.0,0.0,0.0}, {40.0,0.0,0.0}, {-40.0,0.0,0.0}, {0.0,40.0,0.0}, {0.0,-40.0,0.0} };
@@ -934,10 +939,6 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
         TE_Start("Blood Sprite");
         TE_WriteVector("m_vecOrigin", vPos);
         TE_WriteVector("m_vecDirection", view_as<float>({0.0, 0.0, 1.0}));
-        TE_WriteNum("m_nRGBA[0]", 180);
-        TE_WriteNum("m_nRGBA[1]", 0);
-        TE_WriteNum("m_nRGBA[2]", 0);
-        TE_WriteNum("m_nRGBA[3]", 255);
         TE_WriteNum("m_nDoffset", 5);
         TE_WriteNum("m_nSize", 10);
         TE_SendToAll();
@@ -1097,7 +1098,6 @@ public Action Timer_UpdateLoop(Handle timer)
             }
         }
 
-        (void)now;
     }
     return Plugin_Continue;
 }

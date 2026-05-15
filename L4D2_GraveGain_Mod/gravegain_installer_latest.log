@@ -1,0 +1,57 @@
+﻿=== GraveGain Installer ===
+Started : 2026-05-14 19:18:40
+Script  : C:\GitHub5\GraveGain\L4D2_GraveGain_Mod\install_gravegain.ps1
+Log     : C:\GitHub5\GraveGain\L4D2_GraveGain_Mod\gravegain_installer_latest.log
+============================================================
+ _____ _____ _____ __ __ _____  _____ _____ _____ _____
+|   __|  _  |  _  |  |  |   __|/ __  |  _  |     |   | |
+|  |  |     |     |  |  |   __|    __|     |-   -|    |  |
+|_____|__|__|__|__|\___/|_____|\_____| |___|_____|__|____|
+
+        GraveGain Melee Overhaul - Windows Installer
+        https://mattyjacks.com
+
+
+==> Locating Left 4 Dead 2...
+  [OK] Found: c:\program files (x86)\steam\steamapps\common\Left 4 Dead 2
+
+==> Verifying mod files in: C:\GitHub5\GraveGain\L4D2_GraveGain_Mod
+  [OK] Mod files present.
+
+==> Downloading Metamod:Source and SourceMod...
+  Downloading: metamod.zip ... done.
+  Downloading: sourcemod.zip ... done.
+
+==> Extracting archives...
+  [OK] Metamod extracted.
+  [OK] SourceMod extracted.
+
+==> Installing Metamod:Source into: c:\program files (x86)\steam\steamapps\common\Left 4 Dead 2\left4dead2
+  [OK] Metamod installed.
+
+==> Installing SourceMod...
+  [OK] SourceMod addons/ installed.
+  [OK] SourceMod cfg/ installed.
+
+==> Installing GraveGain plugin...
+  [OK] gravegain_melee_pro.smx installed.
+
+==> Installing VScripts...
+  [OK] VScripts installed.
+
+==> Cleaning up temp files...
+  [OK] Done.
+
+============================================================
+  GraveGain Mod installed successfully!
+
+  Installed to: c:\program files (x86)\steam\steamapps\common\Left 4 Dead 2\left4dead2
+
+  Next steps:
+    1. Start L4D2
+    2. Open console (~) and type: sm version
+    3. You should see SourceMod loaded.
+    4. In-game: Block (RClick), Shove (LClick+Block),
+       hold F when Ultimate is READY to arm + fire.
+============================================================
+
