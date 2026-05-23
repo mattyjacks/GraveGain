@@ -1,0 +1,237 @@
+<roblox version="4">
+  <Item class="ScreenGui" referent="RBX0">
+    <Properties>
+      <string name="Name">SkipSimulatorUI</string>
+      <bool name="ResetOnSpawn">false</bool>
+      <BinaryString name="SourceAssetId"></BinaryString>
+    </Properties>
+    <Item class="TextButton" referent="RBX1">
+      <Properties>
+        <string name="Name">ClickButton</string>
+        <UDim2 name="Size">
+          <XS>0.3</XS>
+          <XO>0</XO>
+          <YS>0.15</YS>
+          <YO>0</YO>
+        </UDim2>
+        <UDim2 name="Position">
+          <XS>0.35</XS>
+          <XO>0</XO>
+          <YS>0.7</YS>
+          <YO>0</YO>
+        </UDim2>
+        <string name="Text">🔥 SKIP! 🔥</string>
+        <Color3 name="BackgroundColor3">
+          <R>0.2</R>
+          <G>0.2</G>
+          <B>0.3</B>
+        </Color3>
+        <Color3 name="TextColor3">
+          <R>0</R>
+          <G>1</G>
+          <B>1</B>
+        </Color3>
+        <token name="Font">16</token>
+        <float name="TextSize">32</float>
+        <float name="BorderSizePixel">0</float>
+        <float name="CornerRadius">
+          <UDim>
+            <S>0</S>
+            <O>12</O>
+          </UDim>
+        </float>
+        <token name="AutoButtonColor">true</token>
+      </Properties>
+      <Item class="UIStroke" referent="RBX2">
+        <Properties>
+          <Color3 name="Color">
+            <R>0</R>
+            <G>1</G>
+            <B>1</B>
+          </Color3>
+          <float name="Thickness">3</float>
+        </Properties>
+      </Item>
+      <Item class="UIGradient" referent="RBX3">
+        <Properties>
+          <ColorSequence name="Color">
+            <keypoint time="0" color="0, 0.4, 0.4"/>
+            <keypoint time="1" color="0.2, 0.2, 0.3"/>
+          </ColorSequence>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="TextLabel" referent="RBX4">
+      <Properties>
+        <string name="Name">MomentumDisplay</string>
+        <UDim2 name="Size">
+          <XS>0.4</XS>
+          <XO>0</XO>
+          <YS>0.08</YS>
+          <YO>0</YO>
+        </UDim2>
+        <UDim2 name="Position">
+          <XS>0.3</XS>
+          <XO>0</XO>
+          <YS>0.05</YS>
+          <YO>0</YO>
+        </UDim2>
+        <string name="Text">🔥 0 MOMENTUM</string>
+        <Color3 name="BackgroundColor3">
+          <R>0.1</R>
+          <G>0.1</G>
+          <B>0.1</B>
+        </Color3>
+        <Color3 name="TextColor3">
+          <R>1</R>
+          <G>0.5</G>
+          <B>0</B>
+        </Color3>
+        <token name="Font">16</token>
+        <float name="TextSize">28</float>
+        <float name="BorderSizePixel">0</float>
+        <float name="BackgroundTransparency">0.3</float>
+      </Properties>
+      <Item class="UICorner" referent="RBX5">
+        <Properties>
+          <UDim name="CornerRadius">
+            <S>0</S>
+            <O>8</O>
+          </UDim>
+        </Properties>
+      </Item>
+      <Item class="UIStroke" referent="RBX6">
+        <Properties>
+          <Color3 name="Color">
+            <R>1</R>
+            <G>0.5</G>
+            <B>0</B>
+          </Color3>
+          <float name="Thickness">2</float>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="TextLabel" referent="RBX7">
+      <Properties>
+        <string name="Name">ZoneLabel</string>
+        <UDim2 name="Size">
+          <XS>0.3</XS>
+          <XO>0</XO>
+          <YS>0.05</YS>
+          <YO>0</YO>
+        </UDim2>
+        <UDim2 name="Position">
+          <XS>0.35</XS>
+          <XO>0</XO>
+          <YS>0.15</YS>
+          <YO>0</YO>
+        </UDim2>
+        <string name="Text">📍 NEON PLAZA</string>
+        <Color3 name="BackgroundColor3">
+          <R>0.1</R>
+          <G>0.1</G>
+          <B>0.1</B>
+        </Color3>
+        <Color3 name="TextColor3">
+          <R>0</R>
+          <G>1</G>
+          <B>1</B>
+        </Color3>
+        <token name="Font">16</token>
+        <float name="TextSize">20</float>
+        <float name="BorderSizePixel">0</float>
+        <float name="BackgroundTransparency">0.5</float>
+      </Properties>
+      <Item class="UICorner" referent="RBX8">
+        <Properties>
+          <UDim name="CornerRadius">
+            <S>0</S>
+            <O>6</O>
+          </UDim>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="TextButton" referent="RBX9">
+      <Properties>
+        <string name="Name">ShopButton</string>
+        <UDim2 name="Size">
+          <XS>0.1</XS>
+          <XO>0</XO>
+          <YS>0.08</YS>
+          <YO>0</YO>
+        </UDim2>
+        <UDim2 name="Position">
+          <XS>0.02</XS>
+          <XO>0</XO>
+          <YS>0.85</YS>
+          <YO>0</YO>
+        </UDim2>
+        <string name="Text">🛒 SHOP (E)</string>
+        <Color3 name="BackgroundColor3">
+          <R>0.3</R>
+          <G>0.1</G>
+          <B>0.4</B>
+        </Color3>
+        <Color3 name="TextColor3">
+          <R>1</R>
+          <G>1</G>
+          <B>1</B>
+        </Color3>
+        <token name="Font">16</token>
+        <float name="TextSize">16</float>
+        <float name="BorderSizePixel">0</float>
+        <token name="AutoButtonColor">true</token>
+      </Properties>
+      <Item class="UICorner" referent="RBX10">
+        <Properties>
+          <UDim name="CornerRadius">
+            <S>0</S>
+            <O>8</O>
+          </UDim>
+        </Properties>
+      </Item>
+      <Item class="UIStroke" referent="RBX11">
+        <Properties>
+          <Color3 name="Color">
+            <R>0.6</R>
+            <G>0</G>
+            <B>0.8</B>
+          </Color3>
+          <float name="Thickness">2</float>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="TextLabel" referent="RBX12">
+      <Properties>
+        <string name="Name">HelpText</string>
+        <UDim2 name="Size">
+          <XS>0.3</XS>
+          <XO>0</XO>
+          <YS>0.04</YS>
+          <YO>0</YO>
+        </UDim2>
+        <UDim2 name="Position">
+          <XS>0.35</XS>
+          <XO>0</XO>
+          <YS>0.87</YS>
+          <YO>0</YO>
+        </UDim2>
+        <string name="Text">Click or Tap to Skip! 🔥</string>
+        <Color3 name="BackgroundColor3">
+          <R>0</R>
+          <G>0</G>
+          <B>0</B>
+        </Color3>
+        <Color3 name="TextColor3">
+          <R>1</R>
+          <G>1</G>
+          <B>1</B>
+        </Color3>
+        <token name="Font">16</token>
+        <float name="TextSize">16</float>
+        <float name="BorderSizePixel">0</float>
+        <float name="BackgroundTransparency">1</float>
+      </Properties>
+    </Item>
+  </Item>
+</roblox>

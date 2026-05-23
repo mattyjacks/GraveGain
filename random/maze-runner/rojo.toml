@@ -1,0 +1,12 @@
+name = "maze-runner"
+glob_ignore_paths = ["**/.git/**", "**/.github/**"]
+
+[place]
+place_id = 0
+
+[serve]
+port = 34873
+
+[scripts]
+glob = "src/**/*.lua"
+root = "src"

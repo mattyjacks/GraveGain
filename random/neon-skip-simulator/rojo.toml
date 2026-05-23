@@ -1,0 +1,11 @@
+name = "Neon Skip Simulator"
+glob_ignore_patterns = ["**/.git/**", "**/.vscode/**", "**/node_modules/**"]
+
+[serve]
+port = 34872
+
+[place]
+place-id = 0
+
+[scripts]
+source = "src"

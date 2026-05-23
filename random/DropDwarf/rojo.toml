@@ -1,0 +1,12 @@
+name = "DropDwarf"
+glob_ignore_paths = ["**/.git/**", "**/.github/**"]
+
+[place]
+place_id = 0
+
+[serve]
+port = 34872
+
+[scripts]
+glob = "src/**/*.lua"
+root = "src"
