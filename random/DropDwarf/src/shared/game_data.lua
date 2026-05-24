@@ -148,4 +148,25 @@ function GameData.WorldYToDepth(worldY)
     return GameData.StudsToMeters(depthStuds)
 end
 
+-- ==================== PROCEDURAL & OVERHAUL CONSTANTS ====================
+-- Dynamic Chunk limits
+GameData.SLOT_DEPTH_METERS = 100
+GameData.SLOT_DEPTH_STUDS = GameData.SLOT_DEPTH_METERS * GameData.STUDS_PER_METER -- 320 studs
+GameData.MAX_LOADED_SLOTS = 3 -- active slot + 1 ahead + 1 transition buffer
+
+-- Basket Launch sequence timings
+GameData.BASKET_STEAM_TIME = 2.5 -- seconds steam vents hiss before release
+GameData.BASKET_DOOR_TIME  = 1.2 -- seconds doors take to swing fully open
+
+-- Mining nugget drop speed & magnet settings
+GameData.NUGGET_GRAVITY     = 100 -- studs/s^2 for physical ore nugget drops
+GameData.NUGGET_BOUNCE      = 0.45 -- bounce coefficient on collision
+GameData.NUGGET_MAGNET_MIN_T= 0.4 -- minimum delay in seconds before magnet can pull nugget
+
+-- Volumetric Flashlight scatters
+GameData.FLASHLIGHT_CONE_LEN = 38  -- length of volumetric scattering cone
+GameData.FLASHLIGHT_ANGLE    = 35  -- spotlight/cone angle in degrees
+GameData.FLASHLIGHT_COLOR    = Color3.fromRGB(245, 240, 210)
+
 return GameData
+

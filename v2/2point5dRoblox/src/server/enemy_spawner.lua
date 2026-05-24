@@ -39,7 +39,7 @@ function EnemySpawner:spawnInDungeon(dungeon)
 	end
 end
 
-function EnemySpawner:update(dt)
+function EnemySpawner:update(dt, gameManager)
 	self.spawnCooldown = self.spawnCooldown - dt
 
 	if self.spawnCooldown <= 0 and #self.enemies < self.maxEnemies then
@@ -519,7 +519,7 @@ function EnemySpawner:buildSkeletonModel(position)
 	return model
 end
 
-function EnemySpawner:updateEnemyAI(enemy, dt)
+function EnemySpawner:updateEnemyAI(enemy, dt, gameManager)
 	local root = enemy.root
 	if not root or not root.Parent then return end
 	local humanoid = enemy.model:FindFirstChild("Humanoid")

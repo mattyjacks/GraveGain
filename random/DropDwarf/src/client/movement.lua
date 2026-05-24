@@ -200,9 +200,22 @@ function Movement:OnLand(fallDistStuds)
     self.isFalling    = false
     self.airJumpsLeft = self.airJumpsMax  -- restore air jumps on landing
     local fallMeters  = GameData.StudsToMeters(fallDistStuds)
+    
     if fallMeters > GameData.FALL_DAMAGE_THRESHOLD_METERS then
         Networking.FireServer(Networking.Events.ApplyFallDamage, fallMeters)
     end
+    
+    -- Landing juice: camera shake and dust puff proportional to fall height
+    if fallDistStuds > 8 then
+        self.camera:ApplyShake(math.clamp(fallDistStuds / 8, 1.0, 5.0), 0.35, 26)
+        if self.visualsRef then
+            local hrp = self:GetHRP()
+            if hrp then
+                self.visualsRef:SpawnDustPuff(hrp.Position)
+            end
+        end
+    end
+
     -- Landing squash proportional to fall distance
     local intensity = math.clamp((fallMeters - 2) / 20, 0, 1)
     if intensity > 0.05 then
@@ -280,7 +293,55 @@ function Movement:CheckCoins()
                 if self.hudRef then
                     self.hudRef:UpdateCombo(self.comboStreak, self.comboMult)
                 end
+                if self.visualsRef then
+                    self.visualsRef:PulseCoinCollect()
+                end
                 part:Destroy()
+            end
+        end
+    end
+end
+
+-- Check item crates proximity (Collect on touch/proximity)
+function Movement:CheckItemCrates()
+    local hrp = self:GetHRP()
+    if not hrp then return end
+    local pos = hrp.Position
+    local collectRange = 6.5 -- radius to trigger collection
+
+    -- Spatial query within 12 studs of player
+    local overlapParams = OverlapParams.new()
+    overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+    overlapParams.FilterDescendantsInstances = { self.player.Character }
+    local nearParts = workspace:GetPartBoundsInRadius(pos, 12, overlapParams)
+
+    for _, part in ipairs(nearParts) do
+        if part.Name == "BaseCrate" and part:FindFirstChild("IsItemCrate") then
+            local crateIdTag = part:FindFirstChild("CrateId")
+            local dist = (pos - part.Position).Magnitude
+            if dist <= collectRange and crateIdTag then
+                local crateId = crateIdTag.Value
+                -- Guard: don't send again if already being collected (tagged locally)
+                if part:FindFirstChild("_Collecting") then continue end
+                local guard = Instance.new("BoolValue")
+                guard.Name = "_Collecting"
+                guard.Parent = part
+
+                Networking.FireServer(Networking.Events.CollectItem, crateId)
+
+                -- Visually hide ONLY (don't destroy) — server destroys authoritatively
+                -- which then replicates to this client too
+                local model = part.Parent
+                if model and model:IsA("Model") then
+                    for _, child in ipairs(model:GetDescendants()) do
+                        if child:IsA("BasePart") then
+                            child.Transparency = 1
+                            child.CanCollide = false
+                        elseif child:IsA("BillboardGui") or child:IsA("SelectionBox") then
+                            child.Enabled = false
+                        end
+                    end
+                end
             end
         end
     end
@@ -408,6 +469,11 @@ function Movement:Update(dt)
             if self.hudRef then
                 self.hudRef:UpdateAirJumps(self.airJumpsLeft, self.airJumpsMax)
             end
+            
+            -- Spawn premium air jump steam cloud puff
+            if self.visualsRef then
+                self.visualsRef:SpawnAirJumpPuff(hrp.Position)
+            end
         end
     end
     self.spaceWasDown = spaceDown
@@ -477,6 +543,7 @@ function Movement:Update(dt)
     if self.coinCheckTimer >= COIN_CHECK_RATE then
         self.coinCheckTimer = 0
         self:CheckCoins()
+        self:CheckItemCrates()
     end
     self:CheckHazard()
     self:CheckFinish()

@@ -251,44 +251,10 @@ function GameManager:spawnPlayerInDungeon(player, character, difficulty, mission
 		self:spawnFetchArtifact(dungeon, player)
 	end
 	
-	print("Player spawned in", playerData.difficulty, "dungeon at:", spawnX, spawnY, "Mission:", missionType)
+	print("Player spawned in", playerData.difficulty, "dungeon at:", spawnX, groundY, "Mission:", missionType)
 end
 
-function GameManager:spawnSpaceElevator(dungeon, player)
-	-- Spawn near start
-	local offset = GameData.DUNGEON_CONFIG.offset
-	local spawnX = offset.X + dungeon.rooms[1].centerX * 4
-	local spawnZ = offset.Z + dungeon.rooms[1].centerY * 4
-	
-	local beam = Instance.new("Part")
-	beam.Name = "SpaceElevator"
-	beam.Shape = Enum.PartType.Cylinder
-	beam.Size = Vector3.new(200, 10, 10)
-	beam.Orientation = Vector3.new(0, 0, 90)
-	beam.Position = Vector3.new(spawnX, 100, spawnZ)
-	beam.Material = Enum.Material.Neon
-	beam.Color = Color3.fromRGB(100, 255, 255)
-	beam.Transparency = 0.3
-	beam.Anchored = true
-	beam.CanCollide = false
-	beam.Parent = workspace
-	
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Extract"
-	prompt.ObjectText = "Space Elevator"
-	prompt.HoldDuration = 2
-	prompt.Parent = beam
-	
-	prompt.Triggered:Connect(function(trigPlayer)
-		if trigPlayer == player then
-			print(player.Name, "extracted successfully!")
-			beam:Destroy()
-			self:spawnPlayerInLobby(player, player.Character)
-		end
-	end)
-	
-	print("Space Elevator deployed for", player.Name)
-end
+
 
 function GameManager:spawnBoss(dungeon, player)
 	local offset = GameData.DUNGEON_CONFIG.offset
@@ -427,6 +393,7 @@ function GameManager:spawnSpaceElevator(dungeon, player)
 	
 	prompt.Triggered:Connect(function(trigPlayer)
 		if trigPlayer == player then
+			print(player.Name, "extracted successfully!")
 			elevator:Destroy()
 			local pData = self.playerData[player.UserId]
 			if pData then
@@ -446,6 +413,8 @@ function GameManager:spawnSpaceElevator(dungeon, player)
 					missionCompleteEvent:FireClient(player, stats, loot)
 				end
 			end
+			-- Teleport player back to the spaceship lobby deck
+			self:spawnPlayerInLobby(player, player.Character)
 		end
 	end)
 end

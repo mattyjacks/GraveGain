@@ -155,7 +155,7 @@ function HubUI:Build()
 
     self.bestTimeBarLabel = makeLabel(topBar, "BestTime",
         "BEST: --:--.-",
-        UDim2.new(1, -310, 0, 2), UDim2.new(0, 190, 1, -4),
+        UDim2.new(1, -520, 0, 2), UDim2.new(0, 190, 1, -4),
         Enum.Font.Code, COLOR_CYAN, Enum.TextXAlignment.Right)
 
     -- MODIFIERS button in top bar
@@ -170,6 +170,13 @@ function HubUI:Build()
         UDim2.new(1, -226, 0, 4), UDim2.new(0, 106, 1, -8),
         Color3.fromRGB(30, 80, 160), COLOR_WHITE, function()
             self:OpenLobby(self.onStartRun)
+        end)
+
+    -- OPTIONS button in top bar
+    makeButton(topBar, "OptionsBtn", "OPTIONS",
+        UDim2.new(1, -322, 0, 4), UDim2.new(0, 88, 1, -8),
+        Color3.fromRGB(100, 80, 70), COLOR_WHITE, function()
+            self:OpenOptions()
         end)
 
     -- ==================== UPGRADE SHOP PANEL ====================
@@ -425,6 +432,41 @@ function HubUI:Build()
             self:SetDropType("tps")
         end)
 
+    -- ==================== OPTIONS PANEL ====================
+    local optionsPanel = makeFrame(screenGui, "OptionsPanel",
+        UDim2.new(0.5, -180, 0.5, -120), UDim2.new(0, 360, 0, 240),
+        COLOR_PANEL, 0.05)
+    addCorner(optionsPanel, 12)
+    addStroke(optionsPanel, COLOR_ORANGE, 2)
+    optionsPanel.Visible = false
+    self.optionsPanel = optionsPanel
+
+    makeLabel(optionsPanel, "Title", "OPTIONS",
+        UDim2.new(0, 0, 0, 12), UDim2.new(1, 0, 0, 32),
+        Enum.Font.GothamBold, COLOR_ORANGE)
+
+    makeLabel(optionsPanel, "CamLabel", "DEFAULT CAMERA MODE",
+        UDim2.new(0, 12, 0, 60), UDim2.new(1, -24, 0, 24),
+        Enum.Font.GothamBold, COLOR_WHITE)
+
+    self.optFpsBtn = makeButton(optionsPanel, "OptFPSBtn", "FIRST PERSON",
+        UDim2.new(0.08, 0, 0, 96), UDim2.new(0.4, 0, 0, 44),
+        Color3.fromRGB(255, 100, 30), COLOR_WHITE, function()
+            self:SetDropType("fps")
+        end)
+
+    self.optTpsBtn = makeButton(optionsPanel, "OptTPSBtn", "THIRD PERSON",
+        UDim2.new(0.52, 0, 0, 96), UDim2.new(0.4, 0, 0, 44),
+        Color3.fromRGB(40, 40, 50), COLOR_GRAY, function()
+            self:SetDropType("tps")
+        end)
+
+    makeButton(optionsPanel, "CloseBtn", "CLOSE",
+        UDim2.new(0, 12, 1, -48), UDim2.new(1, -24, 0, 36),
+        Color3.fromRGB(50, 40, 55), COLOR_GRAY, function()
+            self:CloseOptions()
+        end)
+
     self.lbEntries = {}
     self.lbMode = "time"
 end
@@ -443,6 +485,34 @@ function HubUI:SetDropType(dt)
             or  Color3.fromRGB(40, 40, 50)
         self.tpsBtn.TextColor3 = dt == "tps" and COLOR_WHITE or COLOR_GRAY
     end
+    if self.optFpsBtn then
+        self.optFpsBtn.BackgroundColor3 = dt == "fps"
+            and Color3.fromRGB(255, 100, 30)
+            or  Color3.fromRGB(40, 40, 50)
+        self.optFpsBtn.TextColor3 = dt == "fps" and COLOR_WHITE or COLOR_GRAY
+    end
+    if self.optTpsBtn then
+        self.optTpsBtn.BackgroundColor3 = dt == "tps"
+            and Color3.fromRGB(60, 140, 255)
+            or  Color3.fromRGB(40, 40, 50)
+        self.optTpsBtn.TextColor3 = dt == "tps" and COLOR_WHITE or COLOR_GRAY
+    end
+
+    -- Save to server and run camera trigger callback
+    Networking.FireServer(Networking.Events.SaveCameraPreference, dt)
+    if self.onChangeCamera then
+        self.onChangeCamera(dt)
+    end
+end
+
+function HubUI:OpenOptions()
+    self.optionsOpen = true
+    if self.optionsPanel then self.optionsPanel.Visible = true end
+end
+
+function HubUI:CloseOptions()
+    self.optionsOpen = false
+    if self.optionsPanel then self.optionsPanel.Visible = false end
 end
 
 function HubUI:GetDropType()
@@ -680,6 +750,29 @@ function HubUI:UpdatePlayerData(data)
                 self.bestTimeBarLabel.Text = string.format("BEST: %02d:%02d.%02d", m, s, cs)
             else
                 self.bestTimeBarLabel.Text = "BEST: --:--.--"
+            end
+        end
+        if data.defaultCamera then
+            local dt = data.defaultCamera
+            self.dropType = dt
+            if self.fpsBtn then
+                self.fpsBtn.BackgroundColor3 = dt == "fps" and Color3.fromRGB(255, 100, 30) or Color3.fromRGB(40, 40, 50)
+                self.fpsBtn.TextColor3 = dt == "fps" and COLOR_WHITE or COLOR_GRAY
+            end
+            if self.tpsBtn then
+                self.tpsBtn.BackgroundColor3 = dt == "tps" and Color3.fromRGB(60, 140, 255) or Color3.fromRGB(40, 40, 50)
+                self.tpsBtn.TextColor3 = dt == "tps" and COLOR_WHITE or COLOR_GRAY
+            end
+            if self.optFpsBtn then
+                self.optFpsBtn.BackgroundColor3 = dt == "fps" and Color3.fromRGB(255, 100, 30) or Color3.fromRGB(40, 40, 50)
+                self.optFpsBtn.TextColor3 = dt == "fps" and COLOR_WHITE or COLOR_GRAY
+            end
+            if self.optTpsBtn then
+                self.optTpsBtn.BackgroundColor3 = dt == "tps" and Color3.fromRGB(60, 140, 255) or Color3.fromRGB(40, 40, 50)
+                self.optTpsBtn.TextColor3 = dt == "tps" and COLOR_WHITE or COLOR_GRAY
+            end
+            if self.onChangeCamera then
+                self.onChangeCamera(dt)
             end
         end
     end

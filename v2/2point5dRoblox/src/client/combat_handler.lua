@@ -40,7 +40,8 @@ function CombatHandler:performMeleeAttack()
 	
 	local targetPos = self:getMouseTarget()
 	local origin = hrp.Position
-	local direction = (targetPos - origin).Unit
+	local diff = targetPos - origin
+	local direction = diff.Magnitude > 0.0001 and diff.Unit or hrp.CFrame.LookVector
 	local range = 10
 	local damage = 25
 	
@@ -129,7 +130,8 @@ function CombatHandler:performRangedAttack(chargeTime)
 		end
 	end
 
-	local direction = (targetPos - origin).Unit
+	local diff = targetPos - origin
+	local direction = diff.Magnitude > 0.0001 and diff.Unit or hrp.CFrame.LookVector
 	local damage = 15 * chargeMultiplier
 	
 	local WeaponGenerator = require(script.Parent:WaitForChild("weapon_generator"))

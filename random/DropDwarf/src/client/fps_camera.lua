@@ -20,9 +20,16 @@ function FPSCamera.new()
     self.yaw = 0
     self.pitch = 0
     self.active = false
+    self.isDead = false    -- true while death screen is showing
     self.dropType = "fps"  -- "fps" or "tps"
     self.connection = nil
     self.tpsGhosted = {}   -- { [part] = originalTransparency } for TPS occlusion restore
+    
+    -- Volumetric physical shakes
+    self.shakeTime = 0
+    self.shakeDuration = 0
+    self.shakeMagnitude = 0
+    self.shakeSpeed = 25
     return self
 end
 
@@ -48,7 +55,7 @@ local function hideCharacter(char)
     for _, obj in ipairs(char:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.LocalTransparencyModifier = 1
-        elseif obj:IsA("Decal") or obj:IsA("SpecialMesh") then
+        elseif obj:IsA("Decal") then
             obj.Transparency = 1
         end
     end
@@ -59,7 +66,7 @@ local function showCharacter(char)
     for _, obj in ipairs(char:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.LocalTransparencyModifier = 0
-        elseif obj:IsA("Decal") or obj:IsA("SpecialMesh") then
+        elseif obj:IsA("Decal") then
             obj.Transparency = 0
         end
     end
@@ -82,7 +89,9 @@ function FPSCamera:RestoreFirstPerson()
 end
 
 function FPSCamera:Start(dropType)
-    if self.active then return end
+    if self.active then
+        self:Stop()
+    end
     self.active = true
     self.dropType = dropType or "fps"
 
@@ -108,6 +117,7 @@ end
 
 function FPSCamera:Stop()
     self.active = false
+    self.isDead = false
     if self.connection then
         self.connection:Disconnect()
         self.connection = nil
@@ -122,11 +132,48 @@ function FPSCamera:Stop()
     self:RestoreFirstPerson()
 end
 
+-- Call when the death screen appears: unlock mouse for button clicks but keep look active
+function FPSCamera:EnterDeathView()
+    self.isDead = true
+    UserInputService.MouseBehavior  = Enum.MouseBehavior.Default
+    UserInputService.MouseIconEnabled = true
+end
+
+-- Call when the player respawns back into the level (not hub)
+function FPSCamera:LeaveDeathView()
+    self.isDead = false
+    if self.active and self.dropType == "fps" then
+        UserInputService.MouseBehavior  = Enum.MouseBehavior.LockCenter
+        UserInputService.MouseIconEnabled = false
+    end
+end
+
+-- Hook dynamic noise shake
+function FPSCamera:ApplyShake(magnitude, duration, speed)
+    self.shakeMagnitude = magnitude or 1.5
+    self.shakeDuration  = duration or 0.4
+    self.shakeSpeed     = speed or 25
+    self.shakeTime      = self.shakeDuration
+end
+
 function FPSCamera:UpdateFPS()
     local head = self:GetHead()
     local hrp = self:GetHRP()
     if not head or not hrp then return end
 
+    if self.isDead then
+        -- Death view: keep mouse free every frame so nothing can re-lock it
+        UserInputService.MouseBehavior  = Enum.MouseBehavior.Default
+        UserInputService.MouseIconEnabled = true
+        -- Still render camera at current yaw/pitch so the view doesn't snap
+        local camCF = CFrame.new(head.Position)
+            * CFrame.Angles(0, self.yaw, 0)
+            * CFrame.Angles(self.pitch, 0, 0)
+        self.camera.CFrame = camCF
+        return
+    end
+
+    -- Only consume mouse delta when mouse is locked (live gameplay)
     local delta = UserInputService:GetMouseDelta()
     self.yaw   = self.yaw   - delta.X * MOUSE_SENSITIVITY
     self.pitch = self.pitch - delta.Y * MOUSE_SENSITIVITY
@@ -137,6 +184,20 @@ function FPSCamera:UpdateFPS()
     local camCF = CFrame.new(head.Position)
         * CFrame.Angles(0, self.yaw, 0)
         * CFrame.Angles(self.pitch, 0, 0)
+
+    -- Apply physical camera shake calculations via Perlin Noise
+    if self.shakeTime > 0 then
+        self.shakeTime = math.max(0, self.shakeTime - 0.016)
+        local ratio = self.shakeTime / self.shakeDuration
+        local t = tick() * self.shakeSpeed
+        local shakeX = math.noise(t, 17, 34) * self.shakeMagnitude * ratio
+        local shakeY = math.noise(t, 29, 88) * self.shakeMagnitude * ratio
+        local shakeZ = math.noise(t, 93, 14) * self.shakeMagnitude * ratio
+        
+        camCF = camCF * CFrame.new(shakeX * 0.12, shakeY * 0.12, 0)
+                      * CFrame.Angles(shakeY * 0.024, shakeX * 0.024, shakeZ * 0.018)
+    end
+
     self.camera.CFrame = camCF
 
     hideCharacter(self:GetCharacter())

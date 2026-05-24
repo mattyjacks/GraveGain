@@ -35,14 +35,33 @@ local movingPlatforms = MovingPlatforms.new()
 local activeItem      = ActiveItem.new(camera, movement)
 local backpackUI      = BackpackUI.new()
 
+movement.visualsRef = visuals
+
 -- Build static UIs
 hud:Build()
 hubUI:Build()
+hubUI.onChangeCamera = function(camType)
+    State.dropType = camType
+    camera:Start(camType)
+    if pickaxe then
+        pickaxe:SetThirdPerson(camType == "tps")
+    end
+end
 visuals:Setup()
 -- Build backpack onto same ScreenGui as HUD
 if hud.screenGui then
     backpackUI:Build(hud.screenGui)
 end
+
+-- Start pickaxe viewmodel in the hub once PlayerGui is ready.
+-- Runs in a separate thread so WaitForChild never blocks this script.
+task.spawn(function()
+    player:WaitForChild("PlayerGui")
+    pickaxe:Start(
+        function() return false end,   -- not moving in hub
+        function() return false end    -- not falling in hub
+    )
+end)
 
 -- ==================== STATE ====================
 local State = {
@@ -61,6 +80,7 @@ local State = {
     gameModeId   = "Singleplayer",
     downdedPlayers = {},  -- [userId] = { name, bleedTimer }
     rescuing       = nil, -- userId being rescued
+    lastLoadedSlot = 2,
 }
 
 -- ==================== HUB PROXIMITY ====================
@@ -158,6 +178,7 @@ local function onLevelGenerated(data)
     State.inHub = false
     State.currentDepth = 0
     State.timer = 0
+    State.lastLoadedSlot = 2
 
     -- Switch UI
     hubUI:SetVisible(false)
@@ -185,7 +206,8 @@ local function onLevelGenerated(data)
         hud:UpdateAirJumps(State.stats.airJumps or 0, State.stats.airJumps or 0)
     end
 
-    camera:Start(State.dropType or "fps")
+    local dropMode = State.dropType or "fps"
+    camera:Start(dropMode)
     movement:Start()
     activeItem:SetHUD(hud)
     activeItem:Start()
@@ -195,19 +217,27 @@ local function onLevelGenerated(data)
         function() return movement:IsMoving() end,
         function() return movement:IsFalling() end
     )
+    -- Attach pickaxe to right hand in TPS mode
+    if dropMode == "tps" then
+        task.delay(0.3, function() pickaxe:SetThirdPerson(true) end)
+    end
 
     -- Start moving platforms
-    movingPlatforms:Load(data and data.levelFolder or workspace:FindFirstChild("DropDwarfLevel"))
+    local levelFolder = data and data.levelFolder or workspace:FindFirstChild("DropDwarfLevel")
+    movingPlatforms:Load(levelFolder)
     movingPlatforms:Start()
 
     -- Start slime enemies (SlimeRain modifier: slime all terrain on start)
-    local levelFolder = data and data.levelFolder or workspace:FindFirstChild("DropDwarfLevel")
     slimes:Start(levelFolder, pickaxe)
     if activeMod.slimeRain then
         slimes:SlimeAllTerrain(levelFolder)
     end
 
-    -- Start client timer + speedometer + depth tracker
+    -- High-Fidelity Audio Setup
+    visuals:StartWindSound()
+    visuals:AttachSpatialSounds(levelFolder)
+
+    -- Start client timer + speedometer + depth tracker + dynamic chunk loader
     State.timerActive = true
     State.timerConnection = RunService.Heartbeat:Connect(function(dt)
         if not State.timerActive then return end
@@ -221,12 +251,25 @@ local function onLevelGenerated(data)
                 local vel = hrp.AssemblyLinearVelocity
                 local speed = vel.Magnitude
                 hud:UpdateSpeed(speed)
+                
+                -- Wind audio velocity updates
+                visuals:UpdateWind(vel.Y)
+
                 -- Depth: world Y goes negative as player falls
                 local depthStuds = GameData.LEVEL_Y_OFFSET - hrp.Position.Y
                 local depthMeters = math.max(0, depthStuds / GameData.STUDS_PER_METER)
                 if math.abs(depthMeters - State.currentDepth) > 0.5 then
                     State.currentDepth = depthMeters
                     hud:UpdateDepth(depthMeters)
+
+                    -- Dynamic Seeded Chunk Loader trigger
+                    local triggerDepth = (State.lastLoadedSlot - 1) * GameData.SLOT_DEPTH_METERS + 50
+                    if depthMeters >= triggerDepth then
+                        local nextSlot = State.lastLoadedSlot + 1
+                        State.lastLoadedSlot = nextSlot
+                        print("[DropDwarf Client] Approaching slot boundary. Requesting Slot", nextSlot)
+                        Networking.FireServer(Networking.Events.RequestChunkLoad, nextSlot)
+                    end
                 end
             end
         end
@@ -255,9 +298,18 @@ local function returnToHub()
     pickaxe:Destroy()
     slimes:Stop()
     movingPlatforms:Stop()
+    
+    -- Cleanup Audio Loops
+    visuals:CleanupAudio()
+
     -- Rebuild pickaxe and active item for next run
     pickaxe = PickaxeModel.new(workspace.CurrentCamera)
     activeItem = ActiveItem.new(camera, movement)
+    -- Show pickaxe idle in hub immediately after rebuild
+    pickaxe:Start(
+        function() return false end,
+        function() return false end
+    )
 
     -- Switch back to hub
     hud:Hide()
@@ -280,6 +332,102 @@ end
 
 Networking.OnClient(Networking.Events.LevelGenerated, function(data)
     onLevelGenerated(data)
+end)
+
+Networking.OnClient(Networking.Events.TriggerBasketLaunch, function()
+    local sessionId = player.UserId
+    local levelFolder = workspace:FindFirstChild("DropDwarfLevel_" .. sessionId)
+    if not levelFolder then
+        -- Search for any level folder in case sessionId format differs
+        for _, child in ipairs(workspace:GetChildren()) do
+            if child.Name:match("^DropDwarfLevel_") then
+                levelFolder = child
+                break
+            end
+        end
+    end
+    if not levelFolder then return end
+
+    local basket = levelFolder:WaitForChild("DwarvenEntryBasket", 5)
+    if not basket then return end
+
+    local doorL = basket:FindFirstChild("BasketTrapdoorL")
+    local doorR = basket:FindFirstChild("BasketTrapdoorR")
+    if not doorL or not doorR then return end
+
+    -- Cache starting closed CFrame so we can restore it on subsequent runs/deaths
+    if not doorL:FindFirstChild("ClosedCFrame") then
+        local val = Instance.new("CFrameValue")
+        val.Name = "ClosedCFrame"
+        val.Value = doorL.CFrame
+        val.Parent = doorL
+    end
+    if not doorR:FindFirstChild("ClosedCFrame") then
+        local val = Instance.new("CFrameValue")
+        val.Name = "ClosedCFrame"
+        val.Value = doorR.CFrame
+        val.Parent = doorR
+    end
+
+    -- Instantly reset doors to closed state
+    doorL.CFrame = doorL.ClosedCFrame.Value
+    doorR.CFrame = doorR.ClosedCFrame.Value
+
+    -- Find gears and steam nozzles
+    local gearL = basket:FindFirstChild("IndustrialGearL")
+    local gearR = basket:FindFirstChild("IndustrialGearR")
+    local nozzles = {}
+    for _, child in ipairs(basket:GetChildren()) do
+        if child.Name == "SteamNozzle" then
+            table.insert(nozzles, child)
+            local emitter = child:FindFirstChild("SteamVent")
+            if emitter then
+                emitter.Enabled = true
+            end
+        end
+    end
+
+    -- High-fidelity Perlin noise build-up camera shake (duration = 2.0s, magnitude = 1.5, frequency = 28)
+    if camera and camera.ApplyShake then
+        camera:ApplyShake(1.5, 2.0, 28)
+    end
+
+    -- Spin gears smoothly over 2 seconds
+    local TweenService = game:GetService("TweenService")
+    local spinInfo = TweenInfo.new(2.0, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+    
+    if gearL then
+        local targetCF = gearL.CFrame * CFrame.Angles(0, 0, math.rad(720))
+        TweenService:Create(gearL, spinInfo, { CFrame = targetCF }):Play()
+    end
+    if gearR then
+        local targetCF = gearR.CFrame * CFrame.Angles(0, 0, math.rad(-720))
+        TweenService:Create(gearR, spinInfo, { CFrame = targetCF }):Play()
+    end
+
+    -- Trigger steam release and slide doors open after 2.0s buildup
+    task.delay(2.0, function()
+        -- Hard slam camera shake (duration = 0.6s, magnitude = 4.5, frequency = 45)
+        if camera and camera.ApplyShake then
+            camera:ApplyShake(4.5, 0.6, 45)
+        end
+
+        -- Stop steam particles
+        for _, nozzle in ipairs(nozzles) do
+            local emitter = nozzle:FindFirstChild("SteamVent")
+            if emitter then
+                emitter.Enabled = false
+            end
+        end
+
+        -- Slide doors open smoothly (over 0.5s)
+        local doorTh = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local targetCFL = doorL.ClosedCFrame.Value * CFrame.new(-6, 0, 0)
+        local targetCFR = doorR.ClosedCFrame.Value * CFrame.new(6, 0, 0)
+
+        TweenService:Create(doorL, doorTh, { CFrame = targetCFL }):Play()
+        TweenService:Create(doorR, doorTh, { CFrame = targetCFR }):Play()
+    end)
 end)
 
 Networking.OnClient(Networking.Events.DepthUpdate, function(depthMeters)
@@ -306,6 +454,11 @@ Networking.OnClient(Networking.Events.HealthUpdate, function(current, max)
         if current < prev then
             local severity = math.clamp((prev - current) / State.maxHealth, 0, 1)
             visuals:FlashFallDamage(severity)
+            
+            -- Trigger physical Perlin noise camera shake
+            if camera and camera.ApplyShake then
+                camera:ApplyShake(severity * 4.2, 0.45, 28)
+            end
         end
     end
 end)
@@ -326,6 +479,14 @@ Networking.OnClient(Networking.Events.ModifierSet, function(modId)
     if State.inLevel then
         movement:SetModifier(mod)
         hud:SetModifier(mod)
+    end
+end)
+
+-- Receive dynamic slime spawns upon chunk generation
+Networking.OnClient(Networking.Events.ChunkLoaded, function(slotIndex, spawns)
+    if not State.inLevel then return end
+    if spawns and #spawns > 0 then
+        slimes:SpawnSlimes(spawns)
     end
 end)
 
@@ -363,11 +524,20 @@ end)
 Networking.OnClient(Networking.Events.PlayerDied, function(info)
     State.timerActive = false
     hud:FlashDamage(0.5)
+    -- Unlock mouse so death screen buttons are clickable.
+    -- Camera loop keeps running so the player can still look around.
+    if camera and camera.EnterDeathView then
+        camera:EnterDeathView()
+    end
     -- Show the 2x2 choice grid; callback fires DeathChoice to server
     hud:ShowDeath(
         info.depthReached or State.currentDepth,
         info.goldEarned or 0,
         function(choice)
+            -- Re-lock mouse immediately on choice (before server round-trip)
+            if camera and camera.LeaveDeathView then
+                camera:LeaveDeathView()
+            end
             -- Disable buttons immediately to prevent double-fire
             hud:HideDeath()
             Networking.FireServer(Networking.Events.DeathChoice, choice)
@@ -378,6 +548,11 @@ end)
 Networking.OnClient(Networking.Events.RespawnInBasket, function(info)
     -- Server has already moved the character; just restore client state
     hud:HideDeath()
+    -- Ensure mouse is re-locked for FPS play (LeaveDeathView already called on choice,
+    -- but this is a safety net for edge cases like network delay)
+    if camera and camera.LeaveDeathView then
+        camera:LeaveDeathView()
+    end
     if not State.inLevel then
         -- Was not in level client-side; re-enter level mode without regenerating
         State.inLevel = true
@@ -532,6 +707,114 @@ Networking.OnClient(Networking.Events.PlayerEliminated, function(info)
     hud:ShowToast(string.format("%s was eliminated!", info.name or "A player"))
 end)
 
+-- ==================== FLASHLIGHT ====================
+local flashlightPart   = nil   -- Part attached to HRP holding SpotLight
+local flashlight       = nil   -- SpotLight instance
+local flashlightBeam   = nil   -- SpecialMesh cone for volumetric foggy beam
+local flashlightOn     = true  -- starts ON
+local fHoldTime        = 0     -- how long F has been held
+local fWasDown         = false
+local FLASHLIGHT_HOLD  = 2.0   -- seconds to hold F to toggle
+
+local function buildFlashlight(char)
+    -- Clean up old
+    if flashlightPart and flashlightPart.Parent then
+        flashlightPart:Destroy()
+    end
+    flashlightPart = nil
+    flashlight     = nil
+    flashlightBeam = nil
+
+    local hrp = char and char:FindFirstChild("HumanoidRootPart") or (char and char:WaitForChild("HumanoidRootPart", 5))
+    if not hrp then return end
+
+    local fp = Instance.new("Part")
+    fp.Name             = "FlashlightAnchor"
+    fp.Size             = Vector3.new(0.1, 0.1, 0.1)
+    fp.Transparency     = 1
+    fp.Anchored         = false
+    fp.CanCollide       = false
+    fp.CastShadow       = false
+    fp.Parent           = char
+
+    local w = Instance.new("WeldConstraint")
+    w.Part0  = hrp
+    w.Part1  = fp
+    w.Parent = hrp
+    fp.CFrame = hrp.CFrame
+
+    local sl = Instance.new("SpotLight")
+    sl.Name        = "Flashlight"
+    sl.Brightness  = 3
+    sl.Range       = 60
+    sl.Angle       = 45
+    sl.Color       = Color3.fromRGB(240, 240, 255)   -- slightly cool white
+    sl.Enabled     = flashlightOn
+    sl.Shadows     = true
+    sl.Face        = Enum.NormalId.Front
+    sl.Parent      = fp
+
+    -- Premium Volumetric Scattering cone
+    local beam = Instance.new("Part")
+    beam.Name = "FlashlightBeam"
+    beam.Size = Vector3.new(0.2, 0.2, 50)
+    beam.Color = Color3.fromRGB(225, 235, 255)
+    beam.Material = Enum.Material.Neon
+    beam.Transparency = flashlightOn and 0.935 or 1.0
+    beam.CanCollide = false
+    beam.CanQuery = false
+    beam.CanTouch = false
+    beam.CastShadow = false
+    beam.Massless = true
+    beam.Parent = char
+
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.FileMesh
+    mesh.MeshId = "rbxassetid://1033714"
+    mesh.Scale = Vector3.new(12, 12, 50)
+    mesh.Parent = beam
+
+    local bw = Instance.new("Weld")
+    bw.Part0 = fp
+    bw.Part1 = beam
+    bw.C0 = CFrame.new(0, 0, -25) * CFrame.Angles(math.rad(-90), 0, 0)
+    bw.Parent = fp
+
+    flashlightPart = fp
+    flashlight     = sl
+    flashlightBeam = beam
+end
+
+-- F-hold toggle loop
+RunService.Heartbeat:Connect(function(dt)
+    if not State.inLevel then
+        fHoldTime = 0
+        fWasDown  = false
+        return
+    end
+    local fDown = UserInputService:IsKeyDown(Enum.KeyCode.F)
+    if fDown then
+        fHoldTime = fHoldTime + dt
+        if fHoldTime >= FLASHLIGHT_HOLD and not fWasDown then
+            fWasDown      = true
+            flashlightOn  = not flashlightOn
+            if flashlight then
+                flashlight.Enabled = flashlightOn
+            end
+            if flashlightBeam then
+                flashlightBeam.Transparency = flashlightOn and 0.935 or 1.0
+            end
+            -- Toast hint
+            if hud and hud.ShowToast then
+                hud:ShowToast(flashlightOn and "Flashlight ON" or "Flashlight OFF")
+            end
+        end
+    else
+        fHoldTime = 0
+        fWasDown  = false
+    end
+end)
+
 -- ==================== HUB LOOP ====================
 -- Proximity checks only in hub
 RunService.Heartbeat:Connect(function()
@@ -627,21 +910,32 @@ local function onCharacterAdded(character)
     -- Wait for character to load
     character:WaitForChild("HumanoidRootPart", 5)
     task.wait(0.5)
+    -- Rebuild flashlight on every spawn
+    buildFlashlight(character)
 
     -- Always force third-person camera when character spawns in hub
     -- This fixes the case where FPS camera persists through death/respawn
     if State.inHub then
-        workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-        -- Show all character parts (may have been hidden by FPS camera)
-        for _, obj in ipairs(character:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                obj.LocalTransparencyModifier = 0
-            elseif obj:IsA("Decal") or obj:IsA("SpecialMesh") then
-                obj.Transparency = 0
-            end
+        -- Load the chosen camera style in the Hub on spawn!
+        local camMode = State.dropType or "fps"
+        camera:Start(camMode)
+        if pickaxe then
+            pickaxe:SetThirdPerson(camMode == "tps")
         end
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        UserInputService.MouseIconEnabled = true
+
+        -- Ensure character parts are visible if in third-person mode
+        if camMode == "tps" then
+            workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+            for _, obj in ipairs(character:GetDescendants()) do
+                if obj:IsA("BasePart") then
+                    obj.LocalTransparencyModifier = 0
+                elseif obj:IsA("Decal") or obj:IsA("SpecialMesh") then
+                    obj.Transparency = 0
+                end
+            end
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            UserInputService.MouseIconEnabled = true
+        end
         -- Start hub mode: default camera, hub UI visible
         hubUI:SetVisible(true)
         hud:Hide()

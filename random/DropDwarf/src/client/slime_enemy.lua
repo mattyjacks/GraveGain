@@ -172,7 +172,23 @@ local function fireSlimeProjectile(origin, direction, speed)
                     break
                 end
             end
-            if not isPlayer then
+            if isPlayer then
+                alive = false
+                if hitConn then hitConn:Disconnect() end
+                proj:Destroy()
+                
+                -- Apply projectile damage if it hit the local player
+                local char = Players.LocalPlayer.Character
+                if char and hit:IsDescendantOf(char) then
+                    local knockDir = direction.Unit
+                    Networking.FireServer(Networking.Events.SlimeHit, {
+                        damage = 10,
+                        knockbackDir = { knockDir.X, knockDir.Y + 0.3, knockDir.Z },
+                        knockbackForce = 35,
+                    })
+                end
+                return
+            else
                 alive = false
                 if hitConn then hitConn:Disconnect() end
                 -- Slime the hit terrain
@@ -567,6 +583,34 @@ function SlimeEnemy:Update(dt)
             slime:MoveTo(slime.targetPos, dt)
             -- Bob animation
             slime:Bob(dt)
+
+            -- Check contact damage with local player
+            local char = Players.LocalPlayer.Character
+            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local dist = (slime:GetPosition() - hrp.Position).Magnitude
+                local contactRadius = slime.cfg.scale / 2 + 2.5
+                if dist < contactRadius then
+                    local now = tick()
+                    if now - (slime.lastDamageTime or 0) > 1.2 then
+                        slime.lastDamageTime = now
+                        local dmg = slime.size == "Large" and 25
+                            or slime.size == "Medium" and 15
+                            or slime.size == "Small" and 10
+                            or 5
+                        local knockDir = (hrp.Position - slime:GetPosition())
+                        if knockDir.Magnitude < 0.01 then knockDir = Vector3.new(0, 1, 0) end
+                        knockDir = knockDir.Unit
+                        Networking.FireServer(Networking.Events.SlimeHit, {
+                            damage = dmg,
+                            knockbackDir = { knockDir.X, knockDir.Y + 0.4, knockDir.Z },
+                            knockbackForce = 45,
+                        })
+                    end
+                end
+            end
+
             -- Check pickaxe hit
             if slime:CheckPickaxeHit(pickaxeCF, pickaxeSwinging, pickaxeHeavy) then
                 local newSpawns = slime:Die()
@@ -592,6 +636,17 @@ function SlimeEnemy:Update(dt)
     for _, ns in ipairs(toAdd) do
         local child = SlimeInstance.new(ns.size, ns.pos, ns.patrolEnd)
         table.insert(self.slimes, child)
+    end
+end
+
+-- Public: spawn dynamic slimes loaded from new slots
+function SlimeEnemy:SpawnSlimes(spawns)
+    if not self.active then return end
+    for _, s in ipairs(spawns) do
+        local pos = (type(s.pos) == "table") and Vector3.new(s.pos[1], s.pos[2], s.pos[3]) or s.pos
+        local patrolEnd = (type(s.patrolEnd) == "table") and Vector3.new(s.patrolEnd[1], s.patrolEnd[2], s.patrolEnd[3]) or s.patrolEnd
+        local inst = SlimeInstance.new(s.size, pos, patrolEnd)
+        table.insert(self.slimes, inst)
     end
 end
 

@@ -86,6 +86,17 @@ Networking.Events = {
 
     -- Weight system
     WeightUpdate         = "WeightUpdate",          -- S->C: {totalKg, speedMult, fallMult}
+
+    -- Overhaul & Dynamic Chunks
+    RequestChunkLoad     = "RequestChunkLoad",     -- C->S: player requests chunk/slot index {slotIndex}
+    ChunkLoaded          = "ChunkLoaded",          -- S->C: chunk generated/ready {slotIndex}
+    UnloadChunk          = "UnloadChunk",          -- S->C: unload far-behind slot {slotIndex}
+    TriggerBasketLaunch  = "TriggerBasketLaunch",  -- S->C: triggers dwarven basket gear/steam sequence
+    SpawnMiningNugget    = "SpawnMiningNugget",    -- S->C: spawns physical client nugget {itemId, pos, goldVal}
+    CameraShakeSignal    = "CameraShakeSignal",    -- S->C: triggers camera screen shake {magnitude, duration}
+    SaveCameraPreference = "SaveCameraPreference", -- C->S: player saves preferred default camera mode {"fps" or "tps"}
+    CollectItem          = "CollectItem",          -- C->S: player picked up an item crate
+    SlimeHit             = "SlimeHit",             -- C->S: player hit by a slime (contact/projectile)
 }
 
 -- Remote functions (client->server with return value)

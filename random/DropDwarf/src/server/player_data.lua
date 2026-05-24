@@ -31,6 +31,7 @@ local function defaultData()
         totalRuns = 0,
         wins = 0,
         lastSeed = "12345",
+        defaultCamera = "fps",  -- "fps" or "tps"
     }
 end
 
@@ -143,6 +144,15 @@ end
 function PlayerData.SetLastSeed(player, seed)
     local data = cache[player]
     if data then data.lastSeed = tostring(seed) end
+end
+
+-- Set default camera
+function PlayerData.SetDefaultCamera(player, camType)
+    local data = cache[player]
+    if data and (camType == "fps" or camType == "tps") then
+        data.defaultCamera = camType
+        saveData(player)
+    end
 end
 
 -- Force save (e.g., on milestone)

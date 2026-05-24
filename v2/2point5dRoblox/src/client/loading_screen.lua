@@ -204,8 +204,10 @@ local function createUI()
 				tipIndex = tipIndex % #TIPS + 1
 				TweenService:Create(tipLabel, TweenInfo.new(0.4), {TextTransparency = 1}):Play()
 				task.wait(0.4)
-				tipLabel.Text = TIPS[tipIndex]
-				TweenService:Create(tipLabel, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+				if tipLabel then
+					tipLabel.Text = TIPS[tipIndex]
+					TweenService:Create(tipLabel, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+				end
 			end
 		end
 	end)

@@ -38,9 +38,10 @@ function MovementController:performDodgeRoll()
 	self.isDodging = true
 	self.dodgeCooldown = 1.0
 	
+	local dir = (self.moveDirection and self.moveDirection.Magnitude > 0.05) and self.moveDirection or self.hrp.CFrame.LookVector
 	local bv = Instance.new("BodyVelocity")
 	bv.MaxForce = Vector3.new(100000, 0, 100000)
-	bv.Velocity = self.moveDirection * 80
+	bv.Velocity = dir.Unit * 80
 	bv.Parent = self.hrp
 	
 	game:GetService("Debris"):AddItem(bv, 0.25)

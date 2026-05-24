@@ -121,12 +121,21 @@ function HubGenerator.Generate(workspace)
     spawn.Transparency = 0.4
     addLabel(spawn, "SPAWN", 24, 3)
 
-    -- SpawnLocation
+    -- Clean up any existing SpawnLocations in the workspace template to avoid conflicts
+    for _, desc in ipairs(workspace:GetDescendants()) do
+        if desc:IsA("SpawnLocation") then
+            desc:Destroy()
+        end
+    end
+
+    -- SpawnLocation: Neutral=true so all players spawn here on join/respawn.
+    -- Server teleports override this immediately on level entry.
     local spawnLoc = Instance.new("SpawnLocation")
     spawnLoc.Position = Vector3.new(0, HUB_Y + 2, 0)
     spawnLoc.Size = Vector3.new(6, 1, 6)
     spawnLoc.Anchored = true
     spawnLoc.Neutral = true
+    spawnLoc.Duration = 0       -- no force-field
     spawnLoc.BrickColor = BrickColor.new("Bright green")
     spawnLoc.Transparency = 1
     spawnLoc.Parent = workspace
