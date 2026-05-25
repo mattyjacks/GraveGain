@@ -135,7 +135,7 @@ local function enterLevel(seed, modeId, biomeSequence)
     -- Initial biome lighting - reset cache so it always applies fresh
     visuals:ResetLighting()
     local Lighting = game:GetService("Lighting")
-    Lighting.Brightness = 4.5  -- immediate baseline so level isn't black
+    Lighting.Brightness = 7.0  -- immediate baseline so level isn't black
     if biomeSequence and biomeSequence[1] then
         visuals:UpdateBiomeLighting(biomeSequence[1], 1.0)
         hud:ShowBiomeChange(biomeSequence[1].name)

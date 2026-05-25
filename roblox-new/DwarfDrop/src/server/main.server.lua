@@ -30,17 +30,12 @@ local PvPHandler        = require(script.Parent.handlers.pvp_handler)
 -- Gravity
 workspace.Gravity = 100
 
--- Prevent Roblox void from killing players mid-drop.
--- Level bottom is at Y = LEVEL_Y_OFFSET - TOTAL_DEPTH_STUDS = -50 - 3200 = -3250.
--- Set destroy height well below that so parts and humanoids survive the full descent.
-workspace.FallenPartsDestroyHeight = -4000
-
 -- Lighting baseline
-Lighting.Ambient            = Color3.fromRGB(60, 55, 70)
-Lighting.OutdoorAmbient     = Color3.fromRGB(40, 38, 45)
-Lighting.Brightness         = 1.0
+Lighting.Ambient            = Color3.fromRGB(180, 165, 150)
+Lighting.OutdoorAmbient     = Color3.fromRGB(170, 155, 140)
+Lighting.Brightness         = 6.0
 Lighting.ClockTime          = 20
-Lighting.FogStart           = 0
+Lighting.FogStart           = 120
 Lighting.FogEnd             = 800
 Lighting.FogColor           = Color3.fromRGB(20, 16, 24)
 
@@ -349,7 +344,25 @@ RunService.Heartbeat:Connect(function(dt)
 
         -- Depth tracking from character Y position
         if hrp then
-            local depth = GameData.WorldYToDepth(hrp.Position.Y)
+            local worldY = hrp.Position.Y
+            -- Void guard: if player falls below level bottom, rescue them back to basket top
+            local levelBottom = GameData.LEVEL_Y_OFFSET - GameData.TOTAL_DEPTH_STUDS - 50
+            if worldY < levelBottom then
+                local sess = Session.GetSessionForPlayer(player)
+                local rescueY = GameData.LEVEL_Y_OFFSET + 10
+                if sess and sess.levelFolder then
+                    local basket = sess.levelFolder:FindFirstChild("DwarvenEntryBasket")
+                    local sp = basket and basket:FindFirstChild("SpawnPosition")
+                    if sp then rescueY = sp.Value.Y end
+                end
+                hrp.CFrame = CFrame.new(Vector3.new(0, rescueY, 0))
+                local hum2 = char:FindFirstChildOfClass("Humanoid")
+                if hum2 then
+                    hum2.Health = math.max(1, hum2.Health - 20)
+                    Networking.FireClient(Networking.Events.HealthUpdate, player, hum2.Health, hum2.MaxHealth)
+                end
+            end
+            local depth = GameData.WorldYToDepth(worldY)
             depth = math.clamp(depth, 0, GameData.TOTAL_DEPTH_METERS)
             if math.abs(depth - (state.depth or 0)) > 0.5 then
                 state.depth = depth
