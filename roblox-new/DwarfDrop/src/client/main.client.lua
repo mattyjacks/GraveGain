@@ -75,27 +75,32 @@ local function enterHub()
     backpackUI:Hide()
     hubUI:Show()
 
-    -- Camera: use stored preference or fps
-    local data = nil
+    -- Hub uses Roblox default camera - stop FPS camera so mouse moves freely
+    camera:Stop()
+    workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    local char = player.Character
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        workspace.CurrentCamera.CameraSubject = hum
+        hum.AutoRotate = true
+    end
+    UserInputService.MouseBehavior    = Enum.MouseBehavior.Default
+    UserInputService.MouseIconEnabled = true
+
+    -- Fetch player data for UI
     local rf = Networking.GetFunction(Networking.Functions.GetPlayerData)
     if rf then
         local ok, result = pcall(function() return rf:InvokeServer() end)
         if ok and result then
-            data = result
-            hubUI:SetPlayerData(data)
+            hubUI:SetPlayerData(result)
         end
     end
-    local camMode = (data and data.defaultCamera) or "fps"
-    camera:Start(camMode)
 
     movement:Stop()
     pickaxe:Unequip()
     activeItemCtrl:Stop()
     SlimeEnemy.StopManager()
     platforms:Stop()
-
-    UserInputService.MouseBehavior    = Enum.MouseBehavior.Default
-    UserInputService.MouseIconEnabled = true
 end
 
 local function enterLevel(seed, modeId, biomeSequence)
@@ -118,9 +123,12 @@ local function enterLevel(seed, modeId, biomeSequence)
     timerRunning = true
     timerSeconds = 0
 
-    -- Initial biome lighting
+    -- Initial biome lighting - reset cache so it always applies fresh
+    visuals:ResetLighting()
+    local Lighting = game:GetService("Lighting")
+    Lighting.Brightness = 2.0  -- immediate baseline so level isn't black
     if biomeSequence and biomeSequence[1] then
-        visuals:UpdateBiomeLighting(biomeSequence[1])
+        visuals:UpdateBiomeLighting(biomeSequence[1], 1.0)
         hud:ShowBiomeChange(biomeSequence[1].name)
         lastBiome = biomeSequence[1].name
     end

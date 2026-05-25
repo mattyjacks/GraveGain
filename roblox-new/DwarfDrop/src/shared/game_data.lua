@@ -9,8 +9,8 @@ GameData.TOTAL_DEPTH_METERS = 1000
 GameData.TOTAL_DEPTH_STUDS = GameData.TOTAL_DEPTH_METERS * GameData.STUDS_PER_METER -- 3200 studs
 
 -- Level layout
-GameData.LEVEL_WIDTH = 60  -- studs wide
-GameData.LEVEL_Y_OFFSET = 0 -- world Y at depth 0m
+GameData.LEVEL_WIDTH = 120  -- studs wide (doubled for wider drop shaft)
+GameData.LEVEL_Y_OFFSET = -50 -- world Y at depth 0m (below baseplate)
 GameData.HUB_Y = 600 -- hub sits above level
 
 -- Fall damage

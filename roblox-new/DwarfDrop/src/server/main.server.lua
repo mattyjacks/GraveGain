@@ -5,7 +5,11 @@ local Players      = game:GetService("Players")
 local RunService   = game:GetService("RunService")
 local Lighting     = game:GetService("Lighting")
 
-local Networking        = require(game.ReplicatedStorage.Shared.networking)
+-- CreateRemotes MUST run before any module that calls Networking.OnServer at load time
+local Networking = require(game.ReplicatedStorage.Shared.networking)
+Networking.CreateRemotes()
+
+-- Now safe to require modules that bind events at load time
 local GameData          = require(game.ReplicatedStorage.Shared.game_data)
 local UpgradeData       = require(game.ReplicatedStorage.Shared.upgrade_data)
 
@@ -22,9 +26,6 @@ local MiningHandler     = require(script.Parent.handlers.mining_handler)
 local PvPHandler        = require(script.Parent.handlers.pvp_handler)
 
 -- ==================== INIT ====================
-
--- Create all remotes first
-Networking.CreateRemotes()
 
 -- Gravity
 workspace.Gravity = 100

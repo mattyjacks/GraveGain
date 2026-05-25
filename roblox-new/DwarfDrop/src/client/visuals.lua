@@ -56,23 +56,43 @@ function Visuals:PulseCoinCollect()
     -- Handled by HUD combo UI; no world particle needed
 end
 
+-- Biome brightness table - keyed by name so biome_data stays minimal
+local BIOME_BRIGHTNESS = {
+    Volcano  = 2.8,
+    Fortress = 1.6,
+    Cave     = 1.2,
+    Mine     = 1.4,
+}
+
+function Visuals:ResetLighting()
+    -- Force re-apply on next call even if biome name hasn't changed
+    self.lastBiomeName = nil
+end
+
 function Visuals:UpdateBiomeLighting(biome, transitionTime)
     if not biome then return end
     if self.lastBiomeName == biome.name then return end
     self.lastBiomeName = biome.name
 
+    local brightness = BIOME_BRIGHTNESS[biome.name] or 2.0
+
     transitionTime = transitionTime or 3.5
     local tInfo = TweenInfo.new(transitionTime, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 
     local target = {
-        Ambient      = biome.ambientColor      or Color3.fromRGB(40, 38, 50),
-        OutdoorAmbient = biome.ambientColor    or Color3.fromRGB(30, 28, 40),
-        FogColor     = biome.fogColor          or Color3.fromRGB(20, 16, 24),
-        FogEnd       = biome.fogEnd            or 500,
-        ColorShift_Bottom = biome.sunlightColor or Color3.fromRGB(80,70,120),
+        Ambient           = biome.ambientColor   or Color3.fromRGB(60, 45, 40),
+        OutdoorAmbient    = biome.ambientColor   or Color3.fromRGB(50, 38, 35),
+        FogColor          = biome.fogColor       or Color3.fromRGB(20, 16, 24),
+        FogEnd            = biome.fogEnd         or 500,
+        FogStart          = 0,
+        Brightness        = brightness,
+        ColorShift_Bottom = biome.sunlightColor  or Color3.fromRGB(80, 70, 120),
+        ColorShift_Top    = biome.sunlightColor  or Color3.fromRGB(60, 50, 80),
     }
 
     if self.biomeTween then self.biomeTween:Cancel() end
+    -- Immediately snap Brightness so it doesn't start black
+    Lighting.Brightness = brightness * 0.6
     self.biomeTween = TweenService:Create(Lighting, tInfo, target)
     self.biomeTween:Play()
 end

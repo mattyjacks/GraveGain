@@ -107,13 +107,23 @@ Networking.Functions = {
     ValidateSeed  = "ValidateSeed",
 }
 
+local RunService    = game:GetService("RunService")
 local _remoteFolder = nil
 
 local function getFolder()
     if _remoteFolder then return _remoteFolder end
-    _remoteFolder = ReplicatedStorage:WaitForChild("DwarfDropRemotes", 10)
-    if not _remoteFolder then
-        warn("[Networking] Remote folder not found!")
+    if RunService:IsServer() then
+        -- Server: folder must already exist (created by Networking.CreateRemotes)
+        _remoteFolder = ReplicatedStorage:FindFirstChild("DwarfDropRemotes")
+        if not _remoteFolder then
+            warn("[Networking] CreateRemotes() has not been called yet on server!")
+        end
+    else
+        -- Client: wait for server to create it
+        _remoteFolder = ReplicatedStorage:WaitForChild("DwarfDropRemotes", 20)
+        if not _remoteFolder then
+            warn("[Networking] Remote folder not found on client after 20s!")
+        end
     end
     return _remoteFolder
 end

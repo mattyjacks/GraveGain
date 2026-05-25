@@ -109,8 +109,8 @@ function HubUI:Build()
     self.promptLabel.TextScaled = false; self.promptLabel.TextSize = 14
     addCorner(self.promptLabel, 8); self.promptLabel.Visible = false
 
-    -- Camera toggle (top right)
-    local camBtn = makeBtn(screenGui, "CamToggle", "CAM: FPS", UDim2.new(1,-148,0,12), UDim2.new(0,138,0,36), Color3.fromRGB(40,38,60), function()
+    -- Camera toggle (below player list to avoid overlap)
+    local camBtn = makeBtn(screenGui, "CamToggle", "CAM: FPS", UDim2.new(1,-148,0,160), UDim2.new(0,138,0,36), Color3.fromRGB(40,38,60), function()
         self:ToggleCameraMode()
     end)
     addCorner(camBtn, 10); self.camToggleBtn = camBtn

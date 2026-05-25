@@ -109,6 +109,131 @@ local function spawnItemCrate(parent, pos, itemId, rng)
     return crate
 end
 
+-- ==================== BIOME TERRAIN DECORATIONS ====================
+
+local function addVolcanoTerrain(parent, plat, rng)
+    local px, py, pz = plat.Position.X, plat.Position.Y, plat.Position.Z
+    local sx, sz = plat.Size.X, plat.Size.Z
+    -- Lava crack strip along one edge
+    if rng:NextNumber() < 0.5 then
+        local crack = makePart(parent, "LavaCrack",
+            Vector3.new(px + rng:NextNumber(-sx*0.3, sx*0.3), py + 1.1, pz + sz*0.4),
+            Vector3.new(sx * rng:NextNumber(0.3, 0.7), 0.4, 1.5),
+            Color3.fromRGB(255, 80, 0))
+        crack.Material = Enum.Material.Neon; crack.CastShadow = false
+        local l = Instance.new("PointLight")
+        l.Brightness = 1.5; l.Range = 12; l.Color = Color3.fromRGB(255, 100, 0); l.Parent = crack
+    end
+    -- Obsidian spike pillar on corner
+    if rng:NextNumber() < 0.3 then
+        local h = rng:NextNumber(3, 8)
+        local spike = makePart(parent, "ObsidianSpike",
+            Vector3.new(px + sx*0.4, py + h/2 + 1, pz + sz*0.4),
+            Vector3.new(1.5, h, 1.5),
+            Color3.fromRGB(20, 10, 30))
+        spike.Material = Enum.Material.Rock
+    end
+end
+
+local function addFortressTerrain(parent, plat, rng)
+    local px, py, pz = plat.Position.X, plat.Position.Y, plat.Position.Z
+    local sx, sz = plat.Size.X, plat.Size.Z
+    -- Battlement crenels along top edge
+    if rng:NextNumber() < 0.45 then
+        local count = rng:NextInteger(2, 4)
+        for i = 1, count do
+            local bx = px - sx/2 + (i / (count+1)) * sx
+            makePart(parent, "Battlement",
+                Vector3.new(bx, py + 2.5, pz - sz*0.45),
+                Vector3.new(2, 3, 2),
+                Color3.fromRGB(48, 45, 40))
+        end
+    end
+    -- Torch pillar
+    if rng:NextNumber() < 0.35 then
+        local pole = makePart(parent, "TorchPole",
+            Vector3.new(px + sx*0.35, py + 3, pz + sz*0.35),
+            Vector3.new(0.8, 5, 0.8),
+            Color3.fromRGB(60, 55, 50))
+        pole.Material = Enum.Material.SmoothPlastic
+        local flame = makePart(parent, "TorchFlame",
+            Vector3.new(px + sx*0.35, py + 6, pz + sz*0.35),
+            Vector3.new(1.2, 1.2, 1.2),
+            Color3.fromRGB(255, 160, 40))
+        flame.Material = Enum.Material.Neon; flame.Shape = Enum.PartType.Ball
+        local l = Instance.new("PointLight")
+        l.Brightness = 2; l.Range = 18; l.Color = Color3.fromRGB(255, 160, 40); l.Parent = flame
+    end
+end
+
+local function addCaveTerrain(parent, plat, rng)
+    local px, py, pz = plat.Position.X, plat.Position.Y, plat.Position.Z
+    local sx, sz = plat.Size.X, plat.Size.Z
+    -- Crystal spikes growing up from platform surface
+    local spikeCount = rng:NextInteger(1, 4)
+    for _ = 1, spikeCount do
+        local h = rng:NextNumber(2, 6)
+        local ox = rng:NextNumber(-sx*0.4, sx*0.4)
+        local oz = rng:NextNumber(-sz*0.4, sz*0.4)
+        local spike = makePart(parent, "CrystalSpike",
+            Vector3.new(px + ox, py + h/2 + 1, pz + oz),
+            Vector3.new(rng:NextNumber(0.8,1.8), h, rng:NextNumber(0.8,1.8)),
+            Color3.fromRGB(
+                rng:NextInteger(30,80),
+                rng:NextInteger(80,160),
+                rng:NextInteger(160,220)))
+        spike.Material = Enum.Material.Neon
+        spike.CastShadow = false
+    end
+    -- Stalactite hanging from ceiling slab
+    if rng:NextNumber() < 0.4 then
+        local ceilY = py + rng:NextNumber(12, 20)
+        local dripH = rng:NextNumber(4, 10)
+        makePart(parent, "Stalactite",
+            Vector3.new(px + rng:NextNumber(-sx*0.3,sx*0.3), ceilY - dripH/2, pz + rng:NextNumber(-sz*0.3,sz*0.3)),
+            Vector3.new(1.5, dripH, 1.5),
+            Color3.fromRGB(40, 38, 35))
+    end
+end
+
+local function addMineTerrain(parent, plat, rng)
+    local px, py, pz = plat.Position.X, plat.Position.Y, plat.Position.Z
+    local sx, sz = plat.Size.X, plat.Size.Z
+    -- Wooden support beam pair
+    if rng:NextNumber() < 0.5 then
+        local beamH = rng:NextNumber(6, 10)
+        for _, side in ipairs({-1, 1}) do
+            makePart(parent, "SupportPost",
+                Vector3.new(px + side * sx * 0.38, py + beamH/2 + 1, pz),
+                Vector3.new(1.2, beamH, 1.2),
+                Color3.fromRGB(100, 72, 42))
+        end
+        -- Horizontal cross-beam
+        makePart(parent, "CrossBeam",
+            Vector3.new(px, py + beamH + 1, pz),
+            Vector3.new(sx * 0.8, 1.2, 1.2),
+            Color3.fromRGB(88, 62, 36))
+    end
+    -- Gold vein streak on platform surface
+    if rng:NextNumber() < 0.45 then
+        local vein = makePart(parent, "GoldVein",
+            Vector3.new(px + rng:NextNumber(-sx*0.3,sx*0.3), py + 1.1, pz + rng:NextNumber(-sz*0.3,sz*0.3)),
+            Vector3.new(rng:NextNumber(2,5), 0.3, rng:NextNumber(1,3)),
+            Color3.fromRGB(220, 180, 40))
+        vein.Material = Enum.Material.Rock
+        tagPart(vein, "IsOre", true)
+        tagPart(vein, "OreHP", 2)
+        tagPart(vein, "OreGoldValue", rng:NextInteger(12, 28))
+    end
+end
+
+local TERRAIN_FNS = {
+    volcano = addVolcanoTerrain,
+    fortress = addFortressTerrain,
+    cave = addCaveTerrain,
+    mine = addMineTerrain,
+}
+
 -- ==================== SLOT GENERATION ====================
 
 -- Generate one 100m slot at slotIndex (1-10)
@@ -129,43 +254,37 @@ function LevelGenerator.GenerateSlot(sessionFolder, seed, slotIndex, biomeSequen
     local topY = LEVEL_Y_OFFSET - GameData.MetersToStuds(topDepthM)
     local botY = LEVEL_Y_OFFSET - GameData.MetersToStuds(botDepthM)
 
-    -- ===== WALLS =====
-    local wallH  = SLOT_STUDS + 8  -- slight overlap for seamless seams
-    local wallY  = topY - SLOT_STUDS / 2
-    local halfW  = LEVEL_WIDTH / 2
+    -- ===== WALLS (4 thick slabs, biome material) =====
+    local wallH    = SLOT_STUDS + 8
+    local wallY    = topY - SLOT_STUDS / 2
+    local halfW    = LEVEL_WIDTH / 2
+    local wallMat  = biome.wallMaterial or Enum.Material.Rock
+    local wallThick = 8  -- thick walls for natural look
 
-    -- Determine wall colors
     local wallColors = biome.wallColors or biome.colors
     local function rndWallColor()
-        local idx = rng:NextInteger(1, #wallColors)
-        return wallColors[idx]
+        return wallColors[rng:NextInteger(1, #wallColors)]
     end
 
-    -- North wall
+    local walls = {}
     local wallN = makePart(slotFolder, "WallN",
-        Vector3.new(0, wallY, -(halfW + 1)),
-        Vector3.new(LEVEL_WIDTH + 2, wallH, 2),
-        rndWallColor())
-
-    -- South wall
+        Vector3.new(0, wallY, -(halfW + wallThick/2)),
+        Vector3.new(LEVEL_WIDTH + wallThick*2, wallH, wallThick), rndWallColor())
     local wallS = makePart(slotFolder, "WallS",
-        Vector3.new(0, wallY, (halfW + 1)),
-        Vector3.new(LEVEL_WIDTH + 2, wallH, 2),
-        rndWallColor())
-
-    -- East wall
+        Vector3.new(0, wallY,  (halfW + wallThick/2)),
+        Vector3.new(LEVEL_WIDTH + wallThick*2, wallH, wallThick), rndWallColor())
     local wallE = makePart(slotFolder, "WallE",
-        Vector3.new(halfW + 1, wallY, 0),
-        Vector3.new(2, wallH, LEVEL_WIDTH + 2),
-        rndWallColor())
-
-    -- West wall
+        Vector3.new( halfW + wallThick/2, wallY, 0),
+        Vector3.new(wallThick, wallH, LEVEL_WIDTH + wallThick*2), rndWallColor())
     local wallW = makePart(slotFolder, "WallW",
-        Vector3.new(-(halfW + 1), wallY, 0),
-        Vector3.new(2, wallH, LEVEL_WIDTH + 2),
-        rndWallColor())
+        Vector3.new(-(halfW + wallThick/2), wallY, 0),
+        Vector3.new(wallThick, wallH, LEVEL_WIDTH + wallThick*2), rndWallColor())
+    for _, w in ipairs({wallN, wallS, wallE, wallW}) do
+        w.Material = wallMat
+        table.insert(walls, w)
+    end
 
-    -- Tag ore nodes on East/West walls
+    -- Ore nodes on E/W walls
     for _, wall in ipairs({ wallE, wallW }) do
         if rng:NextNumber() < 0.4 then
             tagPart(wall, "IsOre", true)
@@ -175,87 +294,111 @@ function LevelGenerator.GenerateSlot(sessionFolder, seed, slotIndex, biomeSequen
     end
 
     -- ===== PLATFORMS =====
-    local pCfg   = biome.platform
-    local platforms = {}
-    local currentY   = topY - 8  -- first platform slightly below slot top
-    local centerX    = 0
-    local centerZ    = 0
-
+    local pCfg        = biome.platform
+    local platMat     = biome.platMaterial or Enum.Material.Rock
+    local terrainFn   = TERRAIN_FNS[biome.terrainStyle]
+    local platforms   = {}
     local modSpeedMult = modifier and modifier.speedMult or 1
-    -- Smaller platforms for Speedy
-    local sizeScale = modSpeedMult > 1.2 and 0.7 or 1.0
+    local sizeScale    = modSpeedMult > 1.2 and 0.7 or 1.0
 
+    -- Primary platforms: march down the slot with randomised drop gaps
+    local currentY = topY - 6
     while currentY > botY + biome.dropMin * GameData.STUDS_PER_METER do
         local drop = rng:NextNumber(biome.dropMin, biome.dropMax) * GameData.STUDS_PER_METER
         currentY = currentY - drop
-
         if currentY < botY then break end
 
-        -- Platform offset from center
-        local ox = rng:NextNumber(-halfW * 0.5, halfW * 0.5)
-        local oz = rng:NextNumber(-halfW * 0.5, halfW * 0.5)
-
+        -- Spread platforms across the full shaft width
+        local ox = rng:NextNumber(-halfW * 0.65, halfW * 0.65)
+        local oz = rng:NextNumber(-halfW * 0.65, halfW * 0.65)
         local sizeX = rng:NextNumber(pCfg.minX, pCfg.maxX) * sizeScale
         local sizeZ = rng:NextNumber(pCfg.minZ, pCfg.maxZ) * sizeScale
+        -- Vary platform thickness for natural look (1-3 studs)
+        local thick = rng:NextNumber(1.5, 3.5)
 
         local pColor = biome.colors[rng:NextInteger(1, #biome.colors)]
         local plat = makePart(slotFolder, "Platform",
             Vector3.new(ox, currentY, oz),
-            Vector3.new(sizeX, 2, sizeZ),
-            pColor)
-
-        -- Terrain tag
+            Vector3.new(sizeX, thick, sizeZ), pColor)
+        plat.Material = platMat
         tagPart(plat, "TerrainType", "Firm")
 
-        -- Hazard chance
+        -- Hazard
         if rng:NextNumber() < biome.hazardChance then
             tagPart(plat, "IsHazard", biome.hazardDamage or 10)
-            plat.Color = biome.accentColor or Color3.fromRGB(255, 0, 0)
-            plat.Material = Enum.Material.Neon
+            plat.Color  = biome.hazardColor  or Color3.fromRGB(255, 0, 0)
+            plat.Material = biome.hazardMat  or Enum.Material.Neon
         end
 
-        -- Coin spawn
+        -- Coins
         local goldMult = modifier and modifier.goldMult or 1
         if rng:NextNumber() < biome.coinChance then
-            local coinCount = math.floor(rng:NextInteger(1, 4) * goldMult + 0.5)
+            local coinCount = math.floor(rng:NextInteger(1, 5) * goldMult + 0.5)
             LevelGenerator.SpawnCoins(slotFolder,
-                Vector3.new(ox, currentY + 2.5, oz),
-                coinCount, rng)
+                Vector3.new(ox, currentY + thick + 1, oz), coinCount, rng)
         end
 
-        -- Item crate spawn (rare)
+        -- Item crate (rare)
         if rng:NextNumber() < 0.06 then
             local itemPool = ItemData.UtilityItems
-            local idx = rng:NextInteger(1, #itemPool)
             spawnItemCrate(slotFolder,
-                Vector3.new(ox + rng:NextNumber(-2, 2), currentY + 3.5, oz + rng:NextNumber(-2, 2)),
-                itemPool[idx], rng)
+                Vector3.new(ox + rng:NextNumber(-2,2), currentY + thick + 2, oz + rng:NextNumber(-2,2)),
+                itemPool[rng:NextInteger(1, #itemPool)], rng)
+        end
+
+        -- Biome terrain decoration
+        if terrainFn and rng:NextNumber() < 0.65 then
+            terrainFn(slotFolder, plat, rng)
         end
 
         -- Tunnel ceiling slab
         if rng:NextNumber() < biome.tunnelChance then
-            local ceilY = currentY + rng:NextNumber(14, 22)
-            local ceilColor = biome.colors[rng:NextInteger(1, #biome.colors)]
-            makePart(slotFolder, "CeilingSlab",
+            local ceilY = currentY + rng:NextNumber(14, 24)
+            local cColor = biome.colors[rng:NextInteger(1, #biome.colors)]
+            local slab = makePart(slotFolder, "CeilingSlab",
                 Vector3.new(ox, ceilY, oz),
-                Vector3.new(sizeX + 4, 2, sizeZ + 4),
-                ceilColor)
+                Vector3.new(sizeX + 6, 2, sizeZ + 6), cColor)
+            slab.Material = platMat
         end
 
         table.insert(platforms, plat)
+
+        -- Secondary filler platform: offset ~half a gap to the side
+        -- keeps the shaft feeling dense without being trivial
+        if rng:NextNumber() < 0.55 then
+            local fDrop = rng:NextNumber(biome.dropMin*0.5, biome.dropMax*0.5) * GameData.STUDS_PER_METER
+            local fY    = currentY - fDrop
+            if fY > botY then
+                local fox  = rng:NextNumber(-halfW * 0.65, halfW * 0.65)
+                local foz  = rng:NextNumber(-halfW * 0.65, halfW * 0.65)
+                local fSX  = rng:NextNumber(pCfg.minX * 0.6, pCfg.maxX * 0.8) * sizeScale
+                local fSZ  = rng:NextNumber(pCfg.minZ * 0.6, pCfg.maxZ * 0.8) * sizeScale
+                local fCol = biome.colors[rng:NextInteger(1, #biome.colors)]
+                local fp   = makePart(slotFolder, "PlatformFill",
+                    Vector3.new(fox, fY, foz),
+                    Vector3.new(fSX, rng:NextNumber(1.5,3), fSZ), fCol)
+                fp.Material = platMat
+                tagPart(fp, "TerrainType", "Firm")
+                if rng:NextNumber() < biome.coinChance * 0.6 then
+                    local goldMult = modifier and modifier.goldMult or 1
+                    LevelGenerator.SpawnCoins(slotFolder,
+                        Vector3.new(fox, fY + 2.5, foz),
+                        rng:NextInteger(1,3), rng)
+                end
+                table.insert(platforms, fp)
+            end
+        end
     end
 
-    -- ===== SLIMES (server-side AI anchor points only; client handles visuals) =====
-    local slimeCount = rng:NextInteger(1, 4)
+    -- ===== SLIMES =====
+    local slimeCount = rng:NextInteger(2, 5)
     for _ = 1, slimeCount do
         if #platforms > 0 then
-            local platIdx = rng:NextInteger(1, #platforms)
-            local p = platforms[platIdx]
+            local p = platforms[rng:NextInteger(1, #platforms)]
             local anchor = makePart(slotFolder, "SlimeAnchor",
                 p.Position + Vector3.new(0, 2.5, 0),
                 Vector3.new(0.5, 0.5, 0.5),
-                Color3.fromRGB(80, 200, 80),
-                true, false)
+                Color3.fromRGB(80, 200, 80), true, false)
             anchor.Transparency = 1
             tagPart(anchor, "IsSlimeSpawn", true)
             tagPart(anchor, "SlimeId", tostring(slotIndex) .. "_" .. tostring(_))
@@ -265,9 +408,8 @@ function LevelGenerator.GenerateSlot(sessionFolder, seed, slotIndex, biomeSequen
     -- Tag slot metadata
     tagPart(slotFolder:FindFirstChildWhichIsA("Part") or
         makePart(slotFolder, "SlotMeta",
-            Vector3.new(0, topY - SLOT_STUDS / 2, 0),
-            Vector3.new(1, 1, 1),
-            Color3.new(0, 0, 0)), "SlotIndex", slotIndex)
+            Vector3.new(0, topY - SLOT_STUDS/2, 0),
+            Vector3.new(1,1,1), Color3.new(0,0,0)), "SlotIndex", slotIndex)
 
     return slotFolder
 end
@@ -279,44 +421,41 @@ function LevelGenerator.BuildBasket(sessionFolder)
     basketFolder.Name  = "DwarvenEntryBasket"
     basketFolder.Parent = sessionFolder
 
-    local basketY  = LEVEL_Y_OFFSET + 12
-    local basketCX = 0
-    local basketCZ = 0
+    -- 1 meter = 3.2 studs tall walls, open top, open bottom.
+    -- Basket sits at the very top of the shaft so player drops straight in.
+    local wallH   = 3.2   -- 1 metre
+    local halfW   = 8     -- basket inner half-width (16 stud interior)
+    local wallThk = 2
+    -- Basket floor center: just above LEVEL_Y_OFFSET so it's the very top of the shaft
+    local floorY  = LEVEL_Y_OFFSET + wallH + wallThk/2  -- floor top face at LEVEL_Y_OFFSET + wallH
+    local wallMidY = LEVEL_Y_OFFSET + wallH/2 + wallThk/2
+
+    local woodColor = Color3.fromRGB(110, 80, 50)
 
     -- Floor
     local floor = makePart(basketFolder, "BasketFloor",
-        Vector3.new(basketCX, basketY, basketCZ),
-        Vector3.new(14, 2, 14),
-        Color3.fromRGB(100, 80, 60))
+        Vector3.new(0, LEVEL_Y_OFFSET + wallThk/2, 0),
+        Vector3.new(halfW*2, wallThk, halfW*2), woodColor)
+    floor.Material = Enum.Material.WoodPlanks
 
-    -- Walls
-    local wallH = 10
-    local wallThick = 2
-    local halfE = 8
-    local positions = {
-        Vector3.new(basketCX,      basketY + wallH / 2, basketCZ - halfE),
-        Vector3.new(basketCX,      basketY + wallH / 2, basketCZ + halfE),
-        Vector3.new(basketCX - halfE, basketY + wallH / 2, basketCZ),
-        Vector3.new(basketCX + halfE, basketY + wallH / 2, basketCZ),
+    -- Four walls (1m tall, open top)
+    local wallDefs = {
+        { Vector3.new(0,          wallMidY, -(halfW + wallThk/2)), Vector3.new(halfW*2 + wallThk*2, wallH, wallThk) },
+        { Vector3.new(0,          wallMidY,  (halfW + wallThk/2)), Vector3.new(halfW*2 + wallThk*2, wallH, wallThk) },
+        { Vector3.new(-(halfW + wallThk/2), wallMidY, 0),          Vector3.new(wallThk, wallH, halfW*2) },
+        { Vector3.new( (halfW + wallThk/2), wallMidY, 0),          Vector3.new(wallThk, wallH, halfW*2) },
     }
-    local sizes = {
-        Vector3.new(16, wallH, wallThick),
-        Vector3.new(16, wallH, wallThick),
-        Vector3.new(wallThick, wallH, 16),
-        Vector3.new(wallThick, wallH, 16),
-    }
-    for i, pos in ipairs(positions) do
-        makePart(basketFolder, "BasketWall" .. i, pos, sizes[i],
-            Color3.fromRGB(80, 65, 50))
+    for i, wd in ipairs(wallDefs) do
+        local w = makePart(basketFolder, "BasketWall"..i, wd[1], wd[2], woodColor)
+        w.Material = Enum.Material.WoodPlanks
     end
 
-    -- Spawn pad inside basket
-    local spawnPad = makePart(basketFolder, "SpawnPad",
-        Vector3.new(basketCX, basketY + 1.5, basketCZ),
-        Vector3.new(10, 1, 10),
-        Color3.fromRGB(180, 160, 120))
-    spawnPad.Transparency = 0.3
-    tagPart(spawnPad, "IsSpawnPad", true)
+    -- SpawnPosition: player stands on the floor inside the basket
+    local spawnMarker = Instance.new("Vector3Value")
+    spawnMarker.Name  = "SpawnPosition"
+    -- HRP is ~3 studs above floor top face
+    spawnMarker.Value = Vector3.new(0, LEVEL_Y_OFFSET + wallThk + 3.5, 0)
+    spawnMarker.Parent = basketFolder
 
     -- Tag basket folder for death_handler lookup
     tagPart(basketFolder, "IsBasket", true)

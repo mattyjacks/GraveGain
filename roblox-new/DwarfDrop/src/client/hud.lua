@@ -88,8 +88,8 @@ function HUD:Build()
     self.timerLabel = makeLabel(timerPanel, "Timer", "00:00.00", UDim2.new(0,0,0,0), UDim2.new(1,0,1,0), Enum.Font.Code, COLOR_TIMER)
     self.timerLabel.TextXAlignment = Enum.TextXAlignment.Center
 
-    -- Gold
-    local goldPanel = makeFrame(main, "GoldPanel", UDim2.new(1,-180,0,10), UDim2.new(0,170,0,50), COLOR_BG, 0.5)
+    -- Gold: placed to right of depth panel, away from player list
+    local goldPanel = makeFrame(main, "GoldPanel", UDim2.new(0,240,0,10), UDim2.new(0,170,0,50), COLOR_BG, 0.5)
     addCorner(goldPanel, 8)
     self.goldLabel = makeLabel(goldPanel, "Gold", "GOLD: 0", UDim2.new(0,10,0,0), UDim2.new(1,-10,1,0), Enum.Font.GothamBold, COLOR_GOLD)
     self.goldLabel.TextXAlignment = Enum.TextXAlignment.Left

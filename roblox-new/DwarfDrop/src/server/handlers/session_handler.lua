@@ -68,13 +68,13 @@ local function startLevelForSession(host, seed, modeId)
         -- Teleport to basket
         local char = player.Character
         if char and basketFolder then
-            local spawnPad = basketFolder:FindFirstChild("SpawnPad")
-            local spawnPos = spawnPad
-                and spawnPad.Position + Vector3.new(
-                    (math.random() - 0.5) * 6,
-                    3,
-                    (math.random() - 0.5) * 6)
-                or Vector3.new(0, GameData.LEVEL_Y_OFFSET + 15, 0)
+            local spawnMarker = basketFolder:FindFirstChild("SpawnPosition")
+            local basePos = spawnMarker and spawnMarker.Value
+                or Vector3.new(0, GameData.LEVEL_Y_OFFSET - 30, 0)
+            local spawnPos = basePos + Vector3.new(
+                    (math.random() - 0.5) * 10,
+                    0,
+                    (math.random() - 0.5) * 10)
 
             local hrp = char:FindFirstChild("HumanoidRootPart")
             if hrp then
