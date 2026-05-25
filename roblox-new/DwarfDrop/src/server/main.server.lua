@@ -30,6 +30,11 @@ local PvPHandler        = require(script.Parent.handlers.pvp_handler)
 -- Gravity
 workspace.Gravity = 100
 
+-- Prevent Roblox void from killing players mid-drop.
+-- Level bottom is at Y = LEVEL_Y_OFFSET - TOTAL_DEPTH_STUDS = -50 - 3200 = -3250.
+-- Set destroy height well below that so parts and humanoids survive the full descent.
+workspace.FallenPartsDestroyHeight = -4000
+
 -- Lighting baseline
 Lighting.Ambient            = Color3.fromRGB(60, 55, 70)
 Lighting.OutdoorAmbient     = Color3.fromRGB(40, 38, 45)

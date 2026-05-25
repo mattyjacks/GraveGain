@@ -7,6 +7,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Networking = require(game.ReplicatedStorage.Shared.networking)
 local ItemData   = require(game.ReplicatedStorage.Shared.item_data)
+local GameData   = require(game.ReplicatedStorage.Shared.game_data)
 
 local ActiveItem = {}
 ActiveItem.__index = ActiveItem
@@ -28,7 +29,75 @@ function ActiveItem.new(backpackUI, hudRef)
     return self
 end
 
+-- Build the flashlight anchor on the character (SpotLight + PointLight parented to HRP)
+function ActiveItem:BuildFlashlightAnchor()
+    local char = self.player.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    local parent = head or hrp
+    if not parent then return end
+
+    -- Remove any stale anchor first
+    local old = char:FindFirstChild("FlashlightAnchor")
+    if old then old:Destroy() end
+
+    local anchor = Instance.new("Part")
+    anchor.Name        = "FlashlightAnchor"
+    anchor.Size        = Vector3.new(0.1, 0.1, 0.1)
+    anchor.Transparency = 1
+    anchor.CanCollide  = false
+    anchor.CastShadow  = false
+    anchor.Anchored    = false
+    anchor.Parent      = char
+
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = anchor
+    weld.Part1 = parent
+    weld.Parent = anchor
+    anchor.CFrame = parent.CFrame * CFrame.new(0, 0, -1)
+
+    -- SpotLight beam (directional flashlight)
+    local beam = Instance.new("SpotLight")
+    beam.Name        = "FlashlightBeam"
+    beam.Face        = Enum.NormalId.Front
+    beam.Brightness  = 8
+    beam.Range       = GameData.FLASHLIGHT_CONE_LEN or 38
+    beam.Angle       = GameData.FLASHLIGHT_ANGLE    or 35
+    beam.Color       = GameData.FLASHLIGHT_COLOR    or Color3.fromRGB(245, 240, 210)
+    beam.Shadows     = true
+    beam.Enabled     = false
+    beam.Parent      = anchor
+
+    -- PointLight fill (ambient glow around player)
+    local light = Instance.new("PointLight")
+    light.Name       = "FlashlightLight"
+    light.Brightness = 3
+    light.Range      = 20
+    light.Color      = GameData.FLASHLIGHT_COLOR or Color3.fromRGB(245, 240, 210)
+    light.Enabled    = false
+    light.Parent     = anchor
+end
+
+-- Called by main.client when a level begins to auto-enable the lantern in slot 1
+function ActiveItem:AutoEnableLantern()
+    -- Build the anchor (may be a fresh character after level load)
+    self:BuildFlashlightAnchor()
+    -- Force toggle ON for slot 1
+    self.toggleState[1] = true
+    self:ToggleLantern(true)
+    if self.hudRef and self.backpackUI then
+        local slotData = self.backpackUI:GetSlotData(1)
+        if slotData then
+            self.hudRef:UpdateActiveItem(slotData.itemId, slotData.count, true)
+        end
+    end
+end
+
 function ActiveItem:Start()
+    -- Build flashlight geometry on the current character
+    self:BuildFlashlightAnchor()
+
     -- Listen for water updates
     Networking.OnClient(Networking.Events.WaterUpdate, function(current, max)
         self.waterLevel = current or 0

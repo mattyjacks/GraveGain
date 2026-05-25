@@ -82,6 +82,9 @@ local function startLevelForSession(host, seed, modeId)
             end
         end
 
+        -- Give flashlight lantern in slot 1 at level start
+        ItemHandler.GiveItem(player, "Lantern", 1)
+
         -- Apply stats
         local pData = PlayerData.Get(player)
         if pData then

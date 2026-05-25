@@ -136,7 +136,8 @@ function PickaxeModel:UpdateViewmodel(dt)
     local swingOffset = CFrame.Angles(swingAngle, 0, 0)
     local targetCF = camera.CFrame * VIEWMODEL_OFFSET * swingOffset
 
-    -- Smooth follow
+    -- Smooth follow (guard against PrimaryPart being nil if model was just destroyed)
+    if not self.model.PrimaryPart then return end
     self.model:SetPrimaryPartCFrame(targetCF)
 end
 

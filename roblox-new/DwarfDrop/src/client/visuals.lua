@@ -58,10 +58,10 @@ end
 
 -- Biome brightness table - keyed by name so biome_data stays minimal
 local BIOME_BRIGHTNESS = {
-    Volcano  = 2.8,
-    Fortress = 1.6,
-    Cave     = 1.2,
-    Mine     = 1.4,
+    Volcano  = 5.5,
+    Fortress = 4.8,
+    Cave     = 4.2,
+    Mine     = 4.5,
 }
 
 function Visuals:ResetLighting()
@@ -80,19 +80,19 @@ function Visuals:UpdateBiomeLighting(biome, transitionTime)
     local tInfo = TweenInfo.new(transitionTime, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 
     local target = {
-        Ambient           = biome.ambientColor   or Color3.fromRGB(60, 45, 40),
-        OutdoorAmbient    = biome.ambientColor   or Color3.fromRGB(50, 38, 35),
+        Ambient           = biome.ambientColor   or Color3.fromRGB(120, 100, 90),
+        OutdoorAmbient    = biome.ambientColor   or Color3.fromRGB(110, 90, 80),
         FogColor          = biome.fogColor       or Color3.fromRGB(20, 16, 24),
         FogEnd            = biome.fogEnd         or 500,
-        FogStart          = 0,
+        FogStart          = 80,  -- fog only kicks in far away
         Brightness        = brightness,
-        ColorShift_Bottom = biome.sunlightColor  or Color3.fromRGB(80, 70, 120),
-        ColorShift_Top    = biome.sunlightColor  or Color3.fromRGB(60, 50, 80),
+        ColorShift_Bottom = biome.sunlightColor  or Color3.fromRGB(140, 120, 160),
+        ColorShift_Top    = biome.sunlightColor  or Color3.fromRGB(120, 110, 150),
     }
 
     if self.biomeTween then self.biomeTween:Cancel() end
     -- Immediately snap Brightness so it doesn't start black
-    Lighting.Brightness = brightness * 0.6
+    Lighting.Brightness = brightness * 0.85
     self.biomeTween = TweenService:Create(Lighting, tInfo, target)
     self.biomeTween:Play()
 end

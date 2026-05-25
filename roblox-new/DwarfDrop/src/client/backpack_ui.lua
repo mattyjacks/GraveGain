@@ -158,6 +158,10 @@ function BackpackUI:UpdateSlots(backpack)
     end
 end
 
+function BackpackUI:GetSlotData(i)
+    return self.slotData[i]
+end
+
 function BackpackUI:GetActiveSlotData()
     return self.slotData[self.activeSlot]
 end

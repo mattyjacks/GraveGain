@@ -123,6 +123,9 @@ local function enterLevel(seed, modeId, biomeSequence)
     movement:Start()
     pickaxe:Equip()
     activeItemCtrl:Start()
+    task.defer(function()
+        activeItemCtrl:AutoEnableLantern()  -- build flashlight anchor + turn lantern on
+    end)
     SlimeEnemy.StartManager()
     platforms:Start()
 
@@ -132,7 +135,7 @@ local function enterLevel(seed, modeId, biomeSequence)
     -- Initial biome lighting - reset cache so it always applies fresh
     visuals:ResetLighting()
     local Lighting = game:GetService("Lighting")
-    Lighting.Brightness = 2.0  -- immediate baseline so level isn't black
+    Lighting.Brightness = 4.5  -- immediate baseline so level isn't black
     if biomeSequence and biomeSequence[1] then
         visuals:UpdateBiomeLighting(biomeSequence[1], 1.0)
         hud:ShowBiomeChange(biomeSequence[1].name)
