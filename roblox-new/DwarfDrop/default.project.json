@@ -1,0 +1,55 @@
+{
+  "name": "DwarfDrop",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$path": "src/server"
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "src/client"
+      },
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+        "$path": "src/character"
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$ignoreUnknownInstances": true,
+      "SpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Position": { "Vector3": [0, 608, 0] },
+          "Size": { "Vector3": [12, 2, 12] },
+          "Anchored": true,
+          "CanCollide": false,
+          "Neutral": true,
+          "Duration": 0,
+          "Transparency": 1
+        }
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$ignoreUnknownInstances": true
+    },
+    "SoundService": {
+      "$className": "SoundService",
+      "$ignoreUnknownInstances": true
+    },
+    "Players": {
+      "$className": "Players",
+      "$ignoreUnknownInstances": true
+    }
+  }
+}
