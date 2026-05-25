@@ -1,0 +1,9 @@
+[config]
+plugins = ["https://github.com/rojo-rbx/rojo-plugin"]
+
+[serve]
+port = 34872
+
+[project]
+name = "LastWordsZombies"
+version = "0.1.0"

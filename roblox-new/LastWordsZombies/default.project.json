@@ -1,0 +1,70 @@
+{
+	"name": "LastWordsZombies",
+	"tree": {
+		"$className": "DataModel",
+
+		"ServerScriptService": {
+			"$className": "ServerScriptService",
+			"MainServer": {
+				"$path": "src/server/main_new.server.lua"
+			},
+			"ZombieSpawnerNew": {
+				"$path": "src/server/zombie_spawner_new.lua"
+			},
+			"ZombieModel": {
+				"$path": "src/server/zombie_model.lua"
+			},
+			"ZombieMovement": {
+				"$path": "src/server/zombie_movement.lua"
+			},
+			"ZombieEffects": {
+				"$path": "src/server/zombie_effects.lua"
+			},
+			"Corridor": {
+				"$path": "src/server/corridor.lua"
+			},
+			"GameState": {
+				"$path": "src/server/game_state.lua"
+			}
+		},
+
+		"StarterPlayer": {
+			"$className": "StarterPlayer",
+			"StarterPlayerScripts": {
+				"$className": "StarterPlayerScripts",
+				"MainClient": {
+					"$path": "src/client/main.client.lua"
+				},
+				"TypingHandler": {
+					"$path": "src/client/typing_handler.lua"
+				},
+				"WordDictionaryUI": {
+					"$path": "src/client/word_dictionary_ui.lua"
+				},
+				"AudioManager": {
+					"$path": "src/client/audio_manager.lua"
+				},
+				"PremiumStore": {
+					"$path": "src/client/premium_store.lua"
+				}
+			}
+		},
+
+		"ReplicatedStorage": {
+			"$className": "ReplicatedStorage",
+			"GameData": {
+				"$path": "src/shared/game_data.lua"
+			},
+			"WordDictionary": {
+				"$path": "src/shared/word_dictionary.lua"
+			},
+			"WordDefinitions": {
+				"$path": "src/shared/word_definitions.lua"
+			},
+			"RemoteNames": {
+				"$path": "src/shared/remote_names.lua"
+			}
+		}
+	}
+}
+
