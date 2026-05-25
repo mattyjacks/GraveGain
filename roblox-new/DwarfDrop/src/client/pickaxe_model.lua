@@ -18,6 +18,13 @@ local PVP_RANGE       = 10    -- studs, for hit detection
 local VIEWMODEL_OFFSET = CFrame.new(1.1, -1.2, -2.4)
     * CFrame.Angles(math.rad(-10), math.rad(10), 0)
 
+-- Names of the outer shaft walls (cannot grab these)
+local OUTER_WALL_NAMES = {
+    WallN = true, WallS = true, WallE = true, WallW = true,
+    BasketWall1 = true, BasketWall2 = true,
+    BasketWall3 = true, BasketWall4 = true, BasketFloor = true,
+}
+
 function PickaxeModel.new(fpsCamera)
     local self = setmetatable({}, PickaxeModel)
     self.player       = Players.LocalPlayer
@@ -28,7 +35,13 @@ function PickaxeModel.new(fpsCamera)
     self.swingActive  = false
     self.swingT       = 0
     self.active       = false
+    self.movementRef  = nil  -- set via SetMovement()
+    self.grabCooldown = 0    -- prevent spam grabs
     return self
+end
+
+function PickaxeModel:SetMovement(movementObj)
+    self.movementRef = movementObj
 end
 
 -- Build a simple pickaxe viewmodel from parts
@@ -127,6 +140,18 @@ function PickaxeModel:UpdateViewmodel(dt)
     self.model:SetPrimaryPartCFrame(targetCF)
 end
 
+-- Returns true if the given part is an outer shaft wall (not grab-able)
+local function isOuterWall(part)
+    if not part then return true end
+    if OUTER_WALL_NAMES[part.Name] then return true end
+    -- Slot walls are tagged WallN/WallS/WallE/WallW by name
+    if part.Name == "WallN" or part.Name == "WallS"
+        or part.Name == "WallE" or part.Name == "WallW" then
+        return true
+    end
+    return false
+end
+
 function PickaxeModel:TrySwing(modeId, sessionMembersRef)
     if self.swingTimer > 0 then return end
     self.swingTimer  = SWING_COOLDOWN
@@ -149,15 +174,29 @@ function PickaxeModel:TrySwing(modeId, sessionMembersRef)
     local result = workspace:Raycast(origin, forward * MINE_RANGE, rp)
     if not result then return end
 
-    local hit  = result.Instance
+    local hit    = result.Instance
     local hitPos = result.Position
 
-    -- Check ore
+    -- Check ore first
     if hit and hit:FindFirstChild("IsOre") then
         Networking.FireServer(Networking.Events.MineWall, hit, hitPos)
         Networking.FireServer(Networking.Events.PickaxeTerrainHit, hitPos, "ore")
         Networking.FireServer(Networking.Events.CameraShakeSignal, 1.2, 0.25)
         return
+    end
+
+    -- Pickaxe grab: if player is falling and hit a non-outer-wall surface, grab it
+    if hit and not isOuterWall(hit) and self.movementRef then
+        local mov = self.movementRef
+        if mov:IsFalling() and self.grabCooldown <= 0 then
+            self.grabCooldown = 1.2  -- 1.2s cooldown before can grab again
+            mov:OnPickaxeGrab(hrp)
+            Networking.FireServer(Networking.Events.PickaxeTerrainHit, hitPos, "grab")
+            if self.fpsCamera then
+                self.fpsCamera:ApplyShake(1.8, 0.3, 22)
+            end
+            return
+        end
     end
 
     -- PvP check
@@ -186,6 +225,12 @@ function PickaxeModel:TrySwing(modeId, sessionMembersRef)
     -- Terrain hit effect
     if hit then
         Networking.FireServer(Networking.Events.PickaxeTerrainHit, hitPos, "rock")
+    end
+end
+
+function PickaxeModel:Update(dt)
+    if self.grabCooldown > 0 then
+        self.grabCooldown = math.max(0, self.grabCooldown - dt)
     end
 end
 

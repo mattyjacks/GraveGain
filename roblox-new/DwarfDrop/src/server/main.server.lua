@@ -178,7 +178,12 @@ Networking.OnServer(Networking.Events.ApplyFallDamage, function(player, fallMete
     end
 
     local excessMeters = fallMeters - safe
-    local rawDamage = excessMeters * GameData.FALL_DAMAGE_PER_METER
+    -- Power-curve scaling: smooth ramp, small falls barely hurt
+    local scale    = GameData.FALL_DAMAGE_SCALE    or 0.8
+    local exponent = GameData.FALL_DAMAGE_EXPONENT or 1.5
+    local rawDamage = (excessMeters ^ exponent) * scale
+    -- Apply modifiers and resist AFTER capping base damage to prevent insta-kill spikes
+    rawDamage = math.min(rawDamage, GameData.FALL_DAMAGE_MAX)
     local damage = rawDamage * damageMult * weightFallMult * (1 - fallResist)
     damage = math.min(damage, GameData.FALL_DAMAGE_MAX)
 
@@ -203,6 +208,49 @@ Networking.OnServer(Networking.Events.CollectCoin, function(player, coinId)
     state.gold = (state.gold or 0) + earned
 
     Networking.FireClient(Networking.Events.GoldUpdate, player, data.gold)
+end)
+
+-- Treasure chest collection
+Networking.OnServer(Networking.Events.CollectTreasureChest, function(player, chestId)
+    if type(chestId) ~= "string" then return end
+    local state = getState(player)
+    if not state or not state.inLevel then return end
+    local data = PlayerData.Get(player)
+    if not data then return end
+
+    -- Find chest by ChestId tag in workspace
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "ChestBody" then
+            local idTag = obj:FindFirstChild("ChestId")
+            if idTag and idTag.Value == chestId then
+                -- Guard against double-collect
+                if obj:FindFirstChild("_Opened") then return end
+                local guard = Instance.new("BoolValue")
+                guard.Name   = "_Opened"
+                guard.Parent = obj
+
+                local goldTag = obj:FindFirstChild("ChestGold")
+                local goldVal = goldTag and goldTag.Value or 200
+
+                -- Apply modifier goldMult
+                local modifier = state.modifier or GameData.RunModifiers.Normal
+                local earned = math.floor(goldVal * (modifier.goldMult or 1.0))
+
+                PlayerData.AddGold(player, earned)
+                state.gold = (state.gold or 0) + earned
+                Networking.FireClient(Networking.Events.GoldUpdate, player, data.gold)
+                Networking.FireClient(Networking.Events.TreasureChestOpened, player,
+                    { gold = earned })
+
+                -- Destroy chest model after a brief moment
+                local model = obj.Parent
+                task.delay(0.5, function()
+                    if model and model.Parent then model:Destroy() end
+                end)
+                return
+            end
+        end
+    end
 end)
 
 -- Air jump (server needs to know for fall damage calc consistency)

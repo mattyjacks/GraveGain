@@ -45,16 +45,21 @@ hubUI:SetCameraRef(camera)
 -- Wire movement references
 movement:SetHUD(hud)
 movement:SetVisuals(visuals)
+movement:SetPickaxe(pickaxe)
 
 local slimeSystem = SlimeEnemy.GetSlimeSystem()
 movement:SetSlimeSystem(slimeSystem)
+
+-- Wire pickaxe -> movement for grab mechanic
+pickaxe:SetMovement(movement)
 
 local activeItemCtrl = ActiveItem.new(backpackUI, hud)
 
 -- ==================== STATE ====================
 
-local inHub   = true
-local inLevel = false
+local inHub              = true
+local inLevel            = false
+local awaitingDeathChoice = false  -- true while death screen is showing; blocks enterHub on CharacterAdded
 local currentModeId   = "Singleplayer"
 local currentBiomeSeq = nil
 local lastBiome       = nil
@@ -65,9 +70,10 @@ local timerSeconds    = 0
 -- ==================== HUB SETUP ====================
 
 local function enterHub()
-    inHub   = true
-    inLevel = false
-    timerRunning = false
+    inHub               = true
+    inLevel             = false
+    awaitingDeathChoice = false
+    timerRunning        = false
 
     hud:Hide()
     hud:HideDeath()
@@ -230,13 +236,17 @@ end)
 -- ==================== SWING INPUT ====================
 
 local mouseWasDown = false
-RunService.Heartbeat:Connect(function()
-    if not inLevel then return end
+RunService.Heartbeat:Connect(function(dt)
+    if not inLevel then
+        mouseWasDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+        return
+    end
     local mouseDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
     if mouseDown and not mouseWasDown then
         pickaxe:TrySwing(currentModeId, nil)
     end
     mouseWasDown = mouseDown
+    pickaxe:Update(dt)
 end)
 
 -- ==================== SPEED TRACKER ====================
@@ -385,23 +395,28 @@ end)
 
 -- Player died
 Networking.OnClient(Networking.Events.PlayerDied, function(info)
-    timerRunning = false
-    camera:EnterDeathView()
+    timerRunning          = false
+    inLevel               = false   -- stop level tick loops
+    awaitingDeathChoice   = true    -- block onCharacterAdded from instantly enterHub
+
+    camera:EnterDeathView()         -- unlock mouse so buttons are clickable
     movement:Stop()
     pickaxe:Unequip()
     activeItemCtrl:Stop()
     SlimeEnemy.StopManager()
+
     hud:ShowDeath(
         info and info.depth or 0,
         info and info.goldEarned or 0,
         function(choice)
+            awaitingDeathChoice = false
             hud:HideDeath()
             camera:LeaveDeathView()
             Networking.FireServer(Networking.Events.DeathChoice, choice)
             if choice == "respawnHub" or choice == "resetHub" then
                 enterHub()
             else
-                -- Will re-enter level on RespawnInBasket
+                -- Will re-enter level on RespawnInBasket event
             end
         end
     )
@@ -409,6 +424,7 @@ end)
 
 -- Respawn in basket
 Networking.OnClient(Networking.Events.RespawnInBasket, function(data)
+    awaitingDeathChoice = false
     hud:HideDeath()
     camera:LeaveDeathView()
     if data and data.reset then
@@ -448,6 +464,14 @@ end)
 -- Leaderboard
 Networking.OnClient(Networking.Events.LeaderboardUpdate, function(data)
     hubUI:UpdateLeaderboard(data)
+end)
+
+-- Treasure chest opened - celebrate!
+Networking.OnClient(Networking.Events.TreasureChestOpened, function(info)
+    if not info then return end
+    camera:ApplyShake(2.5, 0.4, 18)
+    if visuals then visuals:PulseCoinCollect() end
+    hud:ShowBiomeChange("TREASURE! +" .. (info.gold or 0) .. "G")
 end)
 
 -- Chunk loaded
@@ -508,6 +532,12 @@ end)
 local function onCharacterAdded(char)
     -- Re-attach camera + reset movement on respawn
     task.wait(0.15)
+    if awaitingDeathChoice then
+        -- Death screen is showing: keep mouse free, don't enter hub yet.
+        -- The death choice callback will call enterHub() or wait for RespawnInBasket.
+        camera:EnterDeathView()
+        return
+    end
     if inLevel then
         camera:Start("fps")
         movement:Start()

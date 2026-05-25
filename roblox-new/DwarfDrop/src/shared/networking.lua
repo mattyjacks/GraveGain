@@ -95,6 +95,10 @@ Networking.Events = {
     ChunkLoaded          = "ChunkLoaded",
     UnloadChunk          = "UnloadChunk",
 
+    -- Treasure chests
+    CollectTreasureChest = "CollectTreasureChest",
+    TreasureChestOpened  = "TreasureChestOpened",
+
     -- Misc
     TriggerBasketLaunch  = "TriggerBasketLaunch",
     SpawnMiningNugget    = "SpawnMiningNugget",

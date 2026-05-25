@@ -109,6 +109,74 @@ local function spawnItemCrate(parent, pos, itemId, rng)
     return crate
 end
 
+-- ==================== TREASURE CHEST SPAWN ====================
+
+local function spawnTreasureChest(parent, pos, rng)
+    local goldValue = rng:NextInteger(150, 400)
+
+    local chest = Instance.new("Model")
+    chest.Name = "TreasureChest"
+    chest.Parent = parent
+
+    -- Main box body
+    local body = makePart(chest, "ChestBody", pos,
+        Vector3.new(4, 3, 3),
+        Color3.fromRGB(120, 85, 40))
+    body.Material = Enum.Material.WoodPlanks
+    tagPart(body, "IsTreasureChest", true)
+    tagPart(body, "ChestGold", goldValue)
+    tagPart(body, "ChestId",
+        tostring(math.floor(pos.X * 10)) .. "_"
+        .. tostring(math.floor(pos.Y * 10)) .. "_"
+        .. tostring(math.floor(pos.Z * 10)))
+
+    -- Lid (slightly raised above body)
+    local lid = makePart(chest, "ChestLid",
+        pos + Vector3.new(0, 1.7, 0),
+        Vector3.new(4, 0.8, 3),
+        Color3.fromRGB(140, 100, 50))
+    lid.Material = Enum.Material.WoodPlanks
+
+    -- Gold-colored metal straps (decorative)
+    local strapFront = makePart(chest, "StrapFront",
+        pos + Vector3.new(0, 0, 1.55),
+        Vector3.new(4.1, 3.2, 0.25),
+        Color3.fromRGB(220, 180, 40))
+    strapFront.Material = Enum.Material.Metal
+
+    local strapMid = makePart(chest, "StrapMid",
+        pos + Vector3.new(0, 0.2, 0),
+        Vector3.new(0.4, 3.4, 3.2),
+        Color3.fromRGB(220, 180, 40))
+    strapMid.Material = Enum.Material.Metal
+
+    -- Glow light
+    local glow = Instance.new("PointLight")
+    glow.Brightness = 4
+    glow.Range      = 16
+    glow.Color      = Color3.fromRGB(255, 200, 50)
+    glow.Parent     = body
+
+    -- Gold value label
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size         = UDim2.new(0, 80, 0, 28)
+    billboard.StudsOffset  = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop  = false
+    billboard.Parent       = body
+    local lbl = Instance.new("TextLabel")
+    lbl.Size            = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text            = "CHEST  +" .. goldValue .. "G"
+    lbl.TextColor3      = Color3.fromRGB(255, 220, 60)
+    lbl.TextStrokeTransparency = 0
+    lbl.Font            = Enum.Font.GothamBold
+    lbl.TextScaled      = true
+    lbl.Parent          = billboard
+
+    chest.PrimaryPart = body
+    return chest
+end
+
 -- ==================== BIOME TERRAIN DECORATIONS ====================
 
 local function addVolcanoTerrain(parent, plat, rng)
@@ -313,8 +381,8 @@ function LevelGenerator.GenerateSlot(sessionFolder, seed, slotIndex, biomeSequen
         local oz = rng:NextNumber(-halfW * 0.65, halfW * 0.65)
         local sizeX = rng:NextNumber(pCfg.minX, pCfg.maxX) * sizeScale
         local sizeZ = rng:NextNumber(pCfg.minZ, pCfg.maxZ) * sizeScale
-        -- Vary platform thickness for natural look (1-3 studs)
-        local thick = rng:NextNumber(1.5, 3.5)
+        -- Thick platforms so pickaxe grab works from the side (6-12 studs)
+        local thick = rng:NextNumber(6, 12)
 
         local pColor = biome.colors[rng:NextInteger(1, #biome.colors)]
         local plat = makePart(slotFolder, "Platform",
@@ -344,6 +412,13 @@ function LevelGenerator.GenerateSlot(sessionFolder, seed, slotIndex, biomeSequen
             spawnItemCrate(slotFolder,
                 Vector3.new(ox + rng:NextNumber(-2,2), currentY + thick + 2, oz + rng:NextNumber(-2,2)),
                 itemPool[rng:NextInteger(1, #itemPool)], rng)
+        end
+
+        -- Treasure chest (very rare, ~4% chance per primary platform)
+        if rng:NextNumber() < 0.04 then
+            spawnTreasureChest(slotFolder,
+                Vector3.new(ox + rng:NextNumber(-1.5, 1.5), currentY + thick + 2, oz + rng:NextNumber(-1.5, 1.5)),
+                rng)
         end
 
         -- Biome terrain decoration
@@ -376,7 +451,7 @@ function LevelGenerator.GenerateSlot(sessionFolder, seed, slotIndex, biomeSequen
                 local fCol = biome.colors[rng:NextInteger(1, #biome.colors)]
                 local fp   = makePart(slotFolder, "PlatformFill",
                     Vector3.new(fox, fY, foz),
-                    Vector3.new(fSX, rng:NextNumber(1.5,3), fSZ), fCol)
+                    Vector3.new(fSX, rng:NextNumber(5, 9), fSZ), fCol)
                 fp.Material = platMat
                 tagPart(fp, "TerrainType", "Firm")
                 if rng:NextNumber() < biome.coinChance * 0.6 then

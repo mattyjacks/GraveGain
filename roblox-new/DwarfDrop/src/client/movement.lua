@@ -6,6 +6,8 @@ local Players          = game:GetService("Players")
 local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local TweenService = game:GetService("TweenService")
+
 local GameData   = require(game.ReplicatedStorage.Shared.game_data)
 local Networking = require(game.ReplicatedStorage.Shared.networking)
 
@@ -77,7 +79,12 @@ function Movement.new(fpsCamera)
     self.visualsRef     = nil
     self.weightSpeedMult = 1.0
     self.currentTerrainType = nil
+    self.pickaxeRef = nil  -- set via SetPickaxe()
     return self
+end
+
+function Movement:SetPickaxe(pickaxeObj)
+    self.pickaxeRef = pickaxeObj
 end
 
 function Movement:SetSlimeSystem(slimeSys)
@@ -133,12 +140,13 @@ local function getGroundTerrainType(hrp, char)
     return tag and tag.Value or nil
 end
 
+-- Returns isGrounded (bool), groundPart (Instance|nil)
 local function isGroundedRaycast(hrp, char)
     local rp = RaycastParams.new()
     rp.FilterDescendantsInstances = { char }
     rp.FilterType = Enum.RaycastFilterType.Exclude
     local result = workspace:Raycast(hrp.Position, Vector3.new(0, -5, 0), rp)
-    return result ~= nil
+    return result ~= nil, result and result.Instance or nil
 end
 
 function Movement:GetCharacter() return self.player.Character end
@@ -157,11 +165,64 @@ function Movement:UpdateSpeeds(walk, sprint)
     self.sprintSpeed = sprint or self.sprintSpeed
 end
 
-function Movement:OnLand(fallDistStuds)
+-- Called by pickaxe grab: halts the fall, cancels fall damage, brief hang
+function Movement:OnPickaxeGrab(hrp)
+    if not hrp then return end
+    -- Stop vertical momentum (zero Y velocity, keep horizontal)
+    local vel = hrp.AssemblyLinearVelocity
+    hrp.AssemblyLinearVelocity = Vector3.new(vel.X * 0.4, 0, vel.Z * 0.4)
+
+    -- Calculate fall distance up to this point for feedback but deal NO damage
+    local fallDist = self.fallStartY and (self.fallStartY - hrp.Position.Y) or 0
+
+    -- Cancel fall state cleanly
+    self.isFalling    = false
+    self.fallStartY   = nil
+    self.lastGroundY  = hrp.Position.Y
+    self.airJumpsLeft = self.airJumpsMax
+
+    -- Camera shake + dust puff feedback
+    if fallDist > 8 then
+        self.camera:ApplyShake(math.clamp(fallDist / 14, 0.8, 3.5), 0.28, 20)
+    end
+    if self.visualsRef then
+        self.visualsRef:SpawnDustPuff(hrp.Position)
+    end
+    if self.hudRef then
+        self.hudRef:UpdateAirJumps(self.airJumpsLeft, self.airJumpsMax)
+    end
+
+    -- Short "hang" phase: briefly reduce gravity effect so it feels like clinging
+    local bv = hrp:FindFirstChild("GrabHangBV")
+    if not bv then
+        bv = Instance.new("BodyVelocity")
+        bv.Name     = "GrabHangBV"
+        bv.MaxForce = Vector3.new(0, 4000, 0)
+        bv.Parent   = hrp
+    end
+    bv.Velocity = Vector3.new(0, 0, 0)
+    task.delay(0.45, function()
+        local stillBV = hrp:FindFirstChild("GrabHangBV")
+        if stillBV then stillBV:Destroy() end
+    end)
+end
+
+-- Platform names that count as a soft landing (70% damage reduction)
+local PLATFORM_NAMES = { Platform = true, PlatformFill = true }
+
+function Movement:OnLand(fallDistStuds, groundPart)
     if not self.isFalling then return end
     self.isFalling    = false
     self.airJumpsLeft = self.airJumpsMax
     local fallMeters  = GameData.StudsToMeters(fallDistStuds)
+
+    -- If landed on a generated platform, significantly reduce reported fall distance
+    -- (platforms have give - they absorb impact better than hard floor)
+    if groundPart and (PLATFORM_NAMES[groundPart.Name]
+        or groundPart:FindFirstChild("TerrainType")) then
+        fallMeters = fallMeters * 0.3
+    end
+
     if fallMeters > GameData.FALL_DAMAGE_THRESHOLD_METERS then
         Networking.FireServer(Networking.Events.ApplyFallDamage, fallMeters)
     end
@@ -238,6 +299,44 @@ function Movement:CheckCoins()
                     self.visualsRef:PulseCoinCollect()
                 end
                 part:Destroy()
+            end
+        end
+    end
+end
+
+function Movement:CheckTreasureChests()
+    local hrp = self:GetHRP()
+    if not hrp then return end
+    local pos = hrp.Position
+    local collectRange = 6
+
+    local overlapParams = OverlapParams.new()
+    overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+    overlapParams.FilterDescendantsInstances = { self.player.Character }
+    local nearParts = workspace:GetPartBoundsInRadius(pos, 14, overlapParams)
+
+    for _, part in ipairs(nearParts) do
+        if part.Name == "ChestBody" and part:FindFirstChild("IsTreasureChest") then
+            local chestIdTag = part:FindFirstChild("ChestId")
+            local dist = (pos - part.Position).Magnitude
+            if dist <= collectRange and chestIdTag then
+                if part:FindFirstChild("_Collecting") then continue end
+                local guard = Instance.new("BoolValue")
+                guard.Name   = "_Collecting"
+                guard.Parent = part
+                Networking.FireServer(Networking.Events.CollectTreasureChest, chestIdTag.Value)
+                -- Visually hide the chest immediately (server destroys for real)
+                local model = part.Parent
+                if model and model:IsA("Model") then
+                    for _, child in ipairs(model:GetDescendants()) do
+                        if child:IsA("BasePart") then
+                            child.Transparency = 1
+                            child.CanCollide   = false
+                        elseif child:IsA("BillboardGui") then
+                            child.Enabled = false
+                        end
+                    end
+                end
             end
         end
     end
@@ -347,11 +446,11 @@ function Movement:Update(dt)
     self.fallCheckTimer = self.fallCheckTimer + dt
     if self.fallCheckTimer >= FALL_CHECK_INTERVAL then
         self.fallCheckTimer = 0
-        local isOnGround = isGroundedRaycast(hrp, char)
+        local isOnGround, groundPart = isGroundedRaycast(hrp, char)
         if isOnGround then
             if self.isFalling and self.fallStartY then
                 local fallDist = self.fallStartY - hrp.Position.Y
-                self:OnLand(math.max(0, fallDist))
+                self:OnLand(math.max(0, fallDist), groundPart)
             end
             self.lastGroundY = hrp.Position.Y
             self.isFalling   = false
@@ -374,7 +473,7 @@ function Movement:Update(dt)
     -- Air jump
     local spaceDown = UserInputService:IsKeyDown(Enum.KeyCode.Space)
     if spaceDown and not self.spaceWasDown then
-        local isOnGround = isGroundedRaycast(hrp, char)
+        local isOnGround, _ = isGroundedRaycast(hrp, char)
         local canCoyote  = self.coyoteTimer > 0
         if not isOnGround and not canCoyote and self.airJumpsLeft > 0 then
             self.airJumpsLeft = self.airJumpsLeft - 1
@@ -455,6 +554,7 @@ function Movement:Update(dt)
         self.coinCheckTimer = 0
         self:CheckCoins()
         self:CheckItemCrates()
+        self:CheckTreasureChests()
     end
     self:CheckHazard()
     self:CheckFinish()

@@ -14,9 +14,13 @@ GameData.LEVEL_Y_OFFSET = -50 -- world Y at depth 0m (below baseplate)
 GameData.HUB_Y = 600 -- hub sits above level
 
 -- Fall damage
-GameData.FALL_DAMAGE_THRESHOLD_METERS = 5 -- safe fall in meters
-GameData.FALL_DAMAGE_PER_METER = 8 -- damage per meter beyond threshold
-GameData.FALL_DAMAGE_MAX = 100 -- cap per single fall
+-- Formula: damage = clamp((fallMeters - THRESHOLD)^EXPONENT * SCALE, 0, MAX)
+-- This gives smooth exponential scaling: tiny at first, grows gradually, never lethal alone.
+GameData.FALL_DAMAGE_THRESHOLD_METERS = 15  -- completely safe up to 15m (48 studs)
+GameData.FALL_DAMAGE_SCALE            = 0.08 -- 10% of 0.8: very lenient
+GameData.FALL_DAMAGE_EXPONENT         = 1.5  -- power curve: sub-linear early, steeper later
+GameData.FALL_DAMAGE_PER_METER        = 0    -- legacy field kept for compat; not used in new formula
+GameData.FALL_DAMAGE_MAX              = 3.5  -- 10% of 35: a single fall deals at most 3.5 HP
 
 -- Player defaults
 GameData.DEFAULT_MAX_HEALTH = 100
