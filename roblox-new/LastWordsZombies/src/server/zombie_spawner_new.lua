@@ -85,6 +85,20 @@ function ZombieSpawner.SpawnZombie()
 	ZombieSpawner.ZombiesSpawnedThisWave = ZombieSpawner.ZombiesSpawnedThisWave + 1
 	print("[SPAWN]   Total active zombies now:", #ZombieSpawner.ActiveZombies, "| Spawned this wave:", ZombieSpawner.ZombiesSpawnedThisWave, "/", waveSettings.zombiesPerWave)
 
+	-- Broadcast active word list to all clients so hint UI updates
+	local activeWords = {}
+	for _, z in ipairs(ZombieSpawner.ActiveZombies) do
+		if z.IsAlive then table.insert(activeWords, z.Word) end
+	end
+	local re = game:GetService("ReplicatedStorage"):FindFirstChild("RemoteEvents")
+	if re then
+		local awu = re:FindFirstChild("ActiveWordsUpdate")
+		if awu then
+			awu:FireAllClients(activeWords)
+			print("[SPAWN]   ActiveWordsUpdate sent:", table.concat(activeWords, ", "))
+		end
+	end
+
 	ZombieMovement.Start(zombieData, function()
 		ZombieSpawner.OnZombieReachedCamera(zombieData)
 	end)
@@ -147,7 +161,7 @@ function ZombieSpawner.UpdateZombieWord(zombieData, typedLetters)
 	for i = 1, #zombieData.Word do
 		local ch = zombieData.Word:sub(i, i)
 		if i <= #typedLetters then
-			result = result .. '<font color="rgb(0,255,0)">' .. ch .. '</font>'
+			result = result .. '<font color="#00FF00">' .. ch .. '</font>'
 		else
 			result = result .. ch
 		end

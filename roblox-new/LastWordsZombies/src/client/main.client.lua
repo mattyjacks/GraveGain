@@ -505,6 +505,16 @@ function ConnectRemoteEvents()
 		UpdateScore(score)
 	end)
 
+	RemoteEvents.ScoreUpdate.OnClientEvent:Connect(function(newScore)
+		print("[EVENTS] <<< ScoreUpdate received >>> score=", newScore)
+		UpdateScore(newScore)
+	end)
+
+	RemoteEvents.ActiveWordsUpdate.OnClientEvent:Connect(function(words)
+		print("[EVENTS] <<< ActiveWordsUpdate >>> words=", table.concat(words or {}, ", "))
+		TypingHandler.UpdateWordHints(words or {})
+	end)
+
 	print("[EVENTS] All listeners connected")
 end
 

@@ -7,6 +7,8 @@ return {
 	"WordComplete",
 	"GameOver",
 	"WaveComplete",
+	"ScoreUpdate",
+	"ActiveWordsUpdate",
 	"GameStart",
 	"PlayerReady",
 }

@@ -2,6 +2,7 @@
 -- Captures keyboard input and manages word completion
 
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -14,6 +15,7 @@ TypingHandler.CurrentTarget = nil
 TypingHandler.TypedLetters = ""
 TypingHandler.IsEnabled = false  -- starts disabled; enabled by SetEnabled(true) when game begins
 TypingHandler.LastInputTime = 0
+TypingHandler.ActiveWordHints = {}  -- live list of active zombie words, used for re-targeting logic
 
 -- Remote events
 local RemoteEvents = ReplicatedStorage:WaitForChild("RemoteEvents")
@@ -33,11 +35,30 @@ function TypingHandler.Initialize()
 	TypingHandler.CreateTypingUI()
 	print("[TYPING] TypingUI created")
 
-	-- Connect input events
-	UserInputService.InputBegan:Connect(TypingHandler.OnInputBegan)
-	UserInputService.InputChanged:Connect(TypingHandler.OnInputChanged)
-	UserInputService.InputEnded:Connect(TypingHandler.OnInputEnded)
-	print("[TYPING] Input events connected")
+	-- Bind all letter keys via ContextActionService at high priority.
+	-- CAS fires BEFORE Studio hotkeys (like O=Output, I=Explorer) so we always get the event.
+	local letterKeyCodes = {
+		Enum.KeyCode.A, Enum.KeyCode.B, Enum.KeyCode.C, Enum.KeyCode.D,
+		Enum.KeyCode.E, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H,
+		Enum.KeyCode.I, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L,
+		Enum.KeyCode.M, Enum.KeyCode.N, Enum.KeyCode.O, Enum.KeyCode.P,
+		Enum.KeyCode.Q, Enum.KeyCode.R, Enum.KeyCode.S, Enum.KeyCode.T,
+		Enum.KeyCode.U, Enum.KeyCode.V, Enum.KeyCode.W, Enum.KeyCode.X,
+		Enum.KeyCode.Y, Enum.KeyCode.Z,
+	}
+	ContextActionService:BindActionAtPriority(
+		"TypingInput",
+		function(actionName, inputState, inputObj)
+			if inputState == Enum.UserInputState.Begin then
+				TypingHandler.OnInputBegan(inputObj, false)
+			end
+			return Enum.ContextActionResult.Sink  -- consume the input so Studio shortcuts (O=Output, I=Explorer, etc.) don't fire
+		end,
+		false,  -- createTouchButton
+		3000,   -- priority: above default (2000) and above Studio shortcuts
+		table.unpack(letterKeyCodes)
+	)
+	print("[TYPING] Input events connected via ContextActionService (O key fix)")
 
 	-- Listen for target response from server
 	ZombieTargetResponseEvent.OnClientEvent:Connect(function(zombieModel, word)
@@ -46,6 +67,10 @@ function TypingHandler.Initialize()
 			print("[TYPING]   PendingFirstLetter was='" .. tostring(TypingHandler.PendingFirstLetter) .. "'")
 			TypingHandler.CurrentTarget = { Model = zombieModel, Word = word }
 			TypingHandler.TypedLetters = ""
+			-- Hide hints while actively targeting - reduce visual noise
+			if TypingHandler.WordHintsFrame then
+				TypingHandler.WordHintsFrame.Visible = false
+			end
 
 			-- Reset billboard to plain text before any RichText updates
 			local head = zombieModel:FindFirstChild("Head") or zombieModel.PrimaryPart
@@ -114,7 +139,42 @@ function TypingHandler.CreateTypingUI()
 	typedLabel.Parent = typedFrame
 	
 	TypingHandler.TypedTextDisplay = typedLabel
-	
+
+	-- Invisible TextBox used as a keyboard capture sink.
+	-- When a TextBox has focus in Roblox Studio, Studio's own keyboard shortcuts
+	-- (O=Output, I=Explorer, P=etc.) are suppressed, so every key reaches our handler.
+	local captureBox = Instance.new("TextBox")
+	captureBox.Name = "KeyCapture"
+	captureBox.Size = UDim2.new(0, 1, 0, 1)
+	captureBox.Position = UDim2.new(0, 0, 0, 0)
+	captureBox.BackgroundTransparency = 1
+	captureBox.TextTransparency = 1
+	captureBox.Text = ""
+	captureBox.ClearTextOnFocus = false
+	captureBox.MultiLine = false
+	captureBox.Parent = screenGui
+	TypingHandler.CaptureBox = captureBox
+
+	-- Whenever text is typed into the capture box, forward each new character
+	-- to our input handler, then clear the box.
+	captureBox:GetPropertyChangedSignal("Text"):Connect(function()
+		local text = captureBox.Text
+		if #text == 0 then return end
+		captureBox.Text = ""  -- clear immediately
+		for i = 1, #text do
+			local ch = text:sub(i, i):lower()
+			if ch:match("^%a$") and TypingHandler.IsEnabled then
+				TypingHandler.LastInputTime = tick()
+				print("[INPUT-TB] TextBox captured: '" .. ch .. "' | hasTarget=" .. tostring(TypingHandler.CurrentTarget ~= nil) .. " | typed='" .. TypingHandler.TypedLetters .. "'")
+				if not TypingHandler.CurrentTarget and not TypingHandler.PendingFirstLetter then
+					TypingHandler.FindTarget(ch)
+				elseif not TypingHandler.PendingFirstLetter then
+					TypingHandler.ProcessInput(ch)
+				end
+			end
+		end
+	end)
+
 	-- Target indicator
 	local targetIndicator = Instance.new("Frame")
 	targetIndicator.Name = "TargetIndicator"
@@ -126,6 +186,89 @@ function TypingHandler.CreateTypingUI()
 	targetIndicator.Parent = screenGui
 	
 	TypingHandler.TargetHighlight = targetIndicator
+
+	-- Word hints panel: shows all active zombie words so player knows what letters are available
+	local hintsFrame = Instance.new("Frame")
+	hintsFrame.Name = "WordHintsFrame"
+	hintsFrame.Size = UDim2.new(0, 220, 0, 300)
+	hintsFrame.Position = UDim2.new(0, 16, 0.5, -150)
+	hintsFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+	hintsFrame.BackgroundTransparency = 0.45
+	hintsFrame.BorderSizePixel = 1
+	hintsFrame.BorderColor3 = Color3.new(0.3, 0.3, 0.4)
+	hintsFrame.Visible = false
+	hintsFrame.Parent = screenGui
+
+	local hintsTitle = Instance.new("TextLabel")
+	hintsTitle.Name = "HintsTitle"
+	hintsTitle.Size = UDim2.new(1, 0, 0, 24)
+	hintsTitle.Position = UDim2.new(0, 0, 0, 0)
+	hintsTitle.BackgroundTransparency = 1
+	hintsTitle.Text = "INCOMING WORDS"
+	hintsTitle.TextColor3 = Color3.new(0.7, 0.7, 0.8)
+	hintsTitle.TextScaled = true
+	hintsTitle.Font = Enum.Font.SourceSansBold
+	hintsTitle.Parent = hintsFrame
+
+	local hintsList = Instance.new("Frame")
+	hintsList.Name = "HintsList"
+	hintsList.Size = UDim2.new(1, -8, 1, -30)
+	hintsList.Position = UDim2.new(0, 4, 0, 28)
+	hintsList.BackgroundTransparency = 1
+	hintsList.Parent = hintsFrame
+
+	local listLayout = Instance.new("UIListLayout")
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Padding = UDim.new(0, 3)
+	listLayout.Parent = hintsList
+
+	TypingHandler.WordHintsFrame = hintsFrame
+	TypingHandler.HintsList = hintsList
+end
+
+-- Update the word hints panel with current active words
+function TypingHandler.UpdateWordHints(words)
+	-- Store for use by ProcessInput re-targeting logic
+	TypingHandler.ActiveWordHints = words
+	local frame = TypingHandler.WordHintsFrame
+	local list = TypingHandler.HintsList
+	if not frame or not list then return end
+
+	-- Clear old hints
+	for _, child in ipairs(list:GetChildren()) do
+		if child:IsA("Frame") then child:Destroy() end
+	end
+
+	if #words == 0 then
+		frame.Visible = false
+		return
+	end
+
+	frame.Visible = true
+	for i, word in ipairs(words) do
+		local row = Instance.new("Frame")
+		row.Name = "HintRow" .. i
+		row.Size = UDim2.new(1, 0, 0, 22)
+		row.BackgroundTransparency = 1
+		row.LayoutOrder = i
+		row.Parent = list
+
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(1, -8, 1, 0)
+		label.Position = UDim2.new(0, 8, 0, 0)
+		label.BackgroundTransparency = 1
+		-- Highlight first letter in bright yellow, rest in white
+		local firstLetter = word:sub(1,1):upper()
+		local rest = word:sub(2):upper()
+		label.RichText = true
+		label.Text = '<font color="#FFE040"><b>' .. firstLetter .. '</b></font>' .. rest
+		label.TextColor3 = Color3.new(0.9, 0.9, 0.9)
+		label.TextScaled = true
+		label.Font = Enum.Font.SourceSansBold
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.Parent = row
+	end
+	print("[HINTS] Updated word hints panel:", #words, "words")
 end
 
 -- Handle input began
@@ -159,7 +302,7 @@ function TypingHandler.OnInputBegan(input, gameProcessed)
 	if not character then return end
 
 	TypingHandler.LastInputTime = tick()
-	print("[INPUT] Key pressed: '" .. character .. "' | hasTarget=" .. tostring(TypingHandler.CurrentTarget ~= nil) .. " | pendingLetter='" .. tostring(TypingHandler.PendingFirstLetter) .. "' | typed='" .. TypingHandler.TypedLetters .. "'")
+	print("[INPUT] Key pressed: '" .. character .. "' | hasTarget=" .. tostring(TypingHandler.CurrentTarget ~= nil) .. " | pendingLetter='" .. tostring(TypingHandler.PendingFirstLetter) .. "' | typed='" .. TypingHandler.TypedLetters .. "' | gameProcessed=" .. tostring(gameProcessed))
 
 	-- If no current target, try to find one by first letter
 	if not TypingHandler.CurrentTarget and not TypingHandler.PendingFirstLetter then
@@ -247,12 +390,28 @@ function TypingHandler.ProcessInput(character)
 			end
 		else
 			print("[PROCESS] WRONG KEY: '" .. character .. "' expected '" .. expectedChar .. "' on word '" .. targetWord .. "' typed so far='" .. currentTyped .. "'")
-			-- Wrong character typed - if typed prefix so far still valid, keep target
-			-- If nothing typed yet, try retargeting with first char in case another zombie matches
-			if #currentTyped == 0 and not TypingHandler.PendingFirstLetter then
+			-- Check if this key matches a DIFFERENT zombie's first letter (from hints list)
+			-- If so, abandon current target and switch - lets player pivot mid-word
+			local matchesOtherZombie = false
+			if TypingHandler.ActiveWordHints then
+				for _, hintWord in ipairs(TypingHandler.ActiveWordHints) do
+					if hintWord ~= targetWord and hintWord:sub(1,1):lower() == character then
+						matchesOtherZombie = true
+						break
+					end
+				end
+			end
+			if matchesOtherZombie and not TypingHandler.PendingFirstLetter and #currentTyped <= 1 then
+				print("[PROCESS] Key '" .. character .. "' matches a different zombie - abandoning '" .. targetWord .. "' (only " .. #currentTyped .. " letters in) and retargeting")
+				TypingHandler.CurrentTarget = nil
+				TypingHandler.TypedLetters = ""
+				TypingHandler.FindTarget(character)
+			elseif #currentTyped == 0 and not TypingHandler.PendingFirstLetter then
 				print("[PROCESS] Retargeting with char='" .. character .. "' (nothing typed yet on current target)")
 				TypingHandler.CurrentTarget = nil
 				TypingHandler.FindTarget(character)
+			else
+				print("[PROCESS] Wrong key ignored - no other zombie starts with '" .. character .. "', staying on '" .. targetWord .. "'")
 			end
 		end
 	end
@@ -314,6 +473,11 @@ function TypingHandler.ResetTyping()
 	TypingHandler.TypedLetters = ""
 	TypingHandler.PendingFirstLetter = nil
 
+	-- Show hints panel again now that we're untargeted
+	if TypingHandler.WordHintsFrame then
+		TypingHandler.WordHintsFrame.Visible = TypingHandler.HintsList and #TypingHandler.HintsList:GetChildren() > 1
+	end
+
 	TypingHandler.UpdateTargetHighlight()
 	TypingHandler.UpdateTypedDisplay()
 end
@@ -358,9 +522,18 @@ end
 
 -- Update loop (for visual effects and timeouts)
 function TypingHandler.Update(deltaTime)
-	-- Reset only after 8 seconds of no input (gives time for network + slow typists)
+	-- Idle timeout: only abandon target if zombie is still far away (Z < -40).
+	-- Never auto-drop a close zombie - player must kill it or it triggers game over.
 	if TypingHandler.CurrentTarget and tick() - TypingHandler.LastInputTime > 8.0 then
-		TypingHandler.ResetTyping()
+		local model = TypingHandler.CurrentTarget.Model
+		local zombieZ = model and model.PrimaryPart and model.PrimaryPart.Position.Z or -999
+		if zombieZ < -40 then
+			print("[TIMEOUT] Idle 8s and zombie is far (Z=" .. string.format("%.1f", zombieZ) .. ") - resetting target")
+			TypingHandler.ResetTyping()
+		else
+			print("[TIMEOUT] Idle 8s but zombie is CLOSE (Z=" .. string.format("%.1f", zombieZ) .. ") - NOT resetting, player must type it")
+			TypingHandler.LastInputTime = tick()  -- reset timer so this log doesn't spam every frame
+		end
 	end
 	
 	-- Update target highlight position if we have a target
@@ -384,6 +557,50 @@ function TypingHandler.SetEnabled(enabled)
 
 	if not enabled then
 		TypingHandler.ResetTyping()
+		-- Unbind CAS so Studio shortcuts (O, I, P, etc.) work again in menus/game over
+		ContextActionService:UnbindAction("TypingInput")
+		print("[TYPING] CAS TypingInput unbound (game not active)")
+		-- Release TextBox focus
+		if TypingHandler.CaptureBox then
+			game:GetService("UserInputService"):GetFocusedTextBox() -- just a read, focus released naturally
+		end
+	else
+		-- Re-bind CAS when game is active - must sink O before Studio eats it
+		local letterKeyCodes = {
+			Enum.KeyCode.A, Enum.KeyCode.B, Enum.KeyCode.C, Enum.KeyCode.D,
+			Enum.KeyCode.E, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H,
+			Enum.KeyCode.I, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L,
+			Enum.KeyCode.M, Enum.KeyCode.N, Enum.KeyCode.O, Enum.KeyCode.P,
+			Enum.KeyCode.Q, Enum.KeyCode.R, Enum.KeyCode.S, Enum.KeyCode.T,
+			Enum.KeyCode.U, Enum.KeyCode.V, Enum.KeyCode.W, Enum.KeyCode.X,
+			Enum.KeyCode.Y, Enum.KeyCode.Z,
+		}
+		ContextActionService:BindActionAtPriority(
+			"TypingInput",
+			function(actionName, inputState, inputObj)
+				if inputState == Enum.UserInputState.Begin then
+					TypingHandler.OnInputBegan(inputObj, false)
+				end
+				return Enum.ContextActionResult.Sink
+			end,
+			false, 3000, table.unpack(letterKeyCodes)
+		)
+		print("[TYPING] CAS TypingInput rebound (game active)")
+		-- Focus the invisible TextBox - this suppresses Studio's keyboard shortcuts
+		if TypingHandler.CaptureBox then
+			TypingHandler.CaptureBox:CaptureFocus()
+			print("[TYPING] CaptureBox focused")
+			-- Re-focus if it ever loses focus (e.g. player clicks elsewhere) while game is active
+			TypingHandler.CaptureBox.FocusLost:Connect(function()
+				if TypingHandler.IsEnabled then
+					task.defer(function()
+						if TypingHandler.IsEnabled and TypingHandler.CaptureBox then
+							TypingHandler.CaptureBox:CaptureFocus()
+						end
+					end)
+				end
+			end)
+		end
 	end
 end
 

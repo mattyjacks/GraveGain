@@ -143,7 +143,15 @@ local function OnWordComplete(player, zombieModel)
 	ZombieSpawner.DestroyZombie(zd, pos)
 	GameState.score = GameState.score + GameData.SCORE.WORD_COMPLETE_BASE
 	print("[WORDCOMPLETE] Score after:", GameState.score, "| Active zombies remaining:", #ZombieSpawner.ActiveZombies)
-	RE.WaveComplete:FireAllClients(GameState.currentWave, GameState.score)
+	-- Fire ScoreUpdate (per-kill score push) NOT WaveComplete (wave-end event)
+	RE.ScoreUpdate:FireAllClients(GameState.score)
+	-- Broadcast updated active word list so client hints refresh
+	local activeWords = {}
+	for _, z in ipairs(ZombieSpawner.ActiveZombies) do
+		if z.IsAlive then table.insert(activeWords, z.Word) end
+	end
+	print("[WORDCOMPLETE] Broadcasting ActiveWordsUpdate:", #activeWords, "words remaining")
+	RE.ActiveWordsUpdate:FireAllClients(activeWords)
 end
 
 local function OnGameStart(player)
