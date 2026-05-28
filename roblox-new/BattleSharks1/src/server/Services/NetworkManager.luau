@@ -4,8 +4,70 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
-local RemoteNames = require(script.Parent.Parent.Parent.Shared.Networking.RemoteNames)
-local GameUtilities = require(script.Parent.Parent.Parent.Shared.Utilities.GameUtilities)
+-- Temporary: Use placeholder values until shared modules are working
+local RemoteNames = {
+	-- Player actions
+	PlayerMove = "PlayerMove",
+	PlayerAttack = "PlayerAttack",
+	PlayerBoost = "PlayerBoost",
+	PlayerInteract = "PlayerInteract",
+	
+	-- Game systems
+	UpdatePlayerStats = "UpdatePlayerStats",
+	UpdateHealth = "UpdateHealth",
+	UpdateHunger = "UpdateHunger",
+	UpdateXP = "UpdateXP",
+	UpdateLevel = "UpdateLevel",
+	UpdateGold = "UpdateGold",
+	AbilityCooldown = "AbilityCooldown",
+	
+	-- Inventory
+	InventoryAdd = "InventoryAdd",
+	InventoryRemove = "InventoryRemove",
+	InventoryUse = "InventoryUse",
+	
+	-- Aquarium
+	AquariumFeed = "AquariumFeed",
+	AquariumClean = "AquariumClean",
+	AquariumDecorate = "AquariumDecorate",
+	
+	-- Mutations
+	MutationApply = "MutationApply",
+	MutationRemove = "MutationRemove",
+	
+	-- Messages
+	GameMessage = "GameMessage",
+	Error = "Error",
+	Success = "Success",
+	
+	-- Functions
+	GetPlayerData = "GetPlayerData",
+	GetInventory = "GetInventory",
+	GetAquarium = "GetAquarium",
+	PingClient = "PingClient"
+}
+local GameUtilities = {
+	DebugPrint = function(message) print("[DEBUG]", message) end,
+	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
+	Lerp = function(a, b, t) return a + (b - a) * t end,
+	RandomFloat = function(min, max) return math.random() * (max - min) + min end,
+	FindNearestTarget = function(position, maxDistance, targetType)
+		local nearest = nil
+		local nearestDistance = maxDistance
+		
+		for _, obj in pairs(Workspace:GetChildren()) do
+			if obj:FindFirstChild("Humanoid") and obj ~= Players.LocalPlayer.Character then
+				local distance = (obj.PrimaryPart.Position - position).Magnitude
+				if distance < nearestDistance then
+					nearest = obj
+					nearestDistance = distance
+				end
+			end
+		end
+		
+		return nearest
+	end
+}
 
 local NetworkManager = {}
 

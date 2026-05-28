@@ -7,9 +7,39 @@ local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
-local GameConstants = require(script.Parent.Parent.Parent.Shared.Constants.GameConstants)
-local GameEnums = require(script.Parent.Parent.Parent.Shared.Enums.GameEnums)
-local GameUtilities = require(script.Parent.Parent.Parent.Shared.Utilities.GameUtilities)
+-- Temporary: Use placeholder values until shared modules are working
+local GameConstants = {
+	WATER_LEVEL = 0,
+	UNDERWATER_GRAVITY = 10,
+	WATER_DENSITY = 1,
+	SHARK_TURN_SPEED = 5,
+	SHARK_BASE_SPEED = 16,
+	SHARK_BOOST_SPEED = 32,
+	SHARK_BOOST_COOLDOWN = 3,
+	SHARK_LEAP_FORCE = 100,
+	BITE_RANGE = 10
+}
+local GameEnums = {
+	EnemyType = {
+		SmallFish = "SmallFish",
+		MediumFish = "MediumFish",
+		LargeFish = "LargeFish",
+		Jellyfish = "Jellyfish",
+		Shark = "Shark"
+	},
+	ItemType = {
+		Food = "Food",
+		HealthPotion = "HealthPotion",
+		SpeedBoost = "SpeedBoost",
+		Treasure = "Treasure"
+	}
+}
+local GameUtilities = {
+	DebugPrint = function(message) print("[DEBUG]", message) end,
+	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
+	Lerp = function(a, b, t) return a + (b - a) * t end,
+	RandomFloat = function(min, max) return math.random() * (max - min) + min end
+}
 
 local SharkController = {}
 

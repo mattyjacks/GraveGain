@@ -6,10 +6,75 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 
-local GameConstants = require(script.Parent.Parent.Parent.Shared.Constants.GameConstants)
-local GameEnums = require(script.Parent.Parent.Parent.Shared.Enums.GameEnums)
-local GameData = require(script.Parent.Parent.Parent.Shared.Data.GameData)
-local GameUtilities = require(script.Parent.Parent.Parent.Shared.Utilities.GameUtilities)
+-- Temporary: Use placeholder values until shared modules are working
+local GameConstants = {
+	WATER_LEVEL = 0,
+	UNDERWATER_GRAVITY = 10,
+	WATER_DENSITY = 1,
+	SHARK_TURN_SPEED = 5,
+	SHARK_BASE_SPEED = 16,
+	SHARK_BOOST_SPEED = 32,
+	SHARK_BOOST_COOLDOWN = 3,
+	SHARK_LEAP_FORCE = 100,
+	BITE_RANGE = 10,
+	OCEAN_SIZE = 500,
+	OCEAN_DEPTH = 100,
+	ENEMY_SPAWN_RATE = 5,
+	ITEM_SPAWN_RATE = 8,
+	MAX_ENEMIES = 50,
+	MAX_ITEMS = 100,
+	CLEANUP_DISTANCE = 200
+}
+local GameEnums = {
+	EnemyType = {
+		SmallFish = "SmallFish",
+		MediumFish = "MediumFish",
+		LargeFish = "LargeFish",
+		Jellyfish = "Jellyfish",
+		Shark = "Shark"
+	},
+	ItemType = {
+		Food = "Food",
+		HealthPotion = "HealthPotion",
+		SpeedBoost = "SpeedBoost",
+		Treasure = "Treasure"
+	},
+	EnemyState = {
+		Idle = "Idle",
+		Patrol = "Patrol",
+		Chase = "Chase",
+		Attack = "Attack",
+		Dead = "Dead"
+	}
+}
+local GameData = {
+	EnemyData = {
+		SmallFish = {Health = 20, Damage = 5, Speed = 15, XP = 10},
+		MediumFish = {Health = 50, Damage = 10, Speed = 12, XP = 25},
+		LargeFish = {Health = 100, Damage = 20, Speed = 8, XP = 50}
+	},
+	ItemData = {
+		Food = {HealAmount = 10, Duration = 0},
+		HealthPotion = {HealAmount = 50, Duration = 0},
+		SpeedBoost = {SpeedMultiplier = 1.5, Duration = 30},
+		Treasure = {GoldValue = 100, Duration = 0}
+	}
+}
+local GameUtilities = {
+	DebugPrint = function(message) print("[DEBUG]", message) end,
+	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
+	Lerp = function(a, b, t) return a + (b - a) * t end,
+	RandomFloat = function(min, max) return math.random() * (max - min) + min end,
+	GetRandomPosition = function(center, radius)
+		local angle = math.random() * math.pi * 2
+		local distance = math.random() * radius
+		return center + Vector3.new(
+			math.cos(angle) * distance,
+			0,
+			math.sin(angle) * distance
+		)
+	end
+}
 
 local GameLoopManager = {}
 

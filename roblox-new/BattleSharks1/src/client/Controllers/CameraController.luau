@@ -7,8 +7,16 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 
-local GameConstants = require(script.Parent.Parent.Parent.Shared.Constants.GameConstants)
-local GameUtilities = require(script.Parent.Parent.Parent.Shared.Utilities.GameUtilities)
+-- Temporary: Use placeholder values until shared modules are working
+local GameConstants = {
+	WATER_LEVEL = 0
+}
+local GameUtilities = {
+	DebugPrint = function(message) print("[DEBUG]", message) end,
+	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
+	Lerp = function(a, b, t) return a + (b - a) * t end,
+	RandomFloat = function(min, max) return math.random() * (max - min) + min end
+}
 
 local CameraController = {}
 

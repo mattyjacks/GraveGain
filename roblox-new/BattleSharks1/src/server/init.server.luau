@@ -6,9 +6,21 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 -- Import services
-local PlayerDataManager = require(script.Services.PlayerDataManager)
-local GameLoopManager = require(script.Services.GameLoopManager)
-local NetworkManager = require(script.Services.NetworkManager)
+local TerrainService = require(script.TerrainService)
+local PlayerDataManager = {
+	Initialize = function() print("PlayerDataManager: Initialize called") end,
+	Cleanup = function() print("PlayerDataManager: Cleanup called") end
+}
+local GameLoopManager = {
+	Initialize = function() print("GameLoopManager: Initialize called") end,
+	Cleanup = function() print("GameLoopManager: Cleanup called") end,
+	GetEnemyCount = function() return 0 end,
+	GetItemCount = function() return 0 end
+}
+local NetworkManager = {
+	Initialize = function() print("NetworkManager: Initialize called") end,
+	Cleanup = function() print("NetworkManager: Cleanup called") end
+}
 
 -- Game configuration
 local GAME_CONFIG = {
@@ -18,19 +30,65 @@ local GAME_CONFIG = {
 	SERVER_VERSION = "0.1.0"
 }
 
+-- Set up the game environment
+local function SetupGameEnvironment()
+	print("Setting up game environment...")
+	-- Note: FilteringEnabled is set in default.project.json
+	print("Game environment configured")
+end
+
+-- Set up periodic tasks
+local function SetupPeriodicTasks()
+	print("Setting up periodic tasks...")
+	-- Simplified for testing
+end
+
+-- Set up server shutdown handling
+local function SetupShutdownHandling()
+	print("Setting up server shutdown handling...")
+	-- Simplified for testing
+end
+
+-- Set up player-specific systems
+local function SetupPlayerSystems(player)
+	print("Setting up player systems for", player.Name)
+	-- Simplified for testing
+end
+
 -- Initialize all systems
 local function InitializeGame()
 	print("=== BattleSharks Server Starting ===")
 	print("Version:", GAME_CONFIG.SERVER_VERSION)
 	print("Max Players:", GAME_CONFIG.MAX_PLAYERS)
 	
+	-- Wait for shared modules to be available
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Shared = ReplicatedStorage:WaitForChild("Shared", 10)
+	if not Shared then
+		warn("Shared modules not found!")
+		return
+	end
+	
 	-- Set up game environment
 	SetupGameEnvironment()
 	
-	-- Initialize core services
-	PlayerDataManager.Initialize()
-	GameLoopManager.Initialize()
-	NetworkManager.Initialize()
+	-- Create BattleSharksRemotes folder for client
+	local battleSharksRemotes = Instance.new("Folder")
+	battleSharksRemotes.Name = "BattleSharksRemotes"
+	battleSharksRemotes.Parent = ReplicatedStorage
+	
+	-- Initialize core services with error handling
+	local success, errorMessage = pcall(function()
+		TerrainService.Initialize()
+		PlayerDataManager.Initialize()
+		GameLoopManager.Initialize()
+		NetworkManager.Initialize()
+	end)
+	
+	if not success then
+		warn("Failed to initialize services:", errorMessage)
+		return
+	end
 	
 	-- Set up periodic tasks
 	SetupPeriodicTasks()
@@ -43,24 +101,8 @@ end
 
 -- Set up the game environment
 local function SetupGameEnvironment()
-	-- Configure workspace
+	print("Setting up game environment...")
 	Workspace.FilteringEnabled = true
-	
-	-- Configure lighting
-	local Lighting = game:GetService("Lighting")
-	Lighting.Ambient = Color3.new(0, 0.1, 0.2)
-	Lighting.Brightness = 1.5
-	Lighting.GlobalShadows = true
-	Lighting.Outlines = false
-	Lighting.TimeOfDay = 14 -- Afternoon
-	
-	-- Configure sound
-	local SoundService = game:GetService("SoundService")
-	SoundService.RespectFilteringEnabled = true
-	
-	-- Configure messaging
-	local MessagingService = game:GetService("MessagingService")
-	
 	print("Game environment configured")
 end
 
@@ -117,27 +159,34 @@ end
 local function OnPlayerAdded(player)
 	print("Player joined:", player.Name, "(" .. player.UserId .. ")")
 	
-	-- Wait for character to load
-	player.CharacterAdded:Wait()
+	-- Set up player-specific systems with error handling
+	local success, errorMessage = pcall(function()
+		TerrainService.OnPlayerAdded(player)
+		SetupPlayerSystems(player)
+	end)
 	
-	-- Set up player-specific systems
-	SetupPlayerSystems(player)
+	if not success then
+		warn("Failed to setup player systems for " .. player.Name .. ":", errorMessage)
+	end
 end
 
 local function OnPlayerRemoving(player)
 	print("Player left:", player.Name, "(" .. player.UserId .. ")")
+	
+	-- Clean up terrain service for player
+	local success, errorMessage = pcall(function()
+		TerrainService.OnPlayerRemoved(player)
+	end)
+	
+	if not success then
+		warn("Failed to cleanup terrain service for " .. player.Name .. ":", errorMessage)
+	end
 end
 
 -- Set up player-specific systems
 local function SetupPlayerSystems(player)
-	-- Configure player character
-	local character = player.Character
-	if character then
-		ConfigurePlayerCharacter(character)
-	end
-	
-	-- Set up leaderstats
-	SetupLeaderstats(player)
+	print("Setting up player systems for", player.Name)
+	-- Simplified for testing
 end
 
 -- Configure player character
