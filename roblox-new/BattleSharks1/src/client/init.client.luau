@@ -8,6 +8,7 @@ local StarterGui = game:GetService("StarterGui")
 
 -- Import controllers and systems
 local TerrainRenderer = require(script.TerrainRenderer)
+local SharkModel = require(script.SharkModel)
 local SharkController = {
 	Initialize = function() print("SharkController: Initialize called") end,
 	Cleanup = function() print("SharkController: Cleanup called") end
@@ -96,6 +97,22 @@ local function InitializeClient()
 	TerrainRenderer.Initialize()
 	SharkController.Initialize()
 	CameraController.Initialize()
+	
+	-- Transform player into shark
+	print("Transforming player into shark...")
+	local player = Players.LocalPlayer
+	if player then
+		-- Wait for character to load
+		local character = player.Character or player.CharacterAdded:Wait()
+		
+		-- Transform into shark
+		local sharkModel = SharkModel.TransformPlayer(player)
+		if sharkModel then
+			print("Successfully transformed player into shark!")
+		else
+			warn("Failed to transform player into shark")
+		end
+	end
 	
 	-- Set up network event handlers
 	SetupNetworkHandlers()

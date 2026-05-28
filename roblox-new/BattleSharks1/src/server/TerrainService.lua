@@ -116,162 +116,237 @@ function TerrainService.UpdateWorkspaceTerrain()
 	print("Created hexagonal reef:", reefParts, "hexagons,", fishCount, "fish,", decorationCount, "decorations")
 end
 
--- Create underwater environment
+-- Create underwater environment using Roblox Terrain water
 function TerrainService.CreateUnderwaterEnvironment()
-	-- Create water effect (large transparent blue part)
-	local water = Instance.new("Part")
-	water.Name = "UnderwaterEnvironment"
-	water.Size = Vector3.new(200, 100, 200)
-	water.Position = Vector3.new(0, 25, 0)
-	water.Anchored = true
-	water.CanCollide = false
-	water.Material = Enum.Material.Glass
-	water.Color = Color3.new(0.1, 0.3, 0.8)
-	water.Transparency = 0.7
-	water.Parent = TerrainService.State.TerrainFolder
+	-- Fill a 200x50x200 region with Terrain water
+	workspace.Terrain:FillBlock(
+		CFrame.new(0, 25, 0),
+		Vector3.new(200, 50, 200),
+		Enum.Material.Water
+	)
 	
-	-- Add underwater lighting
-	local light = Instance.new("PointLight")
-	light.Name = "UnderwaterLight"
-	light.Brightness = 0.8
-	light.Color = Color3.new(0.2, 0.6, 1.0)
-	light.Range = 100
-	light.Parent = water
+	-- Underwater ambient light source
+	local ambientPart = Instance.new("Part")
+	ambientPart.Name = "UnderwaterAmbient"
+	ambientPart.Size = Vector3.new(1, 1, 1)
+	ambientPart.Position = Vector3.new(0, 30, 0)
+	ambientPart.Anchored = true
+	ambientPart.CanCollide = false
+	ambientPart.Transparency = 1
+	ambientPart.Parent = TerrainService.State.TerrainFolder
+	local ambient = Instance.new("PointLight")
+	ambient.Brightness = 1.5
+	ambient.Color = Color3.new(0.1, 0.5, 0.9)
+	ambient.Range = 200
+	ambient.Parent = ambientPart
+	
+	-- Sunbeams
+	TerrainService.CreateSunbeams()
 end
 
--- Create hexagonal reef structures
+-- Create animated sunbeams (tall thin neon cylinders slanted at angles)
+function TerrainService.CreateSunbeams()
+	local beamPositions = {
+		{-30, 15}, {10, -25}, {40, 30}, {-50, -10},
+		{20, 50}, {-15, 40}, {55, -20}, {-40, 35}
+	}
+	for i, pos in ipairs(beamPositions) do
+		local beam = Instance.new("Part")
+		beam.Name = "Sunbeam_" .. i
+		beam.Shape = Enum.PartType.Cylinder
+		beam.Size = Vector3.new(55, 3, 3)
+		beam.Anchored = true
+		beam.CanCollide = false
+		beam.CastShadow = false
+		beam.Material = Enum.Material.Neon
+		beam.Color = Color3.new(0.85, 0.92, 1)
+		beam.Transparency = 0.82
+		-- Slant downward at slight angle
+		beam.CFrame = CFrame.new(pos[1], 28, pos[2])
+			* CFrame.Angles(0, 0, math.rad(80 + math.random(-5, 5)))
+		beam.Parent = TerrainService.State.TerrainFolder
+		
+		-- Pulsing animation
+		task.spawn(function()
+			while beam and beam.Parent do
+				local t = tick()
+				beam.Transparency = 0.78 + math.sin(t * 1.5 + i) * 0.08
+				task.wait(0.15)
+			end
+		end)
+	end
+end
+
+-- Create hexagonal reef using Terrain FillCylinder for proper grounded hex pillars
 function TerrainService.CreateHexagonalReef()
-	local hexSize = 8  -- Size of each hexagon
-	local hexHeight = 2  -- Height of hexagonal prisms
+	local hexSize = 8
 	local partsCreated = 0
 	
-	-- Create hexagonal grid pattern
-	for q = -3, 3 do
-		for r = -3, 3 do
-			-- Convert hex coordinates to world position
-			local worldX = hexSize * 1.5 * q
-			local worldZ = hexSize * math.sqrt(3) * (r + q/2)
-			
-			-- Vary the height for natural reef look
-			local height = hexHeight + math.random(-1, 2)
-			
-			-- Create hexagonal prism using multiple wedges
-			local hexModel = TerrainService.CreateHexagonalPrism(worldX, height, worldZ, hexSize)
-			if hexModel then
-				hexModel.Name = "HexReef_" .. q .. "_" .. r
-				hexModel.Parent = TerrainService.State.TerrainFolder
+	-- Use Roblox Terrain to fill the seafloor base with sand
+	workspace.Terrain:FillBlock(
+		CFrame.new(0, 0, 0),
+		Vector3.new(220, 2, 220),
+		Enum.Material.Sand
+	)
+	
+	-- Hex grid: flat-top layout
+	for q = -4, 4 do
+		for r = -4, 4 do
+			if math.random() > 0.2 then
+				local wx = hexSize * 1.5 * q
+				local wz = hexSize * math.sqrt(3) * (r + q / 2)
+				
+				-- Height: taller near center
+				local dist = math.sqrt(wx^2 + wz^2)
+				local h = math.max(2, math.floor(6 - dist * 0.08) + math.random(0, 3))
+				
+				-- Single visible cylinder - no wedge gaps
+				TerrainService.PlaceHexPillar(wx, h, wz, hexSize)
 				partsCreated += 1
+				
+				-- Coral on top
+				if math.random() > 0.55 then
+					TerrainService.PlaceCoral(wx, h, wz)
+				end
 			end
 		end
+	end
+	
+	-- A few rock pillars for visual variety
+	for i = 1, 5 do
+		local px = math.random(-60, 60)
+		local pz = math.random(-60, 60)
+		local ph = math.random(8, 16)
+		workspace.Terrain:FillCylinder(
+			CFrame.new(px, ph / 2, pz),
+			ph, 4,
+			Enum.Material.Basalt
+		)
 	end
 	
 	return partsCreated
 end
 
--- Create a single hexagonal prism using wedges
-function TerrainService.CreateHexagonalPrism(x, y, z, size)
-	local model = Instance.new("Model")
-	
-	-- Create 6 wedges to form a hexagon
-	local wedgeSize = size
-	local wedgeHeight = y
-	
-	-- Materials for reef look
-	local materials = {
-		Enum.Material.Sand,
-		Enum.Material.Slate,
-		Enum.Material.Rock,
-		Enum.Material.Concrete
-	}
-	
-	local colors = {
-		Color3.new(0.9, 0.8, 0.6),  -- Sand
-		Color3.new(0.7, 0.6, 0.5),  -- Brown rock
-		Color3.new(0.6, 0.5, 0.4),  -- Dark rock
-		Color3.new(0.8, 0.7, 0.6)   -- Light sand
-	}
-	
-	-- Create 6 wedges in hexagonal pattern
-	for i = 1, 6 do
-		local angle = (i - 1) * math.pi / 3
-		local wedge = Instance.new("WedgePart")
-		
-		-- Position wedge to form hexagon
-		local offsetX = math.cos(angle) * size * 0.5
-		local offsetZ = math.sin(angle) * size * 0.5
-		
-		wedge.Size = Vector3.new(wedgeSize, wedgeHeight, wedgeSize)
-		wedge.Position = Vector3.new(x + offsetX, y/2, z + offsetZ)
-		wedge.Orientation = Vector3.new(0, (i - 1) * 60, 0)
-		
-		-- Random material and color for variety
-		local materialIndex = math.random(1, #materials)
-		wedge.Material = materials[materialIndex]
-		wedge.Color = colors[materialIndex]
-		
-		wedge.Anchored = true
-		wedge.CanCollide = true
-		wedge.TopSurface = Enum.SurfaceType.Smooth
-		wedge.BottomSurface = Enum.SurfaceType.Smooth
-		wedge.Parent = model
-	end
-	
-	-- Add a center cylinder to fill the hexagon
-	local center = Instance.new("CylinderMesh")
-	local centerPart = Instance.new("Part")
-	centerPart.Name = "Center"
-	centerPart.Size = Vector3.new(size * 0.8, wedgeHeight, size * 0.8)
-	centerPart.Position = Vector3.new(x, y/2, z)
-	centerPart.Material = Enum.Material.Sand
-	centerPart.Color = Color3.new(0.9, 0.8, 0.6)
-	centerPart.Anchored = true
-	centerPart.CanCollide = true
-	centerPart.TopSurface = Enum.SurfaceType.Smooth
-	centerPart.BottomSurface = Enum.SurfaceType.Smooth
-	centerPart.Parent = model
-	
-	return model
+-- Place one hex pillar using Terrain
+function TerrainService.PlaceHexPillar(x, h, z, size)
+	-- Use terrain cylinder for a clean hex look
+	local mat = ({Enum.Material.Sand, Enum.Material.Rock, Enum.Material.Slate, Enum.Material.Sandstone})[math.random(1,4)]
+	workspace.Terrain:FillCylinder(
+		CFrame.new(x, h / 2, z),
+		h, size * 0.6,
+		mat
+	)
 end
 
--- Add fish to the reef
+-- Place a coral decoration part at a position
+function TerrainService.PlaceCoral(x, baseH, z)
+	local coralColors = {
+		Color3.fromRGB(255, 80, 60),
+		Color3.fromRGB(255, 160, 30),
+		Color3.fromRGB(255, 100, 200),
+		Color3.fromRGB(80, 220, 180),
+		Color3.fromRGB(255, 220, 50),
+	}
+	local numBranches = math.random(1, 3)
+	for _ = 1, numBranches do
+		local coral = Instance.new("Part")
+		coral.Name = "Coral"
+		local w = math.random(1, 2) * 0.5
+		local ch = math.random(2, 5)
+		coral.Size = Vector3.new(w, ch, w)
+		coral.CFrame = CFrame.new(
+			x + math.random(-3, 3),
+			baseH + ch / 2,
+			z + math.random(-3, 3)
+		)
+		coral.Anchored = true
+		coral.CanCollide = false
+		coral.CastShadow = false
+		coral.Material = Enum.Material.Neon
+		coral.Color = coralColors[math.random(1, #coralColors)]
+		coral.Transparency = 0.1
+		coral.Parent = TerrainService.State.TerrainFolder
+	end
+end
+
+
+-- Add fish: simple anchored parts that move via CFrame each frame
 function TerrainService.AddFish()
-	local fishCount = 0
-	local fishTypes = {
-		{Size = Vector3.new(2, 1, 4), Color = Color3.new(1, 0.5, 0), Name = "TropicalFish"},
-		{Size = Vector3.new(3, 1.5, 6), Color = Color3.new(0.5, 0.5, 1), Name = "BlueFish"},
-		{Size = Vector3.new(1.5, 0.8, 3), Color = Color3.new(1, 1, 0.5), Name = "YellowFish"},
-		{Size = Vector3.new(4, 2, 8), Color = Color3.new(0.8, 0.8, 0.8), Name = "SilverFish"}
+	local fishSpecs = {
+		{color = Color3.fromRGB(255, 120, 20),  w=2,  h=1.2, l=4,  speed=4,  y=12},
+		{color = Color3.fromRGB(40,  100, 255), w=2,  h=1.2, l=4,  speed=5,  y=18},
+		{color = Color3.fromRGB(255, 220, 0),   w=1.5,h=0.9, l=3,  speed=3,  y=10},
+		{color = Color3.fromRGB(80,  200, 80),  w=2.5,h=1.5, l=5,  speed=6,  y=22},
+		{color = Color3.fromRGB(255, 80,  180), w=1.8,h=1.1, l=3.5,speed=4,  y=15},
+		{color = Color3.fromRGB(255, 160, 60),  w=1.5,h=0.8, l=3,  speed=3.5,y=8 },
 	}
 	
-	-- Add fish swimming around the reef
-	for i = 1, 15 do
-		local fishType = fishTypes[math.random(1, #fishTypes)]
-		local fish = Instance.new("Part")
-		fish.Name = fishType.Name .. "_" .. i
-		fish.Size = fishType.Size
-		fish.Position = Vector3.new(
-			math.random(-60, 60),
-			math.random(10, 40),
-			math.random(-60, 60)
-		)
-		fish.Material = Enum.Material.Neon
-		fish.Color = fishType.Color
-		fish.Transparency = 0.2
-		fish.Anchored = false
-		fish.CanCollide = false
-		
-		-- Add fish movement (simple floating animation)
-		local bodyVelocity = Instance.new("BodyVelocity")
-		bodyVelocity.MaxForce = Vector3.new(1000, 1000, 1000)
-		bodyVelocity.Velocity = Vector3.new(
-			math.random(-2, 2),
-			math.random(-1, 1),
-			math.random(-2, 2)
-		)
-		bodyVelocity.Parent = fish
-		
-		fish.Parent = TerrainService.State.TerrainFolder
-		fishCount += 1
+	local fishCount = 0
+	for _, spec in ipairs(fishSpecs) do
+		local count = math.random(3, 6)
+		for i = 1, count do
+			-- Simple 2-part fish: body ellipse + tail wedge
+			local model = Instance.new("Model")
+			model.Name = "Fish"
+			
+			local body = Instance.new("Part")
+			body.Name = "FishBody"
+			body.Shape = Enum.PartType.Ball
+			body.Size = Vector3.new(spec.w, spec.h, spec.l)
+			body.Material = Enum.Material.SmoothPlastic
+			body.Color = spec.color
+			body.Anchored = true
+			body.CanCollide = false
+			body.CastShadow = false
+			body.CFrame = CFrame.new(
+				math.random(-70, 70),
+				spec.y + math.random(-3, 3),
+				math.random(-70, 70)
+			)
+			body.Parent = model
+			
+			local tail = Instance.new("WedgePart")
+			tail.Name = "FishTail"
+			tail.Size = Vector3.new(spec.w * 0.8, spec.h * 0.9, spec.l * 0.35)
+			tail.Material = Enum.Material.SmoothPlastic
+			tail.Color = spec.color
+			tail.Anchored = true
+			tail.CanCollide = false
+			tail.CastShadow = false
+			tail.CFrame = body.CFrame * CFrame.new(0, 0, spec.l * 0.65)
+			tail.Parent = model
+			
+			model.Parent = TerrainService.State.TerrainFolder
+			fishCount += 1
+			
+			-- Swim: move CFrame directly each tick
+			local targetCF = body.CFrame
+			local changeTimer = 0
+			task.spawn(function()
+				while model and model.Parent do
+					local dt = task.wait(0.05)
+					changeTimer += dt or 0.05
+					
+					-- Pick new target every 3-5 seconds
+					if changeTimer > math.random(3, 5) then
+						changeTimer = 0
+						local tx = math.random(-70, 70)
+						local ty = spec.y + math.random(-5, 5)
+						local tz = math.random(-70, 70)
+						local facing = (Vector3.new(tx, ty, tz) - body.Position)
+						if facing.Magnitude > 0.1 then
+							targetCF = CFrame.new(tx, math.clamp(ty, 4, 40), tz)
+								* CFrame.fromMatrix(Vector3.new(), facing.Unit, Vector3.new(0,1,0))
+						end
+					end
+					
+					-- Lerp body towards target
+					body.CFrame = body.CFrame:Lerp(targetCF, 0.03)
+					-- Keep tail behind body
+					tail.CFrame = body.CFrame * CFrame.new(0, 0, spec.l * 0.65)
+				end
+			end)
+		end
 	end
 	
 	return fishCount
