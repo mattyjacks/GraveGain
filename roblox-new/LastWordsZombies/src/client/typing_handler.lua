@@ -78,7 +78,7 @@ function TypingHandler.Initialize()
 			if billboard then
 				local label = billboard:FindFirstChild("Frame") and billboard.Frame:FindFirstChild("TextLabel")
 				if label then
-					label.RichText = false
+					label.RichText = true
 					label.Text = word:upper()
 					print("[TYPING]   Billboard reset to plain '" .. word:upper() .. "'")
 				else
@@ -428,24 +428,42 @@ function TypingHandler.CompleteWord()
 	-- Flash the word display fully green before destroying
 	local model = TypingHandler.CurrentTarget.Model
 	local wordDisplay = model and model:FindFirstChild("Head") and model.Head:FindFirstChild("WordDisplay")
-					  or model and model.PrimaryPart and model.PrimaryPart:FindFirstChild("WordDisplay")
+				  or model and model.PrimaryPart and model.PrimaryPart:FindFirstChild("WordDisplay")
+
+	-- Dust-scatter fade: flash full green, drift upward, fade to transparent
 	if wordDisplay then
 		local frame = wordDisplay:FindFirstChild("Frame")
 		local label = frame and frame:FindFirstChild("TextLabel")
 		if label then
-			local word = TypingHandler.CurrentTarget.Word
-			local green = '<font color="rgb(0,255,128)">'
-			local full = ""
-			for i = 1, #word do
-				full = full .. green .. word:sub(i,i) .. "</font>"
-			end
+			-- All-green flash first
 			label.RichText = true
-			label.Text = full
+			label.Text = '<font color="#00FF80"><b>' .. TypingHandler.CurrentTarget.Word:upper() .. '</b></font>'
 		end
+		-- Animate: drift billboard upward and fade out over 0.7s
+		local TweenService = game:GetService("TweenService")
+		local startOffset = wordDisplay.StudsOffset
+		local tweenInfo = TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		-- Fade frame background
+		if frame then
+			TweenService:Create(frame, tweenInfo, { BackgroundTransparency = 1 }):Play()
+		end
+		if label then
+			TweenService:Create(label, tweenInfo, { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		end
+		-- Drift upward
+		TweenService:Create(wordDisplay, tweenInfo, {
+			StudsOffset = startOffset + Vector3.new(0, 6, 0)
+		}):Play()
+		-- Hide border by tweening frame size to 0
+		task.delay(0.7, function()
+			if wordDisplay and wordDisplay.Parent then
+				wordDisplay.Enabled = false
+			end
+		end)
 	end
 
-	-- Small delay so player sees the full-green flash
-	task.delay(0.12, function()
+	-- Fire WordComplete to server after brief green flash (0.1s)
+	task.delay(0.1, function()
 		print("[COMPLETE] Firing WordComplete to server for model:", model and model.Name or "nil")
 		WordCompleteEvent:FireServer(model)
 	end)

@@ -151,6 +151,54 @@ function Corridor.Build()
 		table.insert(coverPositions, Vector3.new(bx, 3, bz - 1))
 	end
 
+	-- ===== ESCAPE TUNNEL (behind the player, +Z direction) =====
+	-- Extends from Z=+L/2 (front of main corridor) to Z=+L/2+100 (100m escape room)
+	local ET_START = L / 2          -- +100
+	local ET_LEN   = 100            -- 100 studs of escape space
+	local ET_END   = ET_START + ET_LEN  -- +200
+
+	-- Floor tiles
+	for tx = -hw, hw - tileSize, tileSize do
+		for tz = ET_START, ET_END - tileSize, tileSize do
+			local isDark = ((math.floor(tx/tileSize) + math.floor(tz/tileSize)) % 2 == 0)
+			MakePart(corridor, "EscapeFloor",
+				Vector3.new(tileSize, 1, tileSize),
+				Vector3.new(tx + tileSize/2, -0.5, tz + tileSize/2),
+				isDark and Color3.new(0.12, 0.14, 0.18) or Color3.new(0.20, 0.22, 0.28),
+				Enum.Material.SmoothPlastic)
+		end
+	end
+
+	-- Walls and ceiling
+	MakePart(corridor, "EscapeLeftWall",  Vector3.new(1, H, ET_LEN), Vector3.new(-hw - 0.5, H/2, ET_START + ET_LEN/2), Color3.new(0.15, 0.15, 0.20))
+	MakePart(corridor, "EscapeRightWall", Vector3.new(1, H, ET_LEN), Vector3.new( hw + 0.5, H/2, ET_START + ET_LEN/2), Color3.new(0.15, 0.15, 0.20))
+	MakePart(corridor, "EscapeCeiling",   Vector3.new(W + 2, 1, ET_LEN), Vector3.new(0, H + 0.5, ET_START + ET_LEN/2), Color3.new(0.10, 0.10, 0.13))
+
+	-- End wall (100m back - the limit)
+	MakePart(corridor, "EscapeEndWall",   Vector3.new(W + 2, H + 2, 1), Vector3.new(0, H/2, ET_END + 0.5), Color3.new(0.08, 0.08, 0.10))
+
+	-- Neon trim on escape tunnel walls (dim red to signal danger/retreat zone)
+	for _, side in ipairs({-hw - 0.3, hw + 0.3}) do
+		MakePart(corridor, "EscapeStrip", Vector3.new(0.3, 0.4, ET_LEN), Vector3.new(side, 0.7,   ET_START + ET_LEN/2), Color3.new(0.6, 0.03, 0.03), Enum.Material.Neon, false)
+		MakePart(corridor, "EscapeStrip", Vector3.new(0.3, 0.4, ET_LEN), Vector3.new(side, H - 1, ET_START + ET_LEN/2), Color3.new(0.4, 0.02, 0.02), Enum.Material.Neon, false)
+	end
+
+	-- A few dim floor lights so the player can see
+	for i = 1, 4 do
+		local fx = (i % 2 == 0) and -hw * 0.3 or hw * 0.3
+		local fp = MakePart(corridor, "EscapeLight", Vector3.new(0.5, 0.2, 0.5),
+			Vector3.new(fx, 0.5, ET_START + (i * ET_LEN / 5)),
+			Color3.new(0.6, 0.7, 1), Enum.Material.Neon, false)
+		local fl = Instance.new("PointLight")
+		fl.Color = Color3.new(0.5, 0.5, 1)
+		fl.Brightness = 1.0
+		fl.Range = 18
+		fl.Parent = fp
+	end
+
+	-- Void box over the escape tunnel to block skybox
+	MakePart(corridor, "EscapeVoidCeiling", Vector3.new(W + 200, 10, ET_LEN + 10), Vector3.new(0, H + 6, ET_START + ET_LEN/2), Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, false)
+
 	return coverPositions
 end
 

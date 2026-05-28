@@ -46,6 +46,9 @@
 				},
 				"PremiumStore": {
 					"$path": "src/client/premium_store.lua"
+				},
+				"RunController": {
+					"$path": "src/client/run_controller.lua"
 				}
 			}
 		},

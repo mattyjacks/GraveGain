@@ -30,9 +30,9 @@ function ZombieModel.Build(isBigWord)
 	local sy = (math.random(85, 115) / 100) * bigScale
 	local sz = sx
 
-	local bodyColor  = isBigWord and Color3.new(0.35, 0.1, 0.5)  or Color3.new(0.3, 0.2, 0.2)
-	local eyeColor   = isBigWord and Color3.new(0.8, 0, 1)        or Color3.new(1, 0, 0)
-	local clothColor = isBigWord and Color3.new(0.2, 0.05, 0.35)  or Color3.new(0.1, 0.1, 0.1)
+	local bodyColor  = isBigWord and Color3.new(0.05, 0.35, 0.05) or Color3.new(0.1, 0.4, 0.1)
+	local eyeColor   = isBigWord and Color3.new(0.6, 1, 0)        or Color3.new(0, 1, 0.2)
+	local clothColor = isBigWord and Color3.new(0.02, 0.2, 0.02)  or Color3.new(0.05, 0.22, 0.05)
 
 	local zombie = Instance.new("Model")
 	zombie.Name = isBigWord and "BigWordZombie" or "Zombie"
@@ -69,7 +69,7 @@ function ZombieModel.Build(isBigWord)
 
 	-- Eye glow
 	local eyeLight = Instance.new("PointLight")
-	eyeLight.Color      = isBigWord and Color3.new(0.6, 0, 1) or Color3.new(1, 0, 0)
+	eyeLight.Color      = isBigWord and Color3.new(0.4, 1, 0) or Color3.new(0, 1, 0.2)
 	eyeLight.Brightness = isBigWord and 4 or 2
 	eyeLight.Range      = isBigWord and 14 or 8
 	eyeLight.Parent = torso
@@ -92,7 +92,7 @@ function ZombieModel.CreateWordDisplay(zombie, word)
 	billboard.Name = "WordDisplay"
 	billboard.Size = UDim2.new(0, 240, 0, 56)
 	billboard.StudsOffset = Vector3.new(0, 4, 0)
-	billboard.AlwaysOnTop = true
+	billboard.AlwaysOnTop = false
 	billboard.Parent = head
 
 	local frame = Instance.new("Frame")

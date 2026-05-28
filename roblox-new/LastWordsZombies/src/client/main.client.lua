@@ -55,6 +55,7 @@ print("[CLIENT BOOT] RemoteEvents found!")
 -- Require modules
 local TypingHandler = require(script.Parent.TypingHandler)
 local WordDictionaryUI = require(script.Parent.WordDictionaryUI)
+local RunController = require(script.Parent.RunController)
 local GameData = require(ReplicatedStorage:WaitForChild("GameData"))
 
 -- Remote events
@@ -81,6 +82,10 @@ function InitializeGame()
 	-- Initialize typing handler
 	TypingHandler.Initialize()
 	print("[CLIENT BOOT] TypingHandler initialized")
+
+	-- Initialize run controller
+	RunController.Initialize()
+	print("[CLIENT BOOT] RunController initialized")
 
 	-- Create UI
 	CreateGameUI()
@@ -307,6 +312,10 @@ function StartGame()
 	TypingHandler.SetEnabled(true)
 	print("[STARTGAME CLIENT] TypingHandler enabled")
 
+	-- Enable run controller
+	RunController.SetEnabled(true)
+	print("[STARTGAME CLIENT] RunController enabled")
+
 	-- Notify server we're ready
 	print("[STARTGAME CLIENT] Firing PlayerReady to server")
 	RemoteEvents.PlayerReady:FireServer()
@@ -339,6 +348,10 @@ function RestartGame()
 	TypingHandler.SetEnabled(false)
 	TypingHandler.ResetTyping()
 	print("[RESTART CLIENT] TypingHandler disabled and reset")
+
+	-- Disable run controller
+	RunController.SetEnabled(false)
+	print("[RESTART CLIENT] RunController disabled")
 
 	-- Tell server to restart - it will fire GameStart back to all clients
 	print("[RESTART CLIENT] Firing GameStart to server - waiting for server GameStart response")
