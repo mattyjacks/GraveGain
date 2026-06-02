@@ -146,105 +146,221 @@ end
 -- (Welding is handled inside CreateSharkModel via WeldOffset/Motor6D)
 
 -- Animate tail fin using Motor6D
-function SharkModel.StartSwimAnimation(sharkModel)
+-- animState is a shared table updated by DriveShark each frame
+function SharkModel.StartSwimAnimation(sharkModel, animState)
 	local body = sharkModel:FindFirstChild("Body")
 	if not body then return end
-	
-	-- Find tail motor
-	local tailMotor = nil
+
+	-- Collect all motor references by part name
+	local motors = {}
 	for _, motor in ipairs(body:GetChildren()) do
-		if motor:IsA("Motor6D") and motor.Part1 and motor.Part1.Name == "TailFinV" then
-			tailMotor = motor
-			break
+		if motor:IsA("Motor6D") and motor.Part1 then
+			motors[motor.Part1.Name] = motor
 		end
 	end
-	
+
+	-- Store base C0 offsets so we can compose on top of them
+	local baseC0 = {}
+	for name, motor in pairs(motors) do
+		baseC0[name] = motor.C0
+	end
+
+	local t = 0
 	task.spawn(function()
-		local t = 0
 		while sharkModel.Parent ~= nil do
-			t += 0.05
-			local swing = math.sin(t * 5) * math.rad(18)
-			if tailMotor then
-				tailMotor.C0 = CFrame.new(0, 0, 5.5) * CFrame.Angles(0, swing, 0)
+			local dt = task.wait(0.033) -- ~30 fps animation tick
+			if not body or not body.Parent then break end
+
+			local speed     = animState and animState.speed     or 0
+			local turnRate  = animState and animState.turnRate  or 0
+			local isSprint  = animState and animState.isSprint  or false
+
+			-- Tail wag: faster + wider when sprinting
+			local wagFreq   = 3.5 + speed * 0.08
+			local wagAmp    = math.rad(isSprint and 22 or 15)
+			t += dt
+			local swing = math.sin(t * wagFreq) * wagAmp
+
+			if motors["TailFinV"] and baseC0["TailFinV"] then
+				motors["TailFinV"].C0 = baseC0["TailFinV"] * CFrame.Angles(0, swing, 0)
 			end
-			task.wait(0.05)
+
+			-- Horizontal tail lobe also wags in opposition
+			if motors["TailFinH"] and baseC0["TailFinH"] then
+				motors["TailFinH"].C0 = baseC0["TailFinH"] * CFrame.Angles(0, -swing * 0.6, 0)
+			end
+
+			-- Pectoral fins tilt into turns (bank)
+			local bankAngle = math.clamp(turnRate * 0.4, -math.rad(25), math.rad(25))
+			if motors["LeftFin"] and baseC0["LeftFin"] then
+				motors["LeftFin"].C0 = baseC0["LeftFin"] * CFrame.Angles(0, 0, -bankAngle)
+			end
+			if motors["RightFin"] and baseC0["RightFin"] then
+				motors["RightFin"].C0 = baseC0["RightFin"] * CFrame.Angles(0, 0, bankAngle)
+			end
+
+			-- Gentle undulating body pitch (swimming wave)
+			local bodyWave = math.sin(t * wagFreq + math.pi * 0.5) * math.rad(3)
+			if motors["Head"] and baseC0["Head"] then
+				motors["Head"].C0 = baseC0["Head"] * CFrame.Angles(-bodyWave * 0.5, 0, 0)
+			end
 		end
 	end)
 end
 
--- Drive shark with WASD + mouse look
+-- Drive shark with mouse-look aim + always-forward movement.
+-- S = 180-degree U-turn over 1 second. Shark never moves backward.
+-- Shift = sprint. A/D = yaw steer. Mouse = pitch/yaw aim.
 function SharkModel.DriveShark(sharkModel, player)
 	local body = sharkModel:FindFirstChild("Body")
 	if not body then return end
-	
+
 	local camera = workspace.CurrentCamera
 	camera.CameraType = Enum.CameraType.Scriptable
-	
-	local yaw = 0
-	local pitch = 0
-	local SPEED = 28
-	local CAM_DIST = 20
-	local CAM_HEIGHT = 6
-	
-	-- Track position explicitly to avoid CFrame Y drift
-	local pos = body.Position
-	
-	-- Sink the default jump action so Space doesn't teleport the humanoid
+
+	-- Tunables
+	local SPEED_BASE   = 28
+	local SPEED_SPRINT = 52
+	local TURN_RATE    = 2.2      -- rad/s from A/D keys
+	local MOUSE_YAW    = 0.0022
+	local MOUSE_PITCH  = 0.0018
+	local PITCH_MIN    = math.rad(-50)
+	local PITCH_MAX    = math.rad(40)
+	local UTURN_TIME   = 1.0      -- seconds for S-key 180 U-turn
+	local CAM_DIST     = 22
+	local CAM_HEIGHT   = 5
+	local CAM_SMOOTH   = 9
+	local SPEED_ACCEL  = 6
+	local YAW_SMOOTH   = 7
+
+	-- State
+	local yaw         = 0
+	local pitch       = 0
+	local targetYaw   = 0
+	local targetPitch = 0
+	local currentSpeed = SPEED_BASE
+
+	-- U-turn state
+	local uTurnActive   = false
+	local uTurnProgress = 0
+	local uTurnFromYaw  = 0
+
+	-- Animation state table shared with StartSwimAnimation
+	local animState = { speed = SPEED_BASE, turnRate = 0, isSprint = false }
+
+	local pos   = body.CFrame.Position
+	local camCF = camera.CFrame
+
+	-- Sink default jump
 	ContextActionService:BindAction(
 		"SharkSinkJump",
 		function() return Enum.ContextActionResult.Sink end,
 		false,
 		Enum.KeyCode.Space
 	)
-	
-	-- Mouse look
+
+	-- Lock mouse to center for mouse-look driving
 	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-	
+
+	-- Mouse delta drives yaw/pitch aim
+	-- +pi body offset means rightward mouse drag = increasing targetYaw turns nose right
 	local mouseCon = UserInputService.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement then
-			yaw -= input.Delta.X * 0.003
-			pitch = math.clamp(pitch - input.Delta.Y * 0.003, math.rad(-40), math.rad(30))
+			targetYaw   = targetYaw   + input.Delta.X * MOUSE_YAW
+			targetPitch = math.clamp(
+				targetPitch - input.Delta.Y * MOUSE_PITCH,
+				PITCH_MIN, PITCH_MAX
+			)
 		end
 	end)
-	
+
+	-- S key begins U-turn (180 degrees, no backward swimming)
+	local sTurnCon = UserInputService.InputBegan:Connect(function(input, processed)
+		if processed then return end
+		if input.KeyCode == Enum.KeyCode.S and not uTurnActive then
+			uTurnActive   = true
+			uTurnProgress = 0
+			uTurnFromYaw  = targetYaw
+		end
+	end)
+
 	RunService:BindToRenderStep("SharkDrive", Enum.RenderPriority.Camera.Value, function(dt)
 		if not body or not body.Parent then
 			mouseCon:Disconnect()
+			sTurnCon:Disconnect()
 			ContextActionService:UnbindAction("SharkSinkJump")
 			RunService:UnbindFromRenderStep("SharkDrive")
 			return
 		end
-		
-		-- WASD + Space (up) + LeftControl (down)
-		-- Space is sunk above so it won't jump; Q/E are backup
-		local forward = UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or
-			(UserInputService:IsKeyDown(Enum.KeyCode.S) and -1 or 0)
-		local strafe = UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or
-			(UserInputService:IsKeyDown(Enum.KeyCode.A) and -1 or 0)
-		local riseUp = (UserInputService:IsKeyDown(Enum.KeyCode.Space) or
-			UserInputService:IsKeyDown(Enum.KeyCode.E)) and 1 or 0
-		local riseDown = (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or
-			UserInputService:IsKeyDown(Enum.KeyCode.Q)) and 1 or 0
-		local rise = riseUp - riseDown
-		
-		-- Horizontal movement in camera-yaw space
-		local flatCF = CFrame.Angles(0, yaw, 0)
-		local horiz = flatCF:VectorToWorldSpace(Vector3.new(strafe, 0, -forward))
-		
-		-- Update tracked position
-		pos = pos + (horiz + Vector3.new(0, rise, 0)) * SPEED * dt
-		pos = Vector3.new(pos.X, math.clamp(pos.Y, 3, 45), pos.Z)
-		
-		-- Apply to body
+
+		-- U-turn: smoothstep 180-degree rotation over UTURN_TIME seconds
+		if uTurnActive then
+			uTurnProgress = math.min(uTurnProgress + dt / UTURN_TIME, 1)
+			local ease = uTurnProgress * uTurnProgress * (3 - 2 * uTurnProgress)
+			targetYaw = uTurnFromYaw + math.pi * ease
+			if uTurnProgress >= 1 then
+				uTurnActive   = false
+				targetPitch   = 0  -- level out after U-turn
+			end
+		end
+
+		-- A/D steering: D=nose right=targetYaw decreases, A=nose left=targetYaw increases
+		if not uTurnActive then
+			if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+				targetYaw = targetYaw - TURN_RATE * dt
+			end
+			if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+				targetYaw = targetYaw + TURN_RATE * dt
+			end
+		end
+
+		-- Smooth yaw and pitch towards targets
+		local lerpT  = math.min(YAW_SMOOTH * dt, 1)
+		local prevYaw = yaw
+		yaw   = yaw   + (targetYaw   - yaw)   * lerpT
+		pitch = pitch + (targetPitch - pitch) * lerpT
+
+		local turnRate = (yaw - prevYaw) / (dt + 1e-6)
+
+		-- Speed
+		local isSprint    = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+		local targetSpeed = isSprint and SPEED_SPRINT or SPEED_BASE
+		currentSpeed = currentSpeed + (targetSpeed - currentSpeed) * math.min(SPEED_ACCEL * dt, 1)
+
+		-- Always-forward along shark aim vector (matches body CFrame which has +pi base rotation)
+		local sharkCF  = CFrame.new(pos) * CFrame.Angles(0, yaw + math.pi, 0) * CFrame.Angles(-pitch, 0, 0)
+		local fwd      = sharkCF.LookVector
+		pos = pos + fwd * currentSpeed * dt
+		pos = Vector3.new(pos.X, math.clamp(pos.Y, 2, 48), pos.Z)
+
+		-- Body roll into turns for realism
+		local rollAngle = math.clamp(-turnRate * 0.28, -math.rad(28), math.rad(28))
+
+		-- Apply shark body CFrame
+		-- math.pi base rotation: model nose is at -Z, yaw 0 = world +Z forward, so flip 180 to align
 		body.CFrame = CFrame.new(pos)
-			* CFrame.Angles(0, yaw, 0)
-			* CFrame.Angles(pitch * 0.4, 0, 0)
-		
-		-- Third-person camera behind shark
-		local camOffset = body.CFrame:VectorToWorldSpace(Vector3.new(0, CAM_HEIGHT, CAM_DIST))
-		local camPos = body.Position + camOffset
-		camera.CFrame = CFrame.new(camPos, body.Position + Vector3.new(0, 1, 0))
+			* CFrame.Angles(0, yaw + math.pi, 0)
+			* CFrame.Angles(-pitch, 0, -rollAngle)
+
+		-- Smooth third-person camera behind shark
+		-- shark nose faces +Z at yaw=0, camera behind needs -Z offset, so camYaw=yaw+pi
+		local camYaw = yaw + math.pi
+		local camTargetPos = pos + Vector3.new(
+			-math.sin(camYaw) * math.cos(pitch) * CAM_DIST,
+			 math.sin(pitch) * CAM_DIST + CAM_HEIGHT,
+			 math.cos(camYaw) * math.cos(pitch) * CAM_DIST
+		)
+		local camTargetCF = CFrame.new(camTargetPos, pos + Vector3.new(0, 1, 0))
+		camCF  = camCF:Lerp(camTargetCF, math.min(CAM_SMOOTH * dt, 1))
+		camera.CFrame = camCF
+
+		-- Update animation state
+		animState.speed    = currentSpeed
+		animState.turnRate = turnRate
+		animState.isSprint = isSprint
 	end)
+
+	return animState
 end
 
 -- Transform player into shark - waits for character to be ready
@@ -266,21 +382,34 @@ function SharkModel.TransformPlayer(player)
 		return
 	end
 	
-	-- Hide humanoid body
+	-- Disable humanoid movement
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.WalkSpeed = 0
 		humanoid.JumpPower = 0
+		humanoid.AutoRotate = false
+		-- Hide default character appearance
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	end
-	for _, part in ipairs(character:GetDescendants()) do
-		if part:IsA("BasePart") then
-			part.Transparency = 1
-			part.CanCollide = false
-		end
-	end
+	
+	-- Hide every visual element in the character
 	for _, obj in ipairs(character:GetDescendants()) do
-		if obj:IsA("Decal") or obj:IsA("SpecialMesh") then
+		if obj:IsA("BasePart") or obj:IsA("UnionOperation") or obj:IsA("MeshPart") then
 			obj.Transparency = 1
+			obj.CanCollide = false
+			obj.CastShadow = false
+		elseif obj:IsA("Decal") or obj:IsA("Texture") then
+			obj.Transparency = 1
+		elseif obj:IsA("SpecialMesh") or obj:IsA("BlockMesh") or obj:IsA("CylinderMesh") then
+			obj.Scale = Vector3.new(0, 0, 0)
+		elseif obj:IsA("Accessory") then
+			local handle = obj:FindFirstChild("Handle")
+			if handle then
+				handle.Transparency = 1
+				handle.CanCollide = false
+			end
+		elseif obj:IsA("ShirtGraphic") or obj:IsA("Shirt") or obj:IsA("Pants") then
+			obj:Destroy()
 		end
 	end
 	
@@ -300,11 +429,11 @@ function SharkModel.TransformPlayer(player)
 	
 	sharkModel.Parent = workspace
 	
-	-- Start swim animation
-	SharkModel.StartSwimAnimation(sharkModel)
-	
-	-- Start WASD driving
-	SharkModel.DriveShark(sharkModel, player)
+	-- Start WASD driving first so we get the animState handle
+	local animState = SharkModel.DriveShark(sharkModel, player)
+
+	-- Start swim animation, sharing the animState table
+	SharkModel.StartSwimAnimation(sharkModel, animState)
 	
 	print("Shark model active for", player.Name)
 	return sharkModel

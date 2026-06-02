@@ -1,0 +1,66 @@
+{
+  "name": "JetSkies",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true,
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Remotes": {
+        "$className": "Folder"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$ignoreUnknownInstances": true,
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": true,
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$ignoreUnknownInstances": true,
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Ambient": [0.5, 0.5, 0.6],
+        "Brightness": 2,
+        "ColorShift_Bottom": [0, 0, 0],
+        "ColorShift_Top": [0.8, 0.9, 1],
+        "EnvironmentDiffuseScale": 0.5,
+        "EnvironmentSpecularScale": 0.5,
+        "GlobalShadows": true,
+        "Outlines": false,
+        "ShadowSoftness": 0.3,
+        "Technology": "ShadowMap",
+        "TimeOfDay": "12:00:00"
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$ignoreUnknownInstances": true,
+      "$properties": {
+        "Gravity": 0
+      },
+      "World": {
+        "$className": "Folder"
+      },
+      "Islands": {
+        "$className": "Folder"
+      },
+      "Rings": {
+        "$className": "Folder"
+      }
+    }
+  }
+}

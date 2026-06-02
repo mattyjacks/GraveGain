@@ -151,27 +151,32 @@ function TerrainService.CreateSunbeams()
 		{20, 50}, {-15, 40}, {55, -20}, {-40, 35}
 	}
 	for i, pos in ipairs(beamPositions) do
+		-- Cylinder long axis = X in Roblox, so length is Size.X
+		-- We rotate ~85 deg from horizontal to make nearly-vertical shafts
+		local beamLen = 48
+		local beamRad = 1.2 + math.random() * 0.8
+		local slantAngle = math.rad(82 + math.random(-6, 6))
+		local slantYaw = math.random() * math.pi * 2
+		
 		local beam = Instance.new("Part")
 		beam.Name = "Sunbeam_" .. i
 		beam.Shape = Enum.PartType.Cylinder
-		beam.Size = Vector3.new(55, 3, 3)
+		beam.Size = Vector3.new(beamLen, beamRad, beamRad)
 		beam.Anchored = true
 		beam.CanCollide = false
 		beam.CastShadow = false
 		beam.Material = Enum.Material.Neon
-		beam.Color = Color3.new(0.85, 0.92, 1)
-		beam.Transparency = 0.82
-		-- Slant downward at slight angle
-		beam.CFrame = CFrame.new(pos[1], 28, pos[2])
-			* CFrame.Angles(0, 0, math.rad(80 + math.random(-5, 5)))
+		beam.Color = Color3.fromRGB(210, 235, 255)
+		beam.Transparency = 0.88
+		beam.CFrame = CFrame.new(pos[1], 26, pos[2])
+			* CFrame.Angles(0, slantYaw, slantAngle)
 		beam.Parent = TerrainService.State.TerrainFolder
 		
-		-- Pulsing animation
+		-- Gentle opacity pulse
 		task.spawn(function()
 			while beam and beam.Parent do
-				local t = tick()
-				beam.Transparency = 0.78 + math.sin(t * 1.5 + i) * 0.08
-				task.wait(0.15)
+				beam.Transparency = 0.86 + math.sin(tick() * 1.2 + i) * 0.06
+				task.wait(0.2)
 			end
 		end)
 	end
