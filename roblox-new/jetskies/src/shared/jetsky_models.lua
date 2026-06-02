@@ -20,8 +20,8 @@ function JetSkyModels.CreateJetSky(color)
     hull.CanCollide = true
     hull.Parent = model
     
-    -- Seat
-    local seat = Instance.new("VehicleSeat")
+    -- Seat (regular Seat, not VehicleSeat to avoid native control conflicts)
+    local seat = Instance.new("Seat")
     seat.Name = "Seat"
     seat.Size = Vector3.new(2, 0.5, 2)
     seat.Color = Color3.fromRGB(50, 50, 50)
@@ -31,8 +31,6 @@ function JetSkyModels.CreateJetSky(color)
     seat.Anchored = false
     seat.CanCollide = true
     seat.Disabled = false
-    seat.Headrest = false
-    seat.TorsoOnly = false
     seat.Parent = model
     seat.CFrame = CFrame.new(0, 0.5, 0.5)
     

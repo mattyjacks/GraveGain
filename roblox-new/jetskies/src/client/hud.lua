@@ -12,7 +12,9 @@ local ui = {
     altitudeMeter = nil,
     ringCounter = nil,
     boostBar = nil,
-    ringPopup = nil
+    ringPopup = nil,
+    waterIndicator = nil,
+    throttleMeter = nil
 }
 
 -- State
@@ -35,6 +37,8 @@ function HUD:Init(localPlayer, clientState)
     self:CreateRingCounter()
     self:CreateBoostBar()
     self:CreateRingPopup()
+    self:CreateWaterIndicator()
+    self:CreateThrottleMeter()
     
     print("[HUD] Initialized")
 end
@@ -76,6 +80,7 @@ function HUD:CreateSpeedometer()
     value.Parent = frame
     
     ui.speedometer = value
+    ui.speedometerLabel = label
 end
 
 function HUD:CreateAltitudeMeter()
@@ -211,6 +216,38 @@ function HUD:CreateRingPopup()
     ui.ringPopup = label
 end
 
+function HUD:CreateWaterIndicator()
+    local label = Instance.new("TextLabel")
+    label.Name = "WaterIndicator"
+    label.Size = UDim2.new(0, 150, 0, 30)
+    label.Position = UDim2.new(0, 20, 0, 200)
+    label.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+    label.BackgroundTransparency = 0.3
+    label.Text = "🌊 WATER MODE"
+    label.TextColor3 = Color3.fromRGB(200, 255, 255)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Visible = false
+    label.Parent = ui.screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = label
+    
+    ui.waterIndicator = label
+end
+
+function HUD:SetWaterMode(isInWater)
+    if not ui.waterIndicator then return end
+    ui.waterIndicator.Visible = isInWater
+    
+    -- Update speedometer label
+    if ui.speedometerLabel then
+        ui.speedometerLabel.Text = isInWater and "🌊 WATER SPEED" or "SPEED"
+        ui.speedometerLabel.TextColor3 = isInWater and Color3.fromRGB(0, 200, 255) or GameData.UIColors.TEXT
+    end
+end
+
 function HUD:UpdateStats(stats)
     if ui.speedometer then
         ui.speedometer.Text = string.format("%.0f studs/s", stats.speed or 0)
@@ -275,6 +312,89 @@ function HUD:ShowRingCollected(value)
             ui.ringPopup.Position = UDim2.new(0.5, -100, 0.3, 0)
         end)
     end)
+end
+
+function HUD:CreateThrottleMeter()
+    local frame = Instance.new("Frame")
+    frame.Name = "ThrottleMeter"
+    frame.Size = UDim2.new(0, 200, 0, 40)
+    frame.Position = UDim2.new(1, -220, 0, 190)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Parent = ui.screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.Size = UDim2.new(0, 70, 1, 0)
+    label.Position = UDim2.new(0, 5, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "THROTTLE"
+    label.TextColor3 = GameData.UIColors.TEXT
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = frame
+    
+    local barBg = Instance.new("Frame")
+    barBg.Name = "BarBg"
+    barBg.Size = UDim2.new(0, 110, 0, 20)
+    barBg.Position = UDim2.new(0, 80, 0.5, -10)
+    barBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    barBg.BorderSizePixel = 0
+    barBg.Parent = frame
+    
+    local barBgCorner = Instance.new("UICorner")
+    barBgCorner.CornerRadius = UDim.new(0, 4)
+    barBgCorner.Parent = barBg
+    
+    local bar = Instance.new("Frame")
+    bar.Name = "Bar"
+    bar.Size = UDim2.new(0, 0, 1, 0)
+    bar.BackgroundColor3 = Color3.fromRGB(255, 100, 50)
+    bar.BorderSizePixel = 0
+    bar.Parent = barBg
+    
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 4)
+    barCorner.Parent = bar
+    
+    local value = Instance.new("TextLabel")
+    value.Name = "Value"
+    value.Size = UDim2.new(0, 40, 1, 0)
+    value.Position = UDim2.new(1, -45, 0, 0)
+    value.BackgroundTransparency = 1
+    value.Text = "0%"
+    value.TextColor3 = GameData.UIColors.TEXT
+    value.TextScaled = true
+    value.Font = Enum.Font.GothamBold
+    value.Parent = frame
+    
+    ui.throttleMeter = {
+        frame = frame,
+        bar = bar,
+        value = value
+    }
+end
+
+function HUD:UpdateThrottle(throttle)
+    if not ui.throttleMeter then return end
+    
+    local percent = math.clamp(throttle * 100, 0, 100)
+    ui.throttleMeter.bar.Size = UDim2.new(percent / 100, 0, 1, 0)
+    ui.throttleMeter.value.Text = string.format("%.0f%%", percent)
+    
+    -- Color based on throttle
+    if percent > 80 then
+        ui.throttleMeter.bar.BackgroundColor3 = Color3.fromRGB(255, 50, 50)  -- Red
+    elseif percent > 50 then
+        ui.throttleMeter.bar.BackgroundColor3 = Color3.fromRGB(255, 150, 50)  -- Orange
+    else
+        ui.throttleMeter.bar.BackgroundColor3 = Color3.fromRGB(50, 200, 50)  -- Green
+    end
 end
 
 return HUD

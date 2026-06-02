@@ -19,7 +19,9 @@ function CameraController:Init(jetSky)
     
     state.camera = Workspace.CurrentCamera
     state.jetSky = jetSky
-    state.hull = jetSky:WaitForChild("Hull")
+    
+    -- Try detailed model first, then fallback to simple model
+    state.hull = jetSky:FindFirstChild("HullLower") or jetSky:WaitForChild("Hull")
     state.currentDistance = GameData.CAMERA_DISTANCE
     
     -- Camera setup

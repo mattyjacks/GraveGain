@@ -16,6 +16,14 @@ GameData.BOOST_DRAIN_RATE = 20
 GameData.BOOST_RECHARGE_RATE = 10
 GameData.BOOST_COOLDOWN = 1.0
 
+-- Water Physics
+GameData.WATER_SPEED_MULTIPLIER = 1.5  -- 50% faster in water
+GameData.WATER_DRAG = 0.8              -- Less drag in water (faster)
+GameData.AIR_DRAG = 0.95             -- More drag in air
+GameData.BUOYANCY_FORCE = 60         -- Upward force when in water
+GameData.WATER_LEVEL = -10           -- Ocean surface Y position
+GameData.SPLASH_THRESHOLD = 5        -- Min speed to create splash
+
 -- World Settings
 GameData.ISLAND_SPAWN_DISTANCE = 200
 GameData.MAX_ALTITUDE = 1000

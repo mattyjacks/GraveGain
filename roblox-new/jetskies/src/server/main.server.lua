@@ -13,10 +13,13 @@ local WorldGenerator = require(script.Parent.world_generator)
 local playerData = {}
 local worldIslands = {}
 
--- Setup remotes
-local remotes = Instance.new("Folder")
-remotes.Name = "Remotes"
-remotes.Parent = ReplicatedStorage
+-- Setup remotes (create immediately so client can find them)
+local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+if not remotes then
+    remotes = Instance.new("Folder")
+    remotes.Name = "Remotes"
+    remotes.Parent = ReplicatedStorage
+end
 
 for _, eventName in pairs(GameData.RemoteEvents) do
     local event = Instance.new("RemoteEvent")
@@ -45,8 +48,7 @@ local PurchaseUpgrade = remotes:WaitForChild("PurchaseUpgrade")
 -- Initialize world
 local function initWorld()
     worldIslands = WorldGenerator.GenerateWorld(Vector3.new(0, 50, 0))
-    WorldGenerator.CreateOcean()
-    print("[Server] World generated with", #worldIslands, "islands")
+    print("[Server] World generated with", #worldIslands, "islands and adaptive ocean")
 end
 
 -- Player join handling
@@ -72,26 +74,29 @@ Players.PlayerAdded:Connect(function(player)
             spawnPos = worldIslands[1].position + Vector3.new(0, 15, 0)
         end
         
-        -- Create JetSky for player at starter island
-        local JetSkyModels = require(shared.jetsky_models)
-        local jetSky = JetSkyModels.CreateJetSky()
+        -- Create detailed JetSky for player at starter island
+        local JetSkyDetailed = require(shared.jetsky_detailed)
+        local jetSky, seat = JetSkyDetailed.CreateDetailedJetSky()
         jetSky.Name = "JetSky_" .. player.UserId
         jetSky:SetPrimaryPartCFrame(CFrame.new(spawnPos))
         jetSky.Parent = Workspace
         
         -- Position player and seat them
-        task.wait(0.1)
+        task.wait(0.2)
         local humanoid = character:WaitForChild("Humanoid")
         local hrp = character:WaitForChild("HumanoidRootPart")
-        local seat = jetSky.Hull:WaitForChild("Seat")
         
         if humanoid and hrp and seat then
-            -- Position player above seat first
-            hrp.CFrame = seat.CFrame * CFrame.new(0, 5, 0)
-            task.wait(0.1)
-            -- Then seat them
+            -- Disable humanoid auto-rotation
+            humanoid.AutoRotate = false
+            -- Sit in seat
             seat:Sit(humanoid)
+            -- Position seat relative to hull
+            task.wait(0.1)
         end
+        
+        -- Wait a moment for client tutorial to show, then send world data
+        task.wait(2)
         
         -- Send world data to client
         local islandData = {}

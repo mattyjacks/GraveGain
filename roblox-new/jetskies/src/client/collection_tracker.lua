@@ -26,8 +26,10 @@ function CollectionTracker:Init(jetSky, clientState)
     state.clientState = clientState
     
     -- Get remote event
-    local remotes = ReplicatedStorage:WaitForChild("Remotes")
-    CollectRing = remotes:WaitForChild("CollectRing")
+    local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+    if remotes then
+        CollectRing = remotes:WaitForChild("CollectRing", 5)
+    end
     
     -- Find all ring triggers
     self:ScanForRings()
@@ -55,7 +57,8 @@ function CollectionTracker:Update(dt)
     
     if not state.jetSky then return end
     
-    local hull = state.jetSky:FindFirstChild("Hull")
+    -- Try detailed model hull first, fallback to simple
+    local hull = state.jetSky:FindFirstChild("HullLower") or state.jetSky:FindFirstChild("Hull")
     if not hull then return end
     
     local jetSkyPos = hull.Position
@@ -89,7 +92,9 @@ function CollectionTracker:CollectRing(trigger)
     self:AnimateCollection(ring, hole)
     
     -- Tell server
-    CollectRing:FireServer(trigger)
+    if CollectRing then
+        CollectRing:FireServer(trigger)
+    end
     
     -- Remove from local tracking
     for i, r in ipairs(state.nearbyRings) do
@@ -141,9 +146,9 @@ function CollectionTracker:SpawnCollectParticles(position)
     emitter.Speed = NumberRange.new(GameData.ParticleSettings.RING_COLLECT.speed)
     emitter.Acceleration = Vector3.new(0, 10, 0)
     emitter.SpreadAngle = Vector2.new(180, 180)
-    emitter.BurstCount = 20
     emitter.Parent = particlePart
     
+    -- Emit burst of particles
     emitter:Emit(20)
     
     task.delay(1, function()
