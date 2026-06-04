@@ -4,70 +4,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
--- Temporary: Use placeholder values until shared modules are working
-local RemoteNames = {
-	-- Player actions
-	PlayerMove = "PlayerMove",
-	PlayerAttack = "PlayerAttack",
-	PlayerBoost = "PlayerBoost",
-	PlayerInteract = "PlayerInteract",
-	
-	-- Game systems
-	UpdatePlayerStats = "UpdatePlayerStats",
-	UpdateHealth = "UpdateHealth",
-	UpdateHunger = "UpdateHunger",
-	UpdateXP = "UpdateXP",
-	UpdateLevel = "UpdateLevel",
-	UpdateGold = "UpdateGold",
-	AbilityCooldown = "AbilityCooldown",
-	
-	-- Inventory
-	InventoryAdd = "InventoryAdd",
-	InventoryRemove = "InventoryRemove",
-	InventoryUse = "InventoryUse",
-	
-	-- Aquarium
-	AquariumFeed = "AquariumFeed",
-	AquariumClean = "AquariumClean",
-	AquariumDecorate = "AquariumDecorate",
-	
-	-- Mutations
-	MutationApply = "MutationApply",
-	MutationRemove = "MutationRemove",
-	
-	-- Messages
-	GameMessage = "GameMessage",
-	Error = "Error",
-	Success = "Success",
-	
-	-- Functions
-	GetPlayerData = "GetPlayerData",
-	GetInventory = "GetInventory",
-	GetAquarium = "GetAquarium",
-	PingClient = "PingClient"
-}
-local GameUtilities = {
-	DebugPrint = function(message) print("[DEBUG]", message) end,
-	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
-	Lerp = function(a, b, t) return a + (b - a) * t end,
-	RandomFloat = function(min, max) return math.random() * (max - min) + min end,
-	FindNearestTarget = function(position, maxDistance, targetType)
-		local nearest = nil
-		local nearestDistance = maxDistance
-		
-		for _, obj in pairs(Workspace:GetChildren()) do
-			if obj:FindFirstChild("Humanoid") and obj ~= Players.LocalPlayer.Character then
-				local distance = (obj.PrimaryPart.Position - position).Magnitude
-				if distance < nearestDistance then
-					nearest = obj
-					nearestDistance = distance
-				end
-			end
-		end
-		
-		return nearest
-	end
-}
+-- Load shared modules
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local RemoteNames = require(Shared:WaitForChild("Networking"):WaitForChild("RemoteNames"))
+local GameUtilities = require(Shared:WaitForChild("Utilities"):WaitForChild("GameUtilities"))
 
 local NetworkManager = {}
 
@@ -240,10 +180,39 @@ function NetworkManager.HandlePlayerMove(player, position, direction)
 	
 	local currentPosition = character.PrimaryPart.Position
 	local distance = (position - currentPosition).Magnitude
+	local timeDelta = 1/20 -- Assume 20Hz update rate
 	
-	-- Basic movement validation (max speed check)
-	if distance > 100 then -- Too far, likely cheating
-		GameUtilities.LogWarning("NetworkManager: " .. player.Name .. " attempted invalid movement")
+	-- Get player data for speed validation
+	local PlayerDataManager = require(script.Parent.PlayerDataManager)
+	local data = PlayerDataManager.GetPlayerData(player.UserId)
+	local maxSpeed = GameConstants.SHARK_BOOST_SPEED
+	if data then
+		maxSpeed = math.max(maxSpeed, data.Speed * 1.5) -- Allow some buffer
+	end
+	
+	-- Speed validation: distance should not exceed maxSpeed * timeDelta * buffer
+	local maxDistance = maxSpeed * timeDelta * 2.0 -- 2x buffer for latency
+	if distance > maxDistance then
+		GameUtilities.LogWarning("NetworkManager: " .. player.Name .. " moved too fast (" .. distance .. " studs)")
+		-- Reject movement, teleport back to valid position
+		NetworkManager.SendToClient(player, "Error", "Movement rejected - speed limit exceeded")
+		return
+	end
+	
+	-- World boundary enforcement (C4)
+	local halfSizeX = GameConstants.OCEAN_SIZE.X / 2
+	local halfSizeY = GameConstants.OCEAN_SIZE.Y / 2
+	local clampedX = math.clamp(position.X, -halfSizeX, halfSizeX)
+	local clampedZ = math.clamp(position.Z, -halfSizeY, halfSizeY)
+	local clampedY = math.clamp(position.Y, GameConstants.OCEAN_DEPTH, GameConstants.WATER_LEVEL + 100)
+	
+	-- If position was outside boundaries, reject and correct
+	if position.X ~= clampedX or position.Z ~= clampedZ or position.Y ~= clampedY then
+		GameUtilities.LogWarning("NetworkManager: " .. player.Name .. " hit world boundary")
+		local clampedPosition = Vector3.new(clampedX, clampedY, clampedZ)
+		-- Teleport player back to valid position
+		character.PrimaryPart.CFrame = CFrame.new(clampedPosition)
+		NetworkManager.SendToClient(player, "Error", "You have reached the world boundary")
 		return
 	end
 	
@@ -658,7 +627,7 @@ end
 function NetworkManager.SendToAllClients(eventName, data, excludePlayer)
 	local remote = remoteEvents[eventName]
 	if remote then
-		for _, player in pairs(game.Players:GetPlayers()) do
+		for _, player in pairs(Players:GetPlayers()) do
 			if player ~= excludePlayer then
 				remote:FireClient(player, data)
 			end
@@ -797,6 +766,17 @@ end
 
 function NetworkManager.HandleNPCInteraction(player, npcId)
 	-- TODO: Implement NPC interaction
+end
+
+-- PLAYER CONNECTION HANDLING
+function NetworkManager.OnPlayerAdded(player)
+	GameUtilities.DebugPrint("NetworkManager: Player added " .. player.Name)
+	-- Player-specific network setup can go here
+end
+
+function NetworkManager.OnPlayerRemoving(player)
+	GameUtilities.DebugPrint("NetworkManager: Player removing " .. player.Name)
+	-- Clean up player-specific network state
 end
 
 return NetworkManager

@@ -5,46 +5,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
--- Temporary: Use placeholder values until shared modules are working
-local GameConstants = {
-	WATER_LEVEL = 0,
-	UNDERWATER_GRAVITY = 10,
-	WATER_DENSITY = 1,
-	SHARK_TURN_SPEED = 5,
-	SHARK_BASE_SPEED = 16,
-	SHARK_BOOST_SPEED = 32,
-	SHARK_BOOST_COOLDOWN = 3,
-	SHARK_LEAP_FORCE = 100,
-	BITE_RANGE = 10
-}
-local GameEnums = {
-	EnemyType = {
-		SmallFish = "SmallFish",
-		MediumFish = "MediumFish",
-		LargeFish = "LargeFish",
-		Jellyfish = "Jellyfish",
-		Shark = "Shark"
-	},
-	ItemType = {
-		Food = "Food",
-		HealthPotion = "HealthPotion",
-		SpeedBoost = "SpeedBoost",
-		Treasure = "Treasure"
-	}
-}
-local GameData = {
-	EnemyData = {
-		SmallFish = {Health = 20, Damage = 5, Speed = 15, XP = 10},
-		MediumFish = {Health = 50, Damage = 10, Speed = 12, XP = 25},
-		LargeFish = {Health = 100, Damage = 20, Speed = 8, XP = 50}
-	}
-}
-local GameUtilities = {
-	DebugPrint = function(message) print("[DEBUG]", message) end,
-	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
-	Lerp = function(a, b, t) return a + (b - a) * t end,
-	RandomFloat = function(min, max) return math.random() * (max - min) + min end
-}
+-- Load shared modules
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConstants = require(Shared:WaitForChild("Constants"):WaitForChild("GameConstants"))
+local GameEnums = require(Shared:WaitForChild("Enums"):WaitForChild("GameEnums"))
+local GameData = require(Shared:WaitForChild("Data"):WaitForChild("GameData"))
+local GameUtilities = require(Shared:WaitForChild("Utilities"):WaitForChild("GameUtilities"))
 
 local PlayerDataManager = {}
 
@@ -383,7 +349,7 @@ function PlayerDataManager.DamagePlayer(player, damage, damageType)
 	if not data then return end
 	
 	data.Health = math.max(0, data.Health - damage)
-	data.Statistics.TotalDamageTaken += damage.Statistics.TotalDamageTaken + damage
+	data.Statistics.TotalDamageTaken += damage
 	
 	-- Update statistics
 	if data.Health <= 0 then

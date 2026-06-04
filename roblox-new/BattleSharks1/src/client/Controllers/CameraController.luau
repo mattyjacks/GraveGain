@@ -7,16 +7,10 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 
--- Temporary: Use placeholder values until shared modules are working
-local GameConstants = {
-	WATER_LEVEL = 0
-}
-local GameUtilities = {
-	DebugPrint = function(message) print("[DEBUG]", message) end,
-	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
-	Lerp = function(a, b, t) return a + (b - a) * t end,
-	RandomFloat = function(min, max) return math.random() * (max - min) + min end
-}
+-- Load shared modules
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConstants = require(Shared:WaitForChild("Constants"):WaitForChild("GameConstants"))
+local GameUtilities = require(Shared:WaitForChild("Utilities"):WaitForChild("GameUtilities"))
 
 local CameraController = {}
 
@@ -274,15 +268,27 @@ function CameraController.UpdateEnvironmentEffects()
 		Lighting.Ambient = Color3.new(0, 0.1, 0.2)
 		Lighting.Brightness = 0.8
 		
+		-- Clean up existing effects first to prevent leaks
+		if camera:FindFirstChild("ColorCorrection") then
+			camera.ColorCorrection:Destroy()
+		end
+		if camera:FindFirstChild("Blur") then
+			camera.Blur:Destroy()
+		end
+		
 		-- Underwater color correction
-		camera.ColorCorrection = ColorCorrectionEffect.new()
-		camera.ColorCorrection.TintColor = Color3.new(0.8, 0.9, 1)
-		camera.ColorCorrection.Contrast = 0.1
-		camera.ColorCorrection.Saturation = 0.8
+		local colorCorrection = ColorCorrectionEffect.new()
+		colorCorrection.Name = "ColorCorrection"
+		colorCorrection.TintColor = Color3.new(0.8, 0.9, 1)
+		colorCorrection.Contrast = 0.1
+		colorCorrection.Saturation = 0.8
+		colorCorrection.Parent = camera
 		
 		-- Underwater blur
-		camera.Blur = BlurEffect.new()
-		camera.Blur.Size = 2
+		local blur = BlurEffect.new()
+		blur.Name = "Blur"
+		blur.Size = 2
+		blur.Parent = camera
 		
 	else
 		-- Surface effects

@@ -6,75 +6,12 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 
--- Temporary: Use placeholder values until shared modules are working
-local GameConstants = {
-	WATER_LEVEL = 0,
-	UNDERWATER_GRAVITY = 10,
-	WATER_DENSITY = 1,
-	SHARK_TURN_SPEED = 5,
-	SHARK_BASE_SPEED = 16,
-	SHARK_BOOST_SPEED = 32,
-	SHARK_BOOST_COOLDOWN = 3,
-	SHARK_LEAP_FORCE = 100,
-	BITE_RANGE = 10,
-	OCEAN_SIZE = 500,
-	OCEAN_DEPTH = 100,
-	ENEMY_SPAWN_RATE = 5,
-	ITEM_SPAWN_RATE = 8,
-	MAX_ENEMIES = 50,
-	MAX_ITEMS = 100,
-	CLEANUP_DISTANCE = 200
-}
-local GameEnums = {
-	EnemyType = {
-		SmallFish = "SmallFish",
-		MediumFish = "MediumFish",
-		LargeFish = "LargeFish",
-		Jellyfish = "Jellyfish",
-		Shark = "Shark"
-	},
-	ItemType = {
-		Food = "Food",
-		HealthPotion = "HealthPotion",
-		SpeedBoost = "SpeedBoost",
-		Treasure = "Treasure"
-	},
-	EnemyState = {
-		Idle = "Idle",
-		Patrol = "Patrol",
-		Chase = "Chase",
-		Attack = "Attack",
-		Dead = "Dead"
-	}
-}
-local GameData = {
-	EnemyData = {
-		SmallFish = {Health = 20, Damage = 5, Speed = 15, XP = 10},
-		MediumFish = {Health = 50, Damage = 10, Speed = 12, XP = 25},
-		LargeFish = {Health = 100, Damage = 20, Speed = 8, XP = 50}
-	},
-	ItemData = {
-		Food = {HealAmount = 10, Duration = 0},
-		HealthPotion = {HealAmount = 50, Duration = 0},
-		SpeedBoost = {SpeedMultiplier = 1.5, Duration = 30},
-		Treasure = {GoldValue = 100, Duration = 0}
-	}
-}
-local GameUtilities = {
-	DebugPrint = function(message) print("[DEBUG]", message) end,
-	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
-	Lerp = function(a, b, t) return a + (b - a) * t end,
-	RandomFloat = function(min, max) return math.random() * (max - min) + min end,
-	GetRandomPosition = function(center, radius)
-		local angle = math.random() * math.pi * 2
-		local distance = math.random() * radius
-		return center + Vector3.new(
-			math.cos(angle) * distance,
-			0,
-			math.sin(angle) * distance
-		)
-	end
-}
+-- Load shared modules
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConstants = require(Shared:WaitForChild("Constants"):WaitForChild("GameConstants"))
+local GameEnums = require(Shared:WaitForChild("Enums"):WaitForChild("GameEnums"))
+local GameData = require(Shared:WaitForChild("Data"):WaitForChild("GameData"))
+local GameUtilities = require(Shared:WaitForChild("Utilities"):WaitForChild("GameUtilities"))
 
 local GameLoopManager = {}
 
@@ -294,7 +231,10 @@ function GameLoopManager.TrySpawnEnemy()
 	local character = player.Character
 	if not character then return end
 	
-	local playerPosition = character.PrimaryPart.Position
+	local primaryPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("PrimaryPart")
+	if not primaryPart then return end
+	
+	local playerPosition = primaryPart.Position
 	
 	-- Find spawn position
 	local spawnPosition = GameLoopManager.FindSpawnPosition(playerPosition, spawnConfig.SpawnRadius)
@@ -413,6 +353,7 @@ function GameLoopManager.SpawnEnemy(enemyType, position)
 	healthBar.Parent = healthTag
 	
 	mainPart.Parent = model
+	model.PrimaryPart = mainPart
 	model.Parent = Workspace
 	
 	-- Create enemy object
@@ -461,7 +402,9 @@ function GameLoopManager.UpdateEnemyAI(enemy)
 	local nearestPlayer = GameLoopManager.GetNearestPlayer(enemyPosition)
 	
 	if nearestPlayer and nearestPlayer.Character then
-		local playerPosition = nearestPlayer.Character.PrimaryPart.Position
+		local targetPart = nearestPlayer.Character:FindFirstChild("HumanoidRootPart") or nearestPlayer.Character:FindFirstChild("PrimaryPart")
+		if not targetPart then return end
+		local playerPosition = targetPart.Position
 		local distance = (playerPosition - enemyPosition).Magnitude
 		
 		enemy.Target = nearestPlayer
@@ -509,11 +452,137 @@ function GameLoopManager.EnemyChase(enemy, target)
 	local humanoid = enemy.Model:FindFirstChild("Humanoid")
 	if not humanoid then return end
 	
-	local enemyPosition = enemy.Model.PrimaryPart.Position
-	local targetPosition = target.Character.PrimaryPart.Position
-	local direction = (targetPosition - enemyPosition).Unit
+	if not enemy.Model or not enemy.Model.PrimaryPart then return end
+	local targetPart = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("PrimaryPart")
+	if not targetPart then return end
 	
-	humanoid:Move(direction * enemy.Data.Speed)
+	local enemyPosition = enemy.Model.PrimaryPart.Position
+	local targetPosition = targetPart.Position
+	local distance = (targetPosition - enemyPosition).Magnitude
+	
+	-- Pathfinding with obstacle avoidance (C6)
+	local moveDirection = GameLoopManager.CalculatePathDirection(enemy, enemyPosition, targetPosition, distance)
+	
+	-- Adjust speed based on behavior
+	local speed = enemy.Data.Speed
+	if enemy.Data.Behavior == "Aggressive" and distance < 50 then
+		speed = speed * 1.3 -- Sprint when close
+	end
+	
+	humanoid:Move(moveDirection * speed)
+end
+
+-- PATHFINDING SYSTEM (C6)
+function GameLoopManager.CalculatePathDirection(enemy, startPos, targetPos, distance)
+	local directDirection = (targetPos - startPos).Unit
+	
+	-- If very close, just go directly
+	if distance < 10 then
+		return directDirection
+	end
+	
+	-- Check for obstacles using raycast
+	local rayOrigin = startPos
+	local rayDirection = directDirection * math.min(distance, 30)
+	
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterDescendantsInstances = {enemy.Model, Workspace:FindFirstChild("Terrain")}
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+	
+	local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+	
+	if raycastResult then
+		-- Obstacle detected, try to navigate around
+		return GameLoopManager.FindAvoidanceDirection(enemy, startPos, targetPos, directDirection, raycastResult.Position, raycastResult.Normal)
+	end
+	
+	-- No obstacle, direct path is clear
+	return directDirection
+end
+
+function GameLoopManager.FindAvoidanceDirection(enemy, startPos, targetPos, directDir, hitPos, hitNormal)
+	-- Try multiple angles to find clear path
+	local bestDirection = directDir
+	local bestScore = -math.huge
+	
+	for angle = -90, 90, 30 do
+		local radians = math.rad(angle)
+		local rotatedDir = Vector3.new(
+			directDir.X * math.cos(radians) - directDir.Z * math.sin(radians),
+			0,
+			directDir.X * math.sin(radians) + directDir.Z * math.cos(radians)
+		).Unit
+		
+		-- Test this direction
+		local testRay = rotatedDir * 20
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterDescendantsInstances = {enemy.Model}
+		raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+		
+		local result = Workspace:Raycast(startPos, testRay, raycastParams)
+		
+		-- Score based on clear path and progress toward target
+		local score = 0
+		if not result then
+			score += 50 -- Clear path bonus
+		else
+			score -= 20 -- Obstacle penalty
+		end
+		
+		-- Bonus for directions toward target
+		local toTarget = (targetPos - startPos).Unit
+		local alignment = rotatedDir:Dot(toTarget)
+		score += alignment * 30
+		
+		if score > bestScore then
+			bestScore = score
+			bestDirection = rotatedDir
+		end
+	end
+	
+	return bestDirection
+end
+
+-- DAMAGE SYSTEM INTEGRATION
+function GameLoopManager.DamageEnemy(enemyModel, damage)
+	-- Find enemy by model
+	for _, enemy in pairs(enemies) do
+		if enemy.Model == enemyModel then
+			enemy.Health -= damage
+			
+			-- Visual feedback
+			if enemy.Model and enemy.Model.PrimaryPart then
+				GameLoopManager.ShowEnemyDamage(enemy, damage)
+			end
+			
+			-- Check death
+			if enemy.Health <= 0 then
+				GameLoopManager.OnEnemyDied(enemy)
+			end
+			
+			return true
+		end
+	end
+	
+	return false
+end
+
+function GameLoopManager.ShowEnemyDamage(enemy, damage)
+	local position = enemy.Model.PrimaryPart.Position
+	
+	-- Flash the enemy red
+	for _, part in pairs(enemy.Model:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local originalColor = part.BrickColor
+			part.BrickColor = BrickColor.new("Bright red")
+			
+			task.delay(0.2, function()
+				if part then
+					part.BrickColor = originalColor
+				end
+			end)
+		end
+	end
 end
 
 function GameLoopManager.EnemyAttack(enemy, target)
@@ -524,8 +593,12 @@ function GameLoopManager.EnemyAttack(enemy, target)
 	
 	if currentTime - enemy.LastAttack < attackCooldown then return end
 	
+	if not enemy.Model or not enemy.Model.PrimaryPart then return end
+	local targetPart = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("PrimaryPart")
+	if not targetPart then return end
+	
 	local enemyPosition = enemy.Model.PrimaryPart.Position
-	local targetPosition = target.Character.PrimaryPart.Position
+	local targetPosition = targetPart.Position
 	local distance = (targetPosition - enemyPosition).Magnitude
 	
 	if distance <= (enemy.Data.Range or 10) then
@@ -694,7 +767,10 @@ function GameLoopManager.TrySpawnItem()
 	local character = player.Character
 	if not character then return end
 	
-	local playerPosition = character.PrimaryPart.Position
+	local primaryPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("PrimaryPart")
+	if not primaryPart then return end
+	
+	local playerPosition = primaryPart.Position
 	
 	-- Find spawn position
 	local spawnPosition = GameLoopManager.FindSpawnPosition(playerPosition, spawnConfig.SpawnRadius * 0.7)
@@ -898,7 +974,13 @@ function GameLoopManager.CleanupDistantObjects()
 	local player = GameLoopManager.GetRandomPlayer()
 	if not player then return end
 	
-	local playerPosition = player.Character.PrimaryPart.Position
+	local character = player.Character
+	if not character then return end
+	
+	local primaryPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("PrimaryPart")
+	if not primaryPart then return end
+	
+	local playerPosition = primaryPart.Position
 	
 	-- Clean up distant enemies
 	for i = #enemies, 1, -1 do

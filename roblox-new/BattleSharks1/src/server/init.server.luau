@@ -7,20 +7,21 @@ local Players = game:GetService("Players")
 
 -- Import services
 local TerrainService = require(script.TerrainService)
-local PlayerDataManager = {
-	Initialize = function() print("PlayerDataManager: Initialize called") end,
-	Cleanup = function() print("PlayerDataManager: Cleanup called") end
-}
-local GameLoopManager = {
-	Initialize = function() print("GameLoopManager: Initialize called") end,
-	Cleanup = function() print("GameLoopManager: Cleanup called") end,
-	GetEnemyCount = function() return 0 end,
-	GetItemCount = function() return 0 end
-}
-local NetworkManager = {
-	Initialize = function() print("NetworkManager: Initialize called") end,
-	Cleanup = function() print("NetworkManager: Cleanup called") end
-}
+local PlayerDataManager = require(script.Services.PlayerDataManager)
+local GameLoopManager = require(script.Services.GameLoopManager)
+local NetworkManager = require(script.Services.NetworkManager)
+local PhysicsManager = require(script.Services.PhysicsManager)
+local CombatManager = require(script.Services.CombatManager)
+local AquariumManager = require(script.Services.AquariumManager)
+local InventoryManager = require(script.Services.InventoryManager)
+local DailyRewardsManager = require(script.Services.DailyRewardsManager)
+local AntiCheatManager = require(script.Services.AntiCheatManager)
+local OptimizationManager = require(script.Services.OptimizationManager)
+local AchievementManager = require(script.Services.AchievementManager)
+local LeaderboardManager = require(script.Services.LeaderboardManager)
+local GuildManager = require(script.Services.GuildManager)
+local SeasonalEventsManager = require(script.Services.SeasonalEventsManager)
+local ReplayManager = require(script.Services.ReplayManager)
 
 -- Game configuration
 local GAME_CONFIG = {
@@ -34,75 +35,6 @@ local GAME_CONFIG = {
 local function SetupGameEnvironment()
 	print("Setting up game environment...")
 	-- Note: FilteringEnabled is set in default.project.json
-	print("Game environment configured")
-end
-
--- Set up periodic tasks
-local function SetupPeriodicTasks()
-	print("Setting up periodic tasks...")
-	-- Simplified for testing
-end
-
--- Set up server shutdown handling
-local function SetupShutdownHandling()
-	print("Setting up server shutdown handling...")
-	-- Simplified for testing
-end
-
--- Set up player-specific systems
-local function SetupPlayerSystems(player)
-	print("Setting up player systems for", player.Name)
-	-- Simplified for testing
-end
-
--- Initialize all systems
-local function InitializeGame()
-	print("=== BattleSharks Server Starting ===")
-	print("Version:", GAME_CONFIG.SERVER_VERSION)
-	print("Max Players:", GAME_CONFIG.MAX_PLAYERS)
-	
-	-- Wait for shared modules to be available
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local Shared = ReplicatedStorage:WaitForChild("Shared", 10)
-	if not Shared then
-		warn("Shared modules not found!")
-		return
-	end
-	
-	-- Set up game environment
-	SetupGameEnvironment()
-	
-	-- Create BattleSharksRemotes folder for client
-	local battleSharksRemotes = Instance.new("Folder")
-	battleSharksRemotes.Name = "BattleSharksRemotes"
-	battleSharksRemotes.Parent = ReplicatedStorage
-	
-	-- Initialize core services with error handling
-	local success, errorMessage = pcall(function()
-		TerrainService.Initialize()
-		PlayerDataManager.Initialize()
-		GameLoopManager.Initialize()
-		NetworkManager.Initialize()
-	end)
-	
-	if not success then
-		warn("Failed to initialize services:", errorMessage)
-		return
-	end
-	
-	-- Set up periodic tasks
-	SetupPeriodicTasks()
-	
-	-- Set up server shutdown handling
-	SetupShutdownHandling()
-	
-	print("=== BattleSharks Server Ready ===")
-end
-
--- Set up the game environment
-local function SetupGameEnvironment()
-	print("Setting up game environment...")
-	Workspace.FilteringEnabled = true
 	print("Game environment configured")
 end
 
@@ -150,9 +82,63 @@ local function SetupShutdownHandling()
 		
 		-- Stop game loop
 		GameLoopManager.Cleanup()
+		PhysicsManager.Cleanup()
+		CombatManager.Cleanup()
+		AquariumManager.Cleanup()
+		DailyRewardsManager.Cleanup()
+		AntiCheatManager.Cleanup()
+		OptimizationManager.Cleanup()
+		AchievementManager.Cleanup()
+		LeaderboardManager.Cleanup()
+		GuildManager.Cleanup()
+		SeasonalEventsManager.Cleanup()
+		ReplayManager.Cleanup()
 		
 		print("=== BattleSharks Server Shutdown Complete ===")
 	end)
+end
+
+-- Set up leaderstats
+local function SetupLeaderstats(player)
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = player
+	
+	-- Level stat
+	local level = Instance.new("IntValue")
+	level.Name = "Level"
+	level.Value = 1
+	level.Parent = leaderstats
+	
+	-- XP stat (C7)
+	local xp = Instance.new("IntValue")
+	xp.Name = "XP"
+	xp.Value = 0
+	xp.Parent = leaderstats
+	
+	-- Gold stat
+	local gold = Instance.new("IntValue")
+	gold.Name = "🪙 Gold"
+	gold.Value = 0
+	gold.Parent = leaderstats
+	
+	-- Kills stat
+	local kills = Instance.new("IntValue")
+	kills.Name = "Kills"
+	kills.Value = 0
+	kills.Parent = leaderstats
+	
+	-- Hunger stat (C8)
+	local hunger = Instance.new("IntValue")
+	hunger.Name = "🍖 Hunger"
+	hunger.Value = 100
+	hunger.Parent = leaderstats
+end
+
+-- Set up player-specific systems
+local function SetupPlayerSystems(player)
+	print("Setting up player systems for", player.Name)
+	NetworkManager.OnPlayerAdded(player)
 end
 
 -- Player connection handling
@@ -163,6 +149,7 @@ local function OnPlayerAdded(player)
 	local success, errorMessage = pcall(function()
 		TerrainService.OnPlayerAdded(player)
 		SetupPlayerSystems(player)
+		SetupLeaderstats(player)
 	end)
 	
 	if not success then
@@ -176,6 +163,7 @@ local function OnPlayerRemoving(player)
 	-- Clean up terrain service for player
 	local success, errorMessage = pcall(function()
 		TerrainService.OnPlayerRemoved(player)
+		NetworkManager.OnPlayerRemoving(player)
 	end)
 	
 	if not success then
@@ -183,11 +171,62 @@ local function OnPlayerRemoving(player)
 	end
 end
 
--- Set up player-specific systems
-local function SetupPlayerSystems(player)
-	print("Setting up player systems for", player.Name)
-	-- Simplified for testing
+-- Initialize all systems
+local function InitializeGame()
+	print("=== BattleSharks Server Starting ===")
+	print("Version:", GAME_CONFIG.SERVER_VERSION)
+	print("Max Players:", GAME_CONFIG.MAX_PLAYERS)
+	
+	-- Wait for shared modules to be available
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Shared = ReplicatedStorage:WaitForChild("Shared", 10)
+	if not Shared then
+		warn("Shared modules not found!")
+		return
+	end
+	
+	-- Set up game environment
+	SetupGameEnvironment()
+	
+	-- Create BattleSharksRemotes folder for client
+	local battleSharksRemotes = Instance.new("Folder")
+	battleSharksRemotes.Name = "BattleSharksRemotes"
+	battleSharksRemotes.Parent = ReplicatedStorage
+	
+	-- Initialize core services with error handling
+	local success, errorMessage = pcall(function()
+		TerrainService.Initialize()
+		PlayerDataManager.Initialize()
+		PhysicsManager.Initialize()
+		CombatManager.Initialize()
+		AquariumManager.Initialize()
+		InventoryManager.Initialize()
+		DailyRewardsManager.Initialize()
+		AntiCheatManager.Initialize()
+		OptimizationManager.Initialize()
+		AchievementManager.Initialize()
+		LeaderboardManager.Initialize()
+		GuildManager.Initialize()
+		SeasonalEventsManager.Initialize()
+		ReplayManager.Initialize()
+		GameLoopManager.Initialize()
+		NetworkManager.Initialize()
+	end)
+	
+	if not success then
+		warn("Failed to initialize services:", errorMessage)
+		return
+	end
+	
+	-- Set up periodic tasks
+	SetupPeriodicTasks()
+	
+	-- Set up server shutdown handling
+	SetupShutdownHandling()
+	
+	print("=== BattleSharks Server Ready ===")
 end
+
 
 -- Configure player character
 local function ConfigurePlayerCharacter(character)
@@ -263,31 +302,6 @@ local function SetCharacterAppearance(character)
 	end
 end
 
--- Set up leaderstats
-local function SetupLeaderstats(player)
-	local leaderstats = Instance.new("Folder")
-	leaderstats.Name = "leaderstats"
-	leaderstats.Parent = player
-	
-	-- Level stat
-	local level = Instance.new("IntValue")
-	level.Name = "Level"
-	level.Value = 1
-	level.Parent = leaderstats
-	
-	-- Gold stat
-	local gold = Instance.new("IntValue")
-	gold.Name = "🪙 Gold"
-	gold.Value = 0
-	gold.Parent = leaderstats
-	
-	-- Kills stat
-	local kills = Instance.new("IntValue")
-	kills.Name = "Kills"
-	kills.Value = 0
-	kills.Parent = leaderstats
-end
-
 -- Update leaderstats
 local function UpdateLeaderstats(player)
 	local PlayerDataManager = require(script.Services.PlayerDataManager)
@@ -304,6 +318,12 @@ local function UpdateLeaderstats(player)
 		levelStat.Value = data.Level
 	end
 	
+	-- Update XP (C7)
+	local xpStat = leaderstats:FindFirstChild("XP")
+	if xpStat then
+		xpStat.Value = data.XP
+	end
+	
 	-- Update gold
 	local goldStat = leaderstats:FindFirstChild("🪙 Gold")
 	if goldStat then
@@ -315,7 +335,14 @@ local function UpdateLeaderstats(player)
 	if killsStat then
 		killsStat.Value = data.EnemiesKilled
 	end
+	
+	-- Update Hunger (C8)
+	local hungerStat = leaderstats:FindFirstChild("🍖 Hunger")
+	if hungerStat then
+		hungerStat.Value = math.floor(data.Hunger)
+	end
 end
+
 
 -- Connect player events
 Players.PlayerAdded:Connect(OnPlayerAdded)

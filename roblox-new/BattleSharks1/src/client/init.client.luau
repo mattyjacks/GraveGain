@@ -9,14 +9,15 @@ local StarterGui = game:GetService("StarterGui")
 -- Import controllers and systems
 local TerrainRenderer = require(script.TerrainRenderer)
 local SharkModel = require(script.SharkModel)
-local SharkController = {
-	Initialize = function() print("SharkController: Initialize called") end,
-	Cleanup = function() print("SharkController: Cleanup called") end
-}
-local CameraController = {
-	Initialize = function() print("CameraController: Initialize called") end,
-	Cleanup = function() print("CameraController: Cleanup called") end
-}
+local SharkController = require(script.Controllers.SharkController)
+local CameraController = require(script.Controllers.CameraController)
+local AbilityController = require(script.Controllers.AbilityController)
+local UIManager = require(script.UI.UIManager)
+local TutorialManager = require(script.UI.TutorialManager)
+local SoundManager = require(script.Systems.SoundManager)
+local ParticleManager = require(script.Systems.ParticleManager)
+local SettingsManager = require(script.Systems.SettingsManager)
+local ClientOptimizationManager = require(script.Systems.ClientOptimizationManager)
 
 -- Client configuration
 local CLIENT_CONFIG = {
@@ -69,7 +70,38 @@ end
 -- Set up network event handlers
 local function SetupNetworkHandlers()
 	print("Setting up network handlers...")
-	-- Simplified for testing - just create basic structure
+	
+	local remoteFolder = ReplicatedStorage:WaitForChild("BattleSharksRemotes", 10)
+	if not remoteFolder then
+		warn("BattleSharksRemotes folder not found!")
+		return
+	end
+	
+	-- Connect to server-to-client events
+	local eventMap = {
+		["UpdatePlayerStats"] = OnPlayerStatsUpdated,
+		["UpdateHunger"] = OnHungerUpdated,
+		["UpdateHealth"] = OnHealthUpdated,
+		["UpdateXP"] = OnXPUpdated,
+		["UpdateLevel"] = OnLevelUpdated,
+		["UpdateGold"] = OnGoldUpdated,
+		["AbilityCooldown"] = OnAbilityCooldown,
+		["GameMessage"] = OnGameMessage,
+		["Error"] = OnErrorMessage,
+		["Success"] = OnSuccessMessage,
+	}
+	
+	for eventName, handler in pairs(eventMap) do
+		local remote = remoteFolder:FindFirstChild(eventName)
+		if remote and remote:IsA("RemoteEvent") then
+			remote.OnClientEvent:Connect(handler)
+			print("Connected to", eventName)
+		else
+			warn("RemoteEvent not found:", eventName)
+		end
+	end
+	
+	print("Network handlers configured")
 end
 
 -- Set up periodic tasks
@@ -97,6 +129,19 @@ local function InitializeClient()
 	TerrainRenderer.Initialize()
 	SharkController.Initialize()
 	CameraController.Initialize()
+	
+	-- Initialize new systems (D1-D4)
+	UIManager.Initialize()
+	TutorialManager.Initialize()
+	SoundManager.Initialize()
+	ParticleManager.Initialize()
+	AbilityController.Initialize()
+	
+	-- Initialize optimization (F)
+	ClientOptimizationManager.Initialize()
+	
+	-- Initialize settings (E7)
+	SettingsManager.Initialize()
 	
 	-- Transform player into shark
 	print("Transforming player into shark...")
