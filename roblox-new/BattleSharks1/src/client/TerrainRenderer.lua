@@ -1,6 +1,7 @@
 -- BattleSharks Client Terrain Renderer
 -- Renders hexagonal voxel terrain on the client
 
+local Players = game:GetService("Players")
 local TerrainRenderer = {}
 
 -- Renderer configuration
@@ -36,7 +37,7 @@ function TerrainRenderer.Initialize()
 	
 	-- Get camera and player references
 	TerrainRenderer.State.Camera = workspace.CurrentCamera
-	TerrainRenderer.State.Player = game.Players.LocalPlayer
+	TerrainRenderer.State.Player = Players.LocalPlayer
 	
 	-- Create terrain folder
 	local terrainFolder = Instance.new("Folder")

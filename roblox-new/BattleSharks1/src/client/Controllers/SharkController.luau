@@ -168,14 +168,18 @@ function SharkController.SetupPhysics()
 end
 
 function SharkController.ApplyPlayerStats()
-	-- Request player data from server
-	local NetworkManager = require(script.Parent.Parent.Parent.Shared.Networking.RemoteNames)
-	local remoteFolder = ReplicatedStorage:WaitForChild("BattleSharksRemotes")
+	-- Request player data from server via RemoteFunction
+	local remoteFolder = ReplicatedStorage:WaitForChild("BattleSharksRemotes", 10)
+	if not remoteFolder then return end
 	
 	local getStatsFunction = remoteFolder:WaitForChild("GetPlayerData")
-	local playerData = getStatsFunction:InvokeServer()
+	if not getStatsFunction then return end
 	
-	if playerData then
+	local success, playerData = pcall(function()
+		return getStatsFunction:InvokeServer()
+	end)
+	
+	if success and playerData then
 		movementState.CurrentSpeed = playerData.Speed or GameConstants.SHARK_BASE_SPEED
 		
 		-- Update humanoid health
@@ -321,7 +325,7 @@ function SharkController.UpdatePhysics(deltaTime)
 	
 	local currentY = humanoidRootPart.Position.Y
 	
-	-- Apply underwater physics
+	-- Apply underwater physics (using local body forces, not global gravity)
 	if movementState.IsUnderwater then
 		-- Apply buoyancy
 		local buoyancy = Vector3.new(0, physics.BuoyancyForce * deltaTime, 0)
@@ -332,12 +336,11 @@ function SharkController.UpdatePhysics(deltaTime)
 		local drag = velocity * (-physics.DragCoefficient)
 		humanoidRootPart:ApplyImpulse(drag * deltaTime)
 		
-		-- Reduce gravity effect
-		Workspace.Gravity = physics.WaterGravity
-	else
-		-- Normal gravity
-		Workspace.Gravity = physics.Gravity
+		-- Apply simulated reduced gravity via upward force
+		local waterGravityCompensation = Vector3.new(0, (physics.Gravity - physics.WaterGravity) * deltaTime, 0)
+		humanoidRootPart:ApplyImpulse(waterGravityCompensation)
 	end
+	-- Note: Do NOT modify Workspace.Gravity - it affects all players
 end
 
 function SharkController.UpdateAnimation(deltaTime)
@@ -509,8 +512,7 @@ end
 
 -- CLEANUP
 function SharkController.Cleanup()
-	-- Reset physics
-	Workspace.Gravity = physics.Gravity
+	-- Note: Do NOT reset Workspace.Gravity - it affects all players
 	
 	-- Clear references
 	character = nil

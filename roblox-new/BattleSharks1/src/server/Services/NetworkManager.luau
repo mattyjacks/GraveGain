@@ -6,51 +6,90 @@ local Players = game:GetService("Players")
 
 -- Temporary: Use placeholder values until shared modules are working
 local RemoteNames = {
-	-- Player actions
-	PlayerMove = "PlayerMove",
-	PlayerAttack = "PlayerAttack",
-	PlayerBoost = "PlayerBoost",
-	PlayerInteract = "PlayerInteract",
+	-- Client to Server events
+	ClientToServer = {
+		PlayerSpawn = "PlayerSpawn",
+		PlayerMove = "PlayerMove",
+		PlayerAttack = "PlayerAttack",
+		PlayerBoost = "PlayerBoost",
+		PlayerInteract = "PlayerInteract",
+		FeedShark = "FeedShark",
+		CleanAquarium = "CleanAquarium",
+		ApplyMutation = "ApplyMutation",
+		ChangeClass = "ChangeClass",
+		UseItem = "UseItem",
+		BuyItem = "BuyItem",
+		SellItem = "SellItem",
+		MoveItem = "MoveItem",
+		EquipItem = "EquipItem",
+		UnequipItem = "UnequipItem",
+		PlaceDecoration = "PlaceDecoration",
+		RemoveDecoration = "RemoveDecoration",
+		ChangeBackground = "ChangeBackground",
+		ClaimDailyReward = "ClaimDailyReward",
+		ClaimWeeklyReward = "ClaimWeeklyReward",
+		SaveGameData = "SaveGameData",
+		LoadGameData = "LoadGameData"
+	},
 	
-	-- Game systems
-	UpdatePlayerStats = "UpdatePlayerStats",
-	UpdateHealth = "UpdateHealth",
-	UpdateHunger = "UpdateHunger",
-	UpdateXP = "UpdateXP",
-	UpdateLevel = "UpdateLevel",
-	UpdateGold = "UpdateGold",
-	AbilityCooldown = "AbilityCooldown",
+	-- Server to Client events
+	ServerToClient = {
+		UpdatePlayerStats = "UpdatePlayerStats",
+		UpdateHunger = "UpdateHunger",
+		UpdateHealth = "UpdateHealth",
+		UpdateXP = "UpdateXP",
+		UpdateLevel = "UpdateLevel",
+		UpdateGold = "UpdateGold",
+		UpdateCrystals = "UpdateCrystals",
+		EnemySpawned = "EnemySpawned",
+		EnemyDespawned = "EnemyDespawned",
+		EnemyDied = "EnemyDied",
+		ItemSpawned = "ItemSpawned",
+		ItemDespawned = "ItemDespawned",
+		ItemPickedUp = "ItemPickedUp",
+		AbilityUsed = "AbilityUsed",
+		AbilityCooldown = "AbilityCooldown",
+		AbilityReady = "AbilityReady",
+		MutationApplied = "MutationApplied",
+		MutationRemoved = "MutationRemoved",
+		MutationExpired = "MutationExpired",
+		AquariumStateChanged = "AquariumStateChanged",
+		DecorationPlaced = "DecorationPlaced",
+		DecorationRemoved = "DecorationRemoved",
+		BackgroundChanged = "BackgroundChanged",
+		ShowNotification = "ShowNotification",
+		HideNotification = "HideNotification",
+		GameMessage = "GameMessage",
+		Error = "Error",
+		Success = "Success",
+		Warning = "Warning"
+	},
 	
-	-- Inventory
-	InventoryAdd = "InventoryAdd",
-	InventoryRemove = "InventoryRemove",
-	InventoryUse = "InventoryUse",
+	-- Client to Server functions
+	ClientFunctions = {
+		GetPlayerData = "GetPlayerData",
+		GetInventory = "GetInventory",
+		GetAquariumData = "GetAquariumData",
+		GetShopItems = "GetShopItems",
+		GetDailyRewards = "GetDailyRewards",
+		CanAffordItem = "CanAffordItem"
+	},
 	
-	-- Aquarium
-	AquariumFeed = "AquariumFeed",
-	AquariumClean = "AquariumClean",
-	AquariumDecorate = "AquariumDecorate",
-	
-	-- Mutations
-	MutationApply = "MutationApply",
-	MutationRemove = "MutationRemove",
-	
-	-- Messages
-	GameMessage = "GameMessage",
-	Error = "Error",
-	Success = "Success",
-	
-	-- Functions
-	GetPlayerData = "GetPlayerData",
-	GetInventory = "GetInventory",
-	GetAquarium = "GetAquarium",
-	PingClient = "PingClient"
+	-- Server to Client functions
+	ServerFunctions = {
+		PingClient = "PingClient"
+	}
 }
 local GameUtilities = {
 	DebugPrint = function(message) print("[DEBUG]", message) end,
 	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
 	Lerp = function(a, b, t) return a + (b - a) * t end,
 	RandomFloat = function(min, max) return math.random() * (max - min) + min end,
+	GetTableSize = function(tbl)
+		local count = 0
+		for _ in pairs(tbl) do count += 1 end
+		return count
+	end,
 	FindNearestTarget = function(position, maxDistance, targetType)
 		local nearest = nil
 		local nearestDistance = maxDistance
@@ -658,7 +697,7 @@ end
 function NetworkManager.SendToAllClients(eventName, data, excludePlayer)
 	local remote = remoteEvents[eventName]
 	if remote then
-		for _, player in pairs(game.Players:GetPlayers()) do
+		for _, player in pairs(Players:GetPlayers()) do
 			if player ~= excludePlayer then
 				remote:FireClient(player, data)
 			end
@@ -797,6 +836,17 @@ end
 
 function NetworkManager.HandleNPCInteraction(player, npcId)
 	-- TODO: Implement NPC interaction
+end
+
+-- PLAYER CONNECTION HANDLING
+function NetworkManager.OnPlayerAdded(player)
+	GameUtilities.DebugPrint("NetworkManager: Player added " .. player.Name)
+	-- Player-specific network setup can go here
+end
+
+function NetworkManager.OnPlayerRemoving(player)
+	GameUtilities.DebugPrint("NetworkManager: Player removing " .. player.Name)
+	-- Clean up player-specific network state
 end
 
 return NetworkManager

@@ -41,9 +41,28 @@ local GameData = {
 }
 local GameUtilities = {
 	DebugPrint = function(message) print("[DEBUG]", message) end,
+	LogWarning = function(message) warn("[WARNING]", message) end,
 	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
 	Lerp = function(a, b, t) return a + (b - a) * t end,
-	RandomFloat = function(min, max) return math.random() * (max - min) + min end
+	RandomFloat = function(min, max) return math.random() * (max - min) + min end,
+	DeepCopy = function(tbl)
+		local copy = {}
+		for k, v in pairs(tbl) do
+			if type(v) == "table" then
+				copy[k] = GameUtilities.DeepCopy(v)
+			else
+				copy[k] = v
+			end
+		end
+		return copy
+	end,
+	GetTimestamp = function() return os.time() end,
+	IsSameDay = function(timestamp1, timestamp2)
+		if not timestamp1 or not timestamp2 then return false end
+		local day1 = math.floor(timestamp1 / 86400)
+		local day2 = math.floor(timestamp2 / 86400)
+		return day1 == day2
+	end
 }
 
 local PlayerDataManager = {}
@@ -383,7 +402,7 @@ function PlayerDataManager.DamagePlayer(player, damage, damageType)
 	if not data then return end
 	
 	data.Health = math.max(0, data.Health - damage)
-	data.Statistics.TotalDamageTaken += damage.Statistics.TotalDamageTaken + damage
+	data.Statistics.TotalDamageTaken += damage
 	
 	-- Update statistics
 	if data.Health <= 0 then

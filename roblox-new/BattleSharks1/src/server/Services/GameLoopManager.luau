@@ -17,7 +17,7 @@ local GameConstants = {
 	SHARK_BOOST_COOLDOWN = 3,
 	SHARK_LEAP_FORCE = 100,
 	BITE_RANGE = 10,
-	OCEAN_SIZE = 500,
+	OCEAN_SIZE = Vector2.new(500, 500),
 	OCEAN_DEPTH = 100,
 	ENEMY_SPAWN_RATE = 5,
 	ITEM_SPAWN_RATE = 8,
@@ -48,16 +48,87 @@ local GameEnums = {
 	}
 }
 local GameData = {
-	EnemyData = {
-		SmallFish = {Health = 20, Damage = 5, Speed = 15, XP = 10},
-		MediumFish = {Health = 50, Damage = 10, Speed = 12, XP = 25},
-		LargeFish = {Health = 100, Damage = 20, Speed = 8, XP = 50}
+	Enemies = {
+		SmallFish = {
+			DisplayName = "Small Fish",
+			Health = 20,
+			Damage = 5,
+			Speed = 15,
+			XP = 10,
+			Gold = 5,
+			Size = Vector3.new(2, 1, 3),
+			Behavior = "Passive"
+		},
+		MediumFish = {
+			DisplayName = "Medium Fish",
+			Health = 50,
+			Damage = 10,
+			Speed = 12,
+			XP = 25,
+			Gold = 15,
+			Size = Vector3.new(3, 2, 5),
+			Behavior = "Passive"
+		},
+		LargeFish = {
+			DisplayName = "Large Fish",
+			Health = 100,
+			Damage = 20,
+			Speed = 8,
+			XP = 50,
+			Gold = 30,
+			Size = Vector3.new(5, 3, 8),
+			Behavior = "Aggressive"
+		},
+		Shark = {
+			DisplayName = "Enemy Shark",
+			Health = 150,
+			Damage = 25,
+			Speed = 18,
+			XP = 100,
+			Gold = 50,
+			Size = Vector3.new(6, 4, 10),
+			Behavior = "Aggressive"
+		},
+		Jellyfish = {
+			DisplayName = "Jellyfish",
+			Health = 30,
+			Damage = 15,
+			Speed = 5,
+			XP = 20,
+			Gold = 10,
+			Size = Vector3.new(2, 3, 2),
+			Behavior = "Passive"
+		}
 	},
-	ItemData = {
-		Food = {HealAmount = 10, Duration = 0},
-		HealthPotion = {HealAmount = 50, Duration = 0},
-		SpeedBoost = {SpeedMultiplier = 1.5, Duration = 30},
-		Treasure = {GoldValue = 100, Duration = 0}
+	Items = {
+		Food = {
+			Name = "Fish Food",
+			Type = "Food",
+			HealAmount = 10,
+			Duration = 0,
+			Description = "Restores 10 hunger"
+		},
+		HealthPotion = {
+			Name = "Health Potion",
+			Type = "Potion",
+			HealAmount = 50,
+			Duration = 0,
+			Description = "Restores 50 health"
+		},
+		SpeedBoost = {
+			Name = "Speed Boost",
+			Type = "Potion",
+			SpeedMultiplier = 1.5,
+			Duration = 30,
+			Description = "Increases speed by 50% for 30 seconds"
+		},
+		Treasure = {
+			Name = "Treasure Chest",
+			Type = "Treasure",
+			GoldValue = 100,
+			Duration = 0,
+			Description = "Contains gold"
+		}
 	}
 }
 local GameUtilities = {
@@ -73,6 +144,26 @@ local GameUtilities = {
 			0,
 			math.sin(angle) * distance
 		)
+	end,
+	WeightedRandomChoice = function(choices)
+		if #choices == 0 then return nil end
+		
+		local totalWeight = 0
+		for _, choice in ipairs(choices) do
+			totalWeight += choice.Weight or 1
+		end
+		
+		local random = math.random() * totalWeight
+		local currentWeight = 0
+		
+		for _, choice in ipairs(choices) do
+			currentWeight += choice.Weight or 1
+			if random <= currentWeight then
+				return choice.Value
+			end
+		end
+		
+		return choices[#choices].Value
 	end
 }
 
@@ -294,7 +385,10 @@ function GameLoopManager.TrySpawnEnemy()
 	local character = player.Character
 	if not character then return end
 	
-	local playerPosition = character.PrimaryPart.Position
+	local primaryPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("PrimaryPart")
+	if not primaryPart then return end
+	
+	local playerPosition = primaryPart.Position
 	
 	-- Find spawn position
 	local spawnPosition = GameLoopManager.FindSpawnPosition(playerPosition, spawnConfig.SpawnRadius)
@@ -413,6 +507,7 @@ function GameLoopManager.SpawnEnemy(enemyType, position)
 	healthBar.Parent = healthTag
 	
 	mainPart.Parent = model
+	model.PrimaryPart = mainPart
 	model.Parent = Workspace
 	
 	-- Create enemy object
@@ -461,7 +556,9 @@ function GameLoopManager.UpdateEnemyAI(enemy)
 	local nearestPlayer = GameLoopManager.GetNearestPlayer(enemyPosition)
 	
 	if nearestPlayer and nearestPlayer.Character then
-		local playerPosition = nearestPlayer.Character.PrimaryPart.Position
+		local targetPart = nearestPlayer.Character:FindFirstChild("HumanoidRootPart") or nearestPlayer.Character:FindFirstChild("PrimaryPart")
+		if not targetPart then return end
+		local playerPosition = targetPart.Position
 		local distance = (playerPosition - enemyPosition).Magnitude
 		
 		enemy.Target = nearestPlayer
@@ -509,8 +606,12 @@ function GameLoopManager.EnemyChase(enemy, target)
 	local humanoid = enemy.Model:FindFirstChild("Humanoid")
 	if not humanoid then return end
 	
+	if not enemy.Model or not enemy.Model.PrimaryPart then return end
+	local targetPart = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("PrimaryPart")
+	if not targetPart then return end
+	
 	local enemyPosition = enemy.Model.PrimaryPart.Position
-	local targetPosition = target.Character.PrimaryPart.Position
+	local targetPosition = targetPart.Position
 	local direction = (targetPosition - enemyPosition).Unit
 	
 	humanoid:Move(direction * enemy.Data.Speed)
@@ -524,8 +625,12 @@ function GameLoopManager.EnemyAttack(enemy, target)
 	
 	if currentTime - enemy.LastAttack < attackCooldown then return end
 	
+	if not enemy.Model or not enemy.Model.PrimaryPart then return end
+	local targetPart = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("PrimaryPart")
+	if not targetPart then return end
+	
 	local enemyPosition = enemy.Model.PrimaryPart.Position
-	local targetPosition = target.Character.PrimaryPart.Position
+	local targetPosition = targetPart.Position
 	local distance = (targetPosition - enemyPosition).Magnitude
 	
 	if distance <= (enemy.Data.Range or 10) then
@@ -694,7 +799,10 @@ function GameLoopManager.TrySpawnItem()
 	local character = player.Character
 	if not character then return end
 	
-	local playerPosition = character.PrimaryPart.Position
+	local primaryPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("PrimaryPart")
+	if not primaryPart then return end
+	
+	local playerPosition = primaryPart.Position
 	
 	-- Find spawn position
 	local spawnPosition = GameLoopManager.FindSpawnPosition(playerPosition, spawnConfig.SpawnRadius * 0.7)
@@ -898,7 +1006,13 @@ function GameLoopManager.CleanupDistantObjects()
 	local player = GameLoopManager.GetRandomPlayer()
 	if not player then return end
 	
-	local playerPosition = player.Character.PrimaryPart.Position
+	local character = player.Character
+	if not character then return end
+	
+	local primaryPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("PrimaryPart")
+	if not primaryPart then return end
+	
+	local playerPosition = primaryPart.Position
 	
 	-- Clean up distant enemies
 	for i = #enemies, 1, -1 do

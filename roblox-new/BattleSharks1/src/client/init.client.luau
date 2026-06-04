@@ -9,14 +9,8 @@ local StarterGui = game:GetService("StarterGui")
 -- Import controllers and systems
 local TerrainRenderer = require(script.TerrainRenderer)
 local SharkModel = require(script.SharkModel)
-local SharkController = {
-	Initialize = function() print("SharkController: Initialize called") end,
-	Cleanup = function() print("SharkController: Cleanup called") end
-}
-local CameraController = {
-	Initialize = function() print("CameraController: Initialize called") end,
-	Cleanup = function() print("CameraController: Cleanup called") end
-}
+local SharkController = require(script.Controllers.SharkController)
+local CameraController = require(script.Controllers.CameraController)
 
 -- Client configuration
 local CLIENT_CONFIG = {
@@ -69,7 +63,38 @@ end
 -- Set up network event handlers
 local function SetupNetworkHandlers()
 	print("Setting up network handlers...")
-	-- Simplified for testing - just create basic structure
+	
+	local remoteFolder = ReplicatedStorage:WaitForChild("BattleSharksRemotes", 10)
+	if not remoteFolder then
+		warn("BattleSharksRemotes folder not found!")
+		return
+	end
+	
+	-- Connect to server-to-client events
+	local eventMap = {
+		["UpdatePlayerStats"] = OnPlayerStatsUpdated,
+		["UpdateHunger"] = OnHungerUpdated,
+		["UpdateHealth"] = OnHealthUpdated,
+		["UpdateXP"] = OnXPUpdated,
+		["UpdateLevel"] = OnLevelUpdated,
+		["UpdateGold"] = OnGoldUpdated,
+		["AbilityCooldown"] = OnAbilityCooldown,
+		["GameMessage"] = OnGameMessage,
+		["Error"] = OnErrorMessage,
+		["Success"] = OnSuccessMessage,
+	}
+	
+	for eventName, handler in pairs(eventMap) do
+		local remote = remoteFolder:FindFirstChild(eventName)
+		if remote and remote:IsA("RemoteEvent") then
+			remote.OnClientEvent:Connect(handler)
+			print("Connected to", eventName)
+		else
+			warn("RemoteEvent not found:", eventName)
+		end
+	end
+	
+	print("Network handlers configured")
 end
 
 -- Set up periodic tasks
