@@ -6,166 +6,12 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 
--- Temporary: Use placeholder values until shared modules are working
-local GameConstants = {
-	WATER_LEVEL = 0,
-	UNDERWATER_GRAVITY = 10,
-	WATER_DENSITY = 1,
-	SHARK_TURN_SPEED = 5,
-	SHARK_BASE_SPEED = 16,
-	SHARK_BOOST_SPEED = 32,
-	SHARK_BOOST_COOLDOWN = 3,
-	SHARK_LEAP_FORCE = 100,
-	BITE_RANGE = 10,
-	OCEAN_SIZE = Vector2.new(500, 500),
-	OCEAN_DEPTH = 100,
-	ENEMY_SPAWN_RATE = 5,
-	ITEM_SPAWN_RATE = 8,
-	MAX_ENEMIES = 50,
-	MAX_ITEMS = 100,
-	CLEANUP_DISTANCE = 200
-}
-local GameEnums = {
-	EnemyType = {
-		SmallFish = "SmallFish",
-		MediumFish = "MediumFish",
-		LargeFish = "LargeFish",
-		Jellyfish = "Jellyfish",
-		Shark = "Shark"
-	},
-	ItemType = {
-		Food = "Food",
-		HealthPotion = "HealthPotion",
-		SpeedBoost = "SpeedBoost",
-		Treasure = "Treasure"
-	},
-	EnemyState = {
-		Idle = "Idle",
-		Patrol = "Patrol",
-		Chase = "Chase",
-		Attack = "Attack",
-		Dead = "Dead"
-	}
-}
-local GameData = {
-	Enemies = {
-		SmallFish = {
-			DisplayName = "Small Fish",
-			Health = 20,
-			Damage = 5,
-			Speed = 15,
-			XP = 10,
-			Gold = 5,
-			Size = Vector3.new(2, 1, 3),
-			Behavior = "Passive"
-		},
-		MediumFish = {
-			DisplayName = "Medium Fish",
-			Health = 50,
-			Damage = 10,
-			Speed = 12,
-			XP = 25,
-			Gold = 15,
-			Size = Vector3.new(3, 2, 5),
-			Behavior = "Passive"
-		},
-		LargeFish = {
-			DisplayName = "Large Fish",
-			Health = 100,
-			Damage = 20,
-			Speed = 8,
-			XP = 50,
-			Gold = 30,
-			Size = Vector3.new(5, 3, 8),
-			Behavior = "Aggressive"
-		},
-		Shark = {
-			DisplayName = "Enemy Shark",
-			Health = 150,
-			Damage = 25,
-			Speed = 18,
-			XP = 100,
-			Gold = 50,
-			Size = Vector3.new(6, 4, 10),
-			Behavior = "Aggressive"
-		},
-		Jellyfish = {
-			DisplayName = "Jellyfish",
-			Health = 30,
-			Damage = 15,
-			Speed = 5,
-			XP = 20,
-			Gold = 10,
-			Size = Vector3.new(2, 3, 2),
-			Behavior = "Passive"
-		}
-	},
-	Items = {
-		Food = {
-			Name = "Fish Food",
-			Type = "Food",
-			HealAmount = 10,
-			Duration = 0,
-			Description = "Restores 10 hunger"
-		},
-		HealthPotion = {
-			Name = "Health Potion",
-			Type = "Potion",
-			HealAmount = 50,
-			Duration = 0,
-			Description = "Restores 50 health"
-		},
-		SpeedBoost = {
-			Name = "Speed Boost",
-			Type = "Potion",
-			SpeedMultiplier = 1.5,
-			Duration = 30,
-			Description = "Increases speed by 50% for 30 seconds"
-		},
-		Treasure = {
-			Name = "Treasure Chest",
-			Type = "Treasure",
-			GoldValue = 100,
-			Duration = 0,
-			Description = "Contains gold"
-		}
-	}
-}
-local GameUtilities = {
-	DebugPrint = function(message) print("[DEBUG]", message) end,
-	Clamp = function(value, min, max) return math.max(min, math.min(max, value)) end,
-	Lerp = function(a, b, t) return a + (b - a) * t end,
-	RandomFloat = function(min, max) return math.random() * (max - min) + min end,
-	GetRandomPosition = function(center, radius)
-		local angle = math.random() * math.pi * 2
-		local distance = math.random() * radius
-		return center + Vector3.new(
-			math.cos(angle) * distance,
-			0,
-			math.sin(angle) * distance
-		)
-	end,
-	WeightedRandomChoice = function(choices)
-		if #choices == 0 then return nil end
-		
-		local totalWeight = 0
-		for _, choice in ipairs(choices) do
-			totalWeight += choice.Weight or 1
-		end
-		
-		local random = math.random() * totalWeight
-		local currentWeight = 0
-		
-		for _, choice in ipairs(choices) do
-			currentWeight += choice.Weight or 1
-			if random <= currentWeight then
-				return choice.Value
-			end
-		end
-		
-		return choices[#choices].Value
-	end
-}
+-- Load shared modules
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConstants = require(Shared:WaitForChild("Constants"):WaitForChild("GameConstants"))
+local GameEnums = require(Shared:WaitForChild("Enums"):WaitForChild("GameEnums"))
+local GameData = require(Shared:WaitForChild("Data"):WaitForChild("GameData"))
+local GameUtilities = require(Shared:WaitForChild("Utilities"):WaitForChild("GameUtilities"))
 
 local GameLoopManager = {}
 
@@ -612,9 +458,131 @@ function GameLoopManager.EnemyChase(enemy, target)
 	
 	local enemyPosition = enemy.Model.PrimaryPart.Position
 	local targetPosition = targetPart.Position
-	local direction = (targetPosition - enemyPosition).Unit
+	local distance = (targetPosition - enemyPosition).Magnitude
 	
-	humanoid:Move(direction * enemy.Data.Speed)
+	-- Pathfinding with obstacle avoidance (C6)
+	local moveDirection = GameLoopManager.CalculatePathDirection(enemy, enemyPosition, targetPosition, distance)
+	
+	-- Adjust speed based on behavior
+	local speed = enemy.Data.Speed
+	if enemy.Data.Behavior == "Aggressive" and distance < 50 then
+		speed = speed * 1.3 -- Sprint when close
+	end
+	
+	humanoid:Move(moveDirection * speed)
+end
+
+-- PATHFINDING SYSTEM (C6)
+function GameLoopManager.CalculatePathDirection(enemy, startPos, targetPos, distance)
+	local directDirection = (targetPos - startPos).Unit
+	
+	-- If very close, just go directly
+	if distance < 10 then
+		return directDirection
+	end
+	
+	-- Check for obstacles using raycast
+	local rayOrigin = startPos
+	local rayDirection = directDirection * math.min(distance, 30)
+	
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterDescendantsInstances = {enemy.Model, Workspace:FindFirstChild("Terrain")}
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+	
+	local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+	
+	if raycastResult then
+		-- Obstacle detected, try to navigate around
+		return GameLoopManager.FindAvoidanceDirection(enemy, startPos, targetPos, directDirection, raycastResult.Position, raycastResult.Normal)
+	end
+	
+	-- No obstacle, direct path is clear
+	return directDirection
+end
+
+function GameLoopManager.FindAvoidanceDirection(enemy, startPos, targetPos, directDir, hitPos, hitNormal)
+	-- Try multiple angles to find clear path
+	local bestDirection = directDir
+	local bestScore = -math.huge
+	
+	for angle = -90, 90, 30 do
+		local radians = math.rad(angle)
+		local rotatedDir = Vector3.new(
+			directDir.X * math.cos(radians) - directDir.Z * math.sin(radians),
+			0,
+			directDir.X * math.sin(radians) + directDir.Z * math.cos(radians)
+		).Unit
+		
+		-- Test this direction
+		local testRay = rotatedDir * 20
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterDescendantsInstances = {enemy.Model}
+		raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+		
+		local result = Workspace:Raycast(startPos, testRay, raycastParams)
+		
+		-- Score based on clear path and progress toward target
+		local score = 0
+		if not result then
+			score += 50 -- Clear path bonus
+		else
+			score -= 20 -- Obstacle penalty
+		end
+		
+		-- Bonus for directions toward target
+		local toTarget = (targetPos - startPos).Unit
+		local alignment = rotatedDir:Dot(toTarget)
+		score += alignment * 30
+		
+		if score > bestScore then
+			bestScore = score
+			bestDirection = rotatedDir
+		end
+	end
+	
+	return bestDirection
+end
+
+-- DAMAGE SYSTEM INTEGRATION
+function GameLoopManager.DamageEnemy(enemyModel, damage)
+	-- Find enemy by model
+	for _, enemy in pairs(enemies) do
+		if enemy.Model == enemyModel then
+			enemy.Health -= damage
+			
+			-- Visual feedback
+			if enemy.Model and enemy.Model.PrimaryPart then
+				GameLoopManager.ShowEnemyDamage(enemy, damage)
+			end
+			
+			-- Check death
+			if enemy.Health <= 0 then
+				GameLoopManager.OnEnemyDied(enemy)
+			end
+			
+			return true
+		end
+	end
+	
+	return false
+end
+
+function GameLoopManager.ShowEnemyDamage(enemy, damage)
+	local position = enemy.Model.PrimaryPart.Position
+	
+	-- Flash the enemy red
+	for _, part in pairs(enemy.Model:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local originalColor = part.BrickColor
+			part.BrickColor = BrickColor.new("Bright red")
+			
+			task.delay(0.2, function()
+				if part then
+					part.BrickColor = originalColor
+				end
+			end)
+		end
+	end
 end
 
 function GameLoopManager.EnemyAttack(enemy, target)

@@ -11,6 +11,13 @@ local TerrainRenderer = require(script.TerrainRenderer)
 local SharkModel = require(script.SharkModel)
 local SharkController = require(script.Controllers.SharkController)
 local CameraController = require(script.Controllers.CameraController)
+local AbilityController = require(script.Controllers.AbilityController)
+local UIManager = require(script.UI.UIManager)
+local TutorialManager = require(script.UI.TutorialManager)
+local SoundManager = require(script.Systems.SoundManager)
+local ParticleManager = require(script.Systems.ParticleManager)
+local SettingsManager = require(script.Systems.SettingsManager)
+local ClientOptimizationManager = require(script.Systems.ClientOptimizationManager)
 
 -- Client configuration
 local CLIENT_CONFIG = {
@@ -122,6 +129,19 @@ local function InitializeClient()
 	TerrainRenderer.Initialize()
 	SharkController.Initialize()
 	CameraController.Initialize()
+	
+	-- Initialize new systems (D1-D4)
+	UIManager.Initialize()
+	TutorialManager.Initialize()
+	SoundManager.Initialize()
+	ParticleManager.Initialize()
+	AbilityController.Initialize()
+	
+	-- Initialize optimization (F)
+	ClientOptimizationManager.Initialize()
+	
+	-- Initialize settings (E7)
+	SettingsManager.Initialize()
 	
 	-- Transform player into shark
 	print("Transforming player into shark...")

@@ -10,6 +10,18 @@ local TerrainService = require(script.TerrainService)
 local PlayerDataManager = require(script.Services.PlayerDataManager)
 local GameLoopManager = require(script.Services.GameLoopManager)
 local NetworkManager = require(script.Services.NetworkManager)
+local PhysicsManager = require(script.Services.PhysicsManager)
+local CombatManager = require(script.Services.CombatManager)
+local AquariumManager = require(script.Services.AquariumManager)
+local InventoryManager = require(script.Services.InventoryManager)
+local DailyRewardsManager = require(script.Services.DailyRewardsManager)
+local AntiCheatManager = require(script.Services.AntiCheatManager)
+local OptimizationManager = require(script.Services.OptimizationManager)
+local AchievementManager = require(script.Services.AchievementManager)
+local LeaderboardManager = require(script.Services.LeaderboardManager)
+local GuildManager = require(script.Services.GuildManager)
+local SeasonalEventsManager = require(script.Services.SeasonalEventsManager)
+local ReplayManager = require(script.Services.ReplayManager)
 
 -- Game configuration
 local GAME_CONFIG = {
@@ -70,6 +82,17 @@ local function SetupShutdownHandling()
 		
 		-- Stop game loop
 		GameLoopManager.Cleanup()
+		PhysicsManager.Cleanup()
+		CombatManager.Cleanup()
+		AquariumManager.Cleanup()
+		DailyRewardsManager.Cleanup()
+		AntiCheatManager.Cleanup()
+		OptimizationManager.Cleanup()
+		AchievementManager.Cleanup()
+		LeaderboardManager.Cleanup()
+		GuildManager.Cleanup()
+		SeasonalEventsManager.Cleanup()
+		ReplayManager.Cleanup()
 		
 		print("=== BattleSharks Server Shutdown Complete ===")
 	end)
@@ -87,6 +110,12 @@ local function SetupLeaderstats(player)
 	level.Value = 1
 	level.Parent = leaderstats
 	
+	-- XP stat (C7)
+	local xp = Instance.new("IntValue")
+	xp.Name = "XP"
+	xp.Value = 0
+	xp.Parent = leaderstats
+	
 	-- Gold stat
 	local gold = Instance.new("IntValue")
 	gold.Name = "🪙 Gold"
@@ -98,6 +127,12 @@ local function SetupLeaderstats(player)
 	kills.Name = "Kills"
 	kills.Value = 0
 	kills.Parent = leaderstats
+	
+	-- Hunger stat (C8)
+	local hunger = Instance.new("IntValue")
+	hunger.Name = "🍖 Hunger"
+	hunger.Value = 100
+	hunger.Parent = leaderstats
 end
 
 -- Set up player-specific systems
@@ -162,6 +197,18 @@ local function InitializeGame()
 	local success, errorMessage = pcall(function()
 		TerrainService.Initialize()
 		PlayerDataManager.Initialize()
+		PhysicsManager.Initialize()
+		CombatManager.Initialize()
+		AquariumManager.Initialize()
+		InventoryManager.Initialize()
+		DailyRewardsManager.Initialize()
+		AntiCheatManager.Initialize()
+		OptimizationManager.Initialize()
+		AchievementManager.Initialize()
+		LeaderboardManager.Initialize()
+		GuildManager.Initialize()
+		SeasonalEventsManager.Initialize()
+		ReplayManager.Initialize()
 		GameLoopManager.Initialize()
 		NetworkManager.Initialize()
 	end)
@@ -271,6 +318,12 @@ local function UpdateLeaderstats(player)
 		levelStat.Value = data.Level
 	end
 	
+	-- Update XP (C7)
+	local xpStat = leaderstats:FindFirstChild("XP")
+	if xpStat then
+		xpStat.Value = data.XP
+	end
+	
 	-- Update gold
 	local goldStat = leaderstats:FindFirstChild("🪙 Gold")
 	if goldStat then
@@ -281,6 +334,12 @@ local function UpdateLeaderstats(player)
 	local killsStat = leaderstats:FindFirstChild("Kills")
 	if killsStat then
 		killsStat.Value = data.EnemiesKilled
+	end
+	
+	-- Update Hunger (C8)
+	local hungerStat = leaderstats:FindFirstChild("🍖 Hunger")
+	if hungerStat then
+		hungerStat.Value = math.floor(data.Hunger)
 	end
 end
 
