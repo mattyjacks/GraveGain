@@ -45,10 +45,16 @@ local UpgradeResponse = remotes:WaitForChild("UpgradeResponse")
 local GetPlayerData = remotes:WaitForChild("GetPlayerData")
 local PurchaseUpgrade = remotes:WaitForChild("PurchaseUpgrade")
 
+-- World ready flag
+local worldReady = false
+local worldReadyEvent = Instance.new("BindableEvent")
+
 -- Initialize world
 local function initWorld()
-    worldIslands = WorldGenerator.GenerateWorld(Vector3.new(0, 50, 0))
+    worldIslands = WorldGenerator.GenerateWorld(Vector3.new(0, 5, 0))
     print("[Server] World generated with", #worldIslands, "islands and adaptive ocean")
+    worldReady = true
+    worldReadyEvent:Fire()
 end
 
 -- Player join handling
@@ -68,10 +74,15 @@ Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(character)
         task.wait(0.5)
         
+        -- Wait for world to be ready before spawning
+        if not worldReady then
+            worldReadyEvent.Event:Wait()
+        end
+        
         -- Find starter island position
-        local spawnPos = Vector3.new(0, 65, 0)
+        local spawnPos = Vector3.new(0, 25, 0)
         if worldIslands and #worldIslands > 0 then
-            spawnPos = worldIslands[1].position + Vector3.new(0, 15, 0)
+            spawnPos = worldIslands[1].position + Vector3.new(0, 20, 0)
         end
         
         -- Create detailed JetSky for player at starter island
@@ -149,12 +160,13 @@ CollectRing.OnServerEvent:Connect(function(player, trigger)
     -- Notify client
     RingCollected:FireClient(player, ringValue, pdata.rings)
     
-    -- Cleanup ring parts
-    local ring = trigger:FindFirstChild("Ring")
-    local hole = trigger:FindFirstChild("Hole")
-    if ring then ring:Destroy() end
-    if hole then hole:Destroy() end
-    trigger:Destroy()
+    -- Cleanup entire ring model (trigger is inside ringModel)
+    local ringModel = trigger.Parent
+    if ringModel and ringModel:IsA("Model") then
+        ringModel:Destroy()
+    else
+        trigger:Destroy()
+    end
 end)
 
 -- Purchase upgrade handler

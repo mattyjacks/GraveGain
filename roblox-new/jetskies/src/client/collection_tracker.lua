@@ -40,29 +40,55 @@ end
 function CollectionTracker:ScanForRings()
     state.nearbyRings = {}
     
-    local ringsFolder = Workspace:FindFirstChild("Rings")
-    if not ringsFolder then return end
+    -- Rings live inside island models under Workspace.Islands
+    local islandsFolder = Workspace:FindFirstChild("Islands")
+    if islandsFolder then
+        for _, trigger in ipairs(islandsFolder:GetDescendants()) do
+            if trigger.Name == "Trigger" and trigger:IsA("BasePart") then
+                table.insert(state.nearbyRings, trigger)
+            end
+        end
+    end
     
-    for _, trigger in ipairs(ringsFolder:GetDescendants()) do
-        if trigger.Name == "Trigger" and trigger:IsA("BasePart") then
-            table.insert(state.nearbyRings, trigger)
+    -- Also check legacy Rings folder if present
+    local ringsFolder = Workspace:FindFirstChild("Rings")
+    if ringsFolder then
+        for _, trigger in ipairs(ringsFolder:GetDescendants()) do
+            if trigger.Name == "Trigger" and trigger:IsA("BasePart") then
+                table.insert(state.nearbyRings, trigger)
+            end
         end
     end
 end
 
+-- Rescan counter for periodic ring discovery
+local rescanTimer = 0
+local RESCAN_RATE = 3.0
+
 function CollectionTracker:Update(dt)
     state.lastCheck = state.lastCheck + dt
+    rescanTimer = rescanTimer + dt
+    
+    -- Periodically rescan for newly added rings
+    if rescanTimer >= RESCAN_RATE then
+        rescanTimer = 0
+        self:ScanForRings()
+    end
+    
     if state.lastCheck < state.checkRate then return end
     state.lastCheck = 0
     
     if not state.jetSky then return end
     
-    -- Try detailed model hull first, fallback to simple
-    local hull = state.jetSky:FindFirstChild("HullLower") or state.jetSky:FindFirstChild("Hull")
+    -- Use PrimaryPart first, then any hull part
+    local hull = state.jetSky.PrimaryPart
+        or state.jetSky:FindFirstChild("HullLower")
+        or state.jetSky:FindFirstChild("Hull")
+        or state.jetSky:FindFirstChildWhichIsA("BasePart")
     if not hull then return end
     
     local jetSkyPos = hull.Position
-    local collectRadius = GameData.RING_SIZE + 10
+    local collectRadius = GameData.RING_SIZE + 8
     
     -- Check each ring
     for i = #state.nearbyRings, 1, -1 do
@@ -82,51 +108,53 @@ end
 function CollectionTracker:CollectRing(trigger)
     local value = trigger:FindFirstChild("Value")
     local ringValue = value and value.Value or 1
-    local isHidden = trigger:FindFirstChild("IsHidden") ~= nil
     
-    -- Get ring visual parts
-    local ring = trigger:FindFirstChild("Ring")
-    local hole = trigger:FindFirstChild("Hole")
+    -- Ring visual parts are siblings in the parent Model (Outer, Inner)
+    local ringModel = trigger.Parent
+    local outer = ringModel and ringModel:FindFirstChild("Outer")
+    local inner = ringModel and ringModel:FindFirstChild("Inner")
     
     -- Play collection animation
-    self:AnimateCollection(ring, hole)
+    self:AnimateCollection(outer, inner, trigger.Position)
     
-    -- Tell server
-    if CollectRing then
-        CollectRing:FireServer(trigger)
-    end
-    
-    -- Remove from local tracking
+    -- Remove from local tracking immediately to prevent double-collect
     for i, r in ipairs(state.nearbyRings) do
         if r == trigger then
             table.remove(state.nearbyRings, i)
             break
         end
     end
+    
+    -- Tell server (server will destroy the model)
+    if CollectRing then
+        CollectRing:FireServer(trigger)
+    end
 end
 
-function CollectionTracker:AnimateCollection(ring, hole)
-    if ring then
-        -- Spin and scale up effect
-        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-        
-        local spinTween = TweenService:Create(ring, tweenInfo, {
-            Orientation = ring.Orientation + Vector3.new(0, 360, 0),
-            Size = ring.Size * 1.5,
-            Transparency = 0.8
+function CollectionTracker:AnimateCollection(outer, inner, position)
+    local collectPos = position or Vector3.zero
+    
+    if outer then
+        collectPos = outer.Position
+        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        local spinTween = TweenService:Create(outer, tweenInfo, {
+            Size = outer.Size * 1.8,
+            Transparency = 0.9
         })
-        
         spinTween:Play()
-        
-        -- Destroy after animation
-        task.delay(0.3, function()
-            if ring then ring:Destroy() end
-            if hole then hole:Destroy() end
-        end)
+    end
+    
+    if inner then
+        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local innerTween = TweenService:Create(inner, tweenInfo, {
+            Size = inner.Size * 2,
+            Transparency = 1.0
+        })
+        innerTween:Play()
     end
     
     -- Particle effect at collection point
-    self:SpawnCollectParticles(ring and ring.Position or Vector3.zero)
+    self:SpawnCollectParticles(collectPos)
 end
 
 function CollectionTracker:SpawnCollectParticles(position)

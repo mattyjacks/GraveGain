@@ -74,6 +74,10 @@ end
 function PauseMenu:TogglePause()
     ui.isOpen = not ui.isOpen
     ui.screenGui.Enabled = ui.isOpen
+    -- Free mouse when paused, re-lock for flight when resumed
+    UserInputService.MouseBehavior = ui.isOpen
+        and Enum.MouseBehavior.Default
+        or  Enum.MouseBehavior.LockCenter
 end
 
 return PauseMenu

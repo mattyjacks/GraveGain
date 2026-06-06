@@ -7,16 +7,15 @@ local AdaptiveOcean = {}
 -- Ocean configuration
 local OCEAN_CONFIG = {
     BASE_HEIGHT = -10,
-    GRID_SIZE = 50,           -- studs per wave tile
-    WAVE_TILE_SIZE = 4000,    -- total ocean size
-    WAVE_HEIGHT = 3,          -- max wave height
-    WAVE_SPEED = 1.5,         -- wave animation speed
-    WAVE_FREQUENCY = 0.1,     -- wave density
-    UPDATE_RATE = 0.1,        -- seconds between updates
+    GRID_COUNT = 20,          -- NxN grid of wave tiles
+    WAVE_TILE_SIZE = 6000,    -- total ocean size
+    WAVE_HEIGHT = 4,          -- max wave height
+    WAVE_SPEED = 0.8,         -- wave animation speed
+    UPDATE_RATE = 0.08,       -- seconds between updates
     COLORS = {
-        DEEP = Color3.fromRGB(0, 80, 140),
-        SHALLOW = Color3.fromRGB(0, 120, 180),
-        FOAM = Color3.fromRGB(200, 240, 255)
+        DEEP = Color3.fromRGB(0, 60, 120),
+        SHALLOW = Color3.fromRGB(0, 100, 170),
+        FOAM = Color3.fromRGB(180, 230, 255)
     }
 }
 
@@ -101,13 +100,15 @@ function AdaptiveOcean.CreateBasePlane(parent)
     -- Large flat water plane as base
     local base = Instance.new("Part")
     base.Name = "OceanBase"
-    base.Size = Vector3.new(OCEAN_CONFIG.WAVE_TILE_SIZE, 1, OCEAN_CONFIG.WAVE_TILE_SIZE)
-    base.Position = Vector3.new(0, OCEAN_CONFIG.BASE_HEIGHT - 2, 0)
+    base.Size = Vector3.new(OCEAN_CONFIG.WAVE_TILE_SIZE, 4, OCEAN_CONFIG.WAVE_TILE_SIZE)
+    base.Position = Vector3.new(0, OCEAN_CONFIG.BASE_HEIGHT - 4, 0)
     base.Color = OCEAN_CONFIG.COLORS.DEEP
     base.Material = Enum.Material.Water
-    base.Transparency = 0.3
+    base.Transparency = 0.15
     base.Anchored = true
     base.CanCollide = false
+    base.TopSurface = Enum.SurfaceType.Smooth
+    base.BottomSurface = Enum.SurfaceType.Smooth
     base.Parent = parent
     
     -- Kill brick script for falling players
@@ -128,30 +129,29 @@ function AdaptiveOcean.CreateBasePlane(parent)
 end
 
 function AdaptiveOcean.CreateWaveGrid(parent)
-    -- Create grid of wave tiles
-    local gridCount = 8  -- 8x8 grid around center
+    local gridCount = OCEAN_CONFIG.GRID_COUNT
     local tileSize = OCEAN_CONFIG.WAVE_TILE_SIZE / gridCount
     
     for x = -gridCount/2, gridCount/2 - 1 do
         for z = -gridCount/2, gridCount/2 - 1 do
             local tile = Instance.new("Part")
             tile.Name = "Wave_" .. x .. "_" .. z
-            tile.Size = Vector3.new(tileSize, 2, tileSize)
-            tile.Position = Vector3.new(
-                x * tileSize + tileSize/2,
-                OCEAN_CONFIG.BASE_HEIGHT,
-                z * tileSize + tileSize/2
-            )
+            tile.Size = Vector3.new(tileSize, 3, tileSize)
+            local posX = x * tileSize + tileSize/2
+            local posZ = z * tileSize + tileSize/2
+            tile.Position = Vector3.new(posX, OCEAN_CONFIG.BASE_HEIGHT, posZ)
             tile.Color = OCEAN_CONFIG.COLORS.SHALLOW
-            tile.Material = Enum.Material.SmoothPlastic
-            tile.Transparency = 0.4
+            tile.Material = Enum.Material.Water
+            tile.Transparency = 0.35
             tile.Anchored = true
             tile.CanCollide = false
+            tile.TopSurface = Enum.SurfaceType.Smooth
+            tile.BottomSurface = Enum.SurfaceType.Smooth
+            tile.CastShadow = false
             tile.Parent = parent
             
-            -- Store original position
-            tile:SetAttribute("BaseX", tile.Position.X)
-            tile:SetAttribute("BaseZ", tile.Position.Z)
+            tile:SetAttribute("BaseX", posX)
+            tile:SetAttribute("BaseZ", posZ)
             tile:SetAttribute("GridX", x)
             tile:SetAttribute("GridZ", z)
             
@@ -161,19 +161,32 @@ function AdaptiveOcean.CreateWaveGrid(parent)
 end
 
 function AdaptiveOcean.CreateHorizon(parent)
-    -- Create distant horizon fog effect
+    -- Distant horizon rim
     local horizon = Instance.new("Part")
     horizon.Name = "Horizon"
-    horizon.Shape = Enum.PartType.Cylinder
-    horizon.Size = Vector3.new(OCEAN_CONFIG.WAVE_TILE_SIZE * 1.5, 100, OCEAN_CONFIG.WAVE_TILE_SIZE * 1.5)
-    horizon.Orientation = Vector3.new(0, 0, 90)
-    horizon.Position = Vector3.new(0, OCEAN_CONFIG.BASE_HEIGHT + 30, 0)
-    horizon.Color = Color3.fromRGB(150, 200, 255)
-    horizon.Material = Enum.Material.Glass
-    horizon.Transparency = 0.9
+    horizon.Size = Vector3.new(OCEAN_CONFIG.WAVE_TILE_SIZE * 1.5, 60, OCEAN_CONFIG.WAVE_TILE_SIZE * 1.5)
+    horizon.Orientation = Vector3.new(0, 0, 0)
+    horizon.Position = Vector3.new(0, OCEAN_CONFIG.BASE_HEIGHT - 30, 0)
+    horizon.Color = Color3.fromRGB(0, 40, 100)
+    horizon.Material = Enum.Material.SmoothPlastic
+    horizon.Transparency = 0.0
     horizon.Anchored = true
     horizon.CanCollide = false
+    horizon.CastShadow = false
     horizon.Parent = parent
+    
+    -- Foam/spray layer on top of ocean
+    local foam = Instance.new("Part")
+    foam.Name = "OceanFoam"
+    foam.Size = Vector3.new(OCEAN_CONFIG.WAVE_TILE_SIZE, 1, OCEAN_CONFIG.WAVE_TILE_SIZE)
+    foam.Position = Vector3.new(0, OCEAN_CONFIG.BASE_HEIGHT + OCEAN_CONFIG.WAVE_HEIGHT + 0.5, 0)
+    foam.Color = Color3.fromRGB(220, 245, 255)
+    foam.Material = Enum.Material.Neon
+    foam.Transparency = 0.92
+    foam.Anchored = true
+    foam.CanCollide = false
+    foam.CastShadow = false
+    foam.Parent = parent
 end
 
 function AdaptiveOcean.UpdateWaves()
@@ -200,39 +213,34 @@ function AdaptiveOcean.UpdateWaves()
     for _, tile in ipairs(oceanState.waveTiles) do
         local baseX = tile:GetAttribute("BaseX")
         local baseZ = tile:GetAttribute("BaseZ")
-        local gridX = tile:GetAttribute("GridX")
-        local gridZ = tile:GetAttribute("GridZ")
         
         -- Calculate wave height at this position
         local waveHeight = noise(baseX, baseZ, time)
         
         -- Adaptive detail based on distance from players
-        local distanceFromPlayer = math.sqrt((baseX - avgPlayerPos.X)^2 + (baseZ - avgPlayerPos.Z)^2)
-        
-        -- Far tiles move less for performance
-        if distanceFromPlayer > 500 then
-            waveHeight = waveHeight * 0.5
+        local distanceFromPlayer = math.huge
+        if playerCount > 0 then
+            distanceFromPlayer = math.sqrt((baseX - avgPlayerPos.X)^2 + (baseZ - avgPlayerPos.Z)^2)
         end
         
-        -- Update tile position
+        -- Far tiles get reduced wave movement for performance
+        local heightScale = distanceFromPlayer > 800 and 0.3 or (distanceFromPlayer > 400 and 0.7 or 1.0)
+        waveHeight = waveHeight * heightScale
+        
+        -- Update tile Y position only (no tilting - avoids gaps between tiles)
         tile.Position = Vector3.new(baseX, config.BASE_HEIGHT + waveHeight, baseZ)
         
-        -- Adjust color based on height (foam on peaks)
-        if waveHeight > config.WAVE_HEIGHT * 0.6 then
+        -- Adjust color based on wave height
+        if waveHeight > config.WAVE_HEIGHT * 0.55 then
             tile.Color = config.COLORS.FOAM
-            tile.Transparency = 0.2
+            tile.Transparency = 0.25
         elseif waveHeight > 0 then
             tile.Color = config.COLORS.SHALLOW
-            tile.Transparency = 0.4
+            tile.Transparency = 0.35
         else
             tile.Color = config.COLORS.DEEP
-            tile.Transparency = 0.5
+            tile.Transparency = 0.45
         end
-        
-        -- Tilt tile to match wave slope
-        local slopeX = noise(baseX + 5, baseZ, time) - waveHeight
-        local slopeZ = noise(baseX, baseZ + 5, time) - waveHeight
-        tile.Orientation = Vector3.new(slopeZ * 5, 0, -slopeX * 5)
     end
 end
 

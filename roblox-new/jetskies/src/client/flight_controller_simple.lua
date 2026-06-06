@@ -6,6 +6,15 @@ local TweenService = game:GetService("TweenService")
 local FlightController = {}
 local GameData
 
+-- Mouse sensitivity for flight steering
+local MOUSE_PITCH_SENSITIVITY = 0.003
+local MOUSE_YAW_SENSITIVITY   = 0.003
+local MOUSE_SMOOTHING          = 0.25   -- how fast mouse input decays
+
+-- Accumulated mouse-driven pitch/yaw targets (-1 to 1)
+local mousePitch = 0
+local mouseYaw   = 0
+
 -- State
 local state = {
     jetSky = nil,
@@ -17,7 +26,7 @@ local state = {
     rotation = CFrame.new(),
     
     -- Controls
-    throttle = 0,
+    throttle = 0.3,   -- start with some throttle so it doesn't stall
     pitch = 0,
     yaw = 0,
     roll = 0,
@@ -35,7 +44,7 @@ local state = {
     
     -- Physics bodies
     bodyVelocity = nil,
-    bodyAngularVelocity = nil
+    bodyGyro = nil
 }
 
 -- Input state
@@ -61,7 +70,10 @@ function FlightController:Init(jetSky, seat, stats)
     -- Setup physics
     self:SetupPhysics()
     
-    -- Input handling
+    -- Lock mouse for flight steering
+    UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+    
+    -- Keyboard input
     UserInputService.InputBegan:Connect(function(key, processed)
         if processed then return end
         self:HandleInput(key.KeyCode, true)
@@ -69,6 +81,14 @@ function FlightController:Init(jetSky, seat, stats)
     
     UserInputService.InputEnded:Connect(function(key)
         self:HandleInput(key.KeyCode, false)
+    end)
+    
+    -- Mouse scroll = throttle adjustment
+    UserInputService.InputChanged:Connect(function(inp, processed)
+        if processed then return end
+        if inp.UserInputType == Enum.UserInputType.MouseWheel then
+            state.throttle = math.clamp(state.throttle + inp.Position.Z * 0.05, 0, 1)
+        end
     end)
     
     -- Set initial rotation
@@ -79,24 +99,26 @@ end
 
 function FlightController:SetupPhysics()
     -- Remove old physics bodies
-    local oldVel = state.hull:FindFirstChild("JetSkyVelocity")
-    if oldVel then oldVel:Destroy() end
-    local oldGyro = state.hull:FindFirstChild("JetSkyGyro")
-    if oldGyro then oldGyro:Destroy() end
+    for _, name in ipairs({"JetSkyVelocity", "JetSkyGyro", "JetSkyAngularVel"}) do
+        local old = state.hull:FindFirstChild(name)
+        if old then old:Destroy() end
+    end
     
-    -- BodyVelocity for movement
+    -- BodyVelocity for movement (large MaxForce Y to fully fight gravity)
     state.bodyVelocity = Instance.new("BodyVelocity")
     state.bodyVelocity.Name = "JetSkyVelocity"
-    state.bodyVelocity.MaxForce = Vector3.new(40000, 40000, 40000)
+    state.bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     state.bodyVelocity.Velocity = Vector3.zero
     state.bodyVelocity.Parent = state.hull
     
-    -- BodyAngularVelocity for rotation
-    state.bodyAngularVelocity = Instance.new("BodyAngularVelocity")
-    state.bodyAngularVelocity.Name = "JetSkyAngularVel"
-    state.bodyAngularVelocity.MaxTorque = Vector3.new(30000, 30000, 30000)
-    state.bodyAngularVelocity.AngularVelocity = Vector3.zero
-    state.bodyAngularVelocity.Parent = state.hull
+    -- BodyGyro to hold orientation (no drift/tumbling)
+    state.bodyGyro = Instance.new("BodyGyro")
+    state.bodyGyro.Name = "JetSkyGyro"
+    state.bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    state.bodyGyro.P = 3000
+    state.bodyGyro.D = 200
+    state.bodyGyro.CFrame = state.hull.CFrame
+    state.bodyGyro.Parent = state.hull
     
     -- Make sure hull isn't anchored
     state.hull.Anchored = false
@@ -153,27 +175,36 @@ function FlightController:Update(dt)
         end
     end
     
+    -- === MOUSE STEERING ===
+    local mouseDelta = UserInputService:GetMouseDelta()
+    
+    -- Mouse Y -> pitch (invert so mouse up = nose up)
+    mousePitch = mousePitch - mouseDelta.Y * MOUSE_PITCH_SENSITIVITY
+    -- Mouse X -> yaw
+    mouseYaw = mouseYaw - mouseDelta.X * MOUSE_YAW_SENSITIVITY
+    
+    -- Clamp and smooth decay
+    mousePitch = math.clamp(mousePitch, -1, 1)
+    mouseYaw   = math.clamp(mouseYaw,   -1, 1)
+    
     -- === ROTATION CONTROLS ===
-    -- Pitch (Space/Ctrl or mouse)
-    if input.Space then
-        state.pitch = math.min(state.pitch + dt * 2, 1)
-    elseif input.Ctrl then
-        state.pitch = math.max(state.pitch - dt * 2, -1)
-    else
-        state.pitch = state.pitch * 0.9  -- Return to center
-    end
+    -- Pitch: mouse Y + keyboard Space/Ctrl
+    local keyPitch = (input.Space and 1 or 0) + (input.Ctrl and -1 or 0)
+    state.pitch = mousePitch + keyPitch * 0.5
+    state.pitch = math.clamp(state.pitch, -1, 1)
     
-    -- Yaw (A/D - rudder)
-    if input.A then
-        state.yaw = math.max(state.yaw - dt * 2, -1)
-    elseif input.D then
-        state.yaw = math.min(state.yaw + dt * 2, 1)
-    else
-        state.yaw = state.yaw * 0.9
-    end
+    -- Decay mouse pitch/yaw toward zero when no mouse movement
+    mousePitch = mousePitch * (1 - MOUSE_SMOOTHING)
+    mouseYaw   = mouseYaw   * (1 - MOUSE_SMOOTHING)
     
-    -- Auto-roll to level when no input
-    state.roll = state.roll * 0.95
+    -- Yaw: mouse X + keyboard A/D
+    local keyYaw = (input.D and 1 or 0) + (input.A and -1 or 0)
+    state.yaw = mouseYaw + keyYaw * 0.5
+    state.yaw = math.clamp(state.yaw, -1, 1)
+    
+    -- Bank (roll) follows yaw for feel
+    local targetRoll = -state.yaw * 0.4
+    state.roll = state.roll + (targetRoll - state.roll) * dt * 4
     
     -- === CALCULATE FORCES ===
     local forward = currentCFrame.LookVector
@@ -181,67 +212,66 @@ function FlightController:Update(dt)
     local right = currentCFrame.RightVector
     
     -- Base speed
-    local baseSpeed = (state.stats.speed or 50)
-    local maxSpeed = baseSpeed * (state.isBoosting and 2 or 1)
+    local baseSpeed = (state.stats and state.stats.speed or 50)
+    local speedMult = state.isBoosting and 2 or 1
+    if state.isInWater then speedMult = speedMult * 1.5 end
+    local maxSpeed = baseSpeed * speedMult
     
-    -- Water speed bonus
-    if state.isInWater then
-        maxSpeed = maxSpeed * 1.5
-    end
+    -- Thrust: forward component
+    local thrust = forward * state.throttle * maxSpeed
     
-    -- Thrust force
-    local thrust = forward * state.throttle * maxSpeed * 2
-    
-    -- Add pitch lift component
-    local pitchLift = up * state.pitch * maxSpeed * 0.5
-    
-    -- Apply gravity compensation when not in water
-    local gravityComp = Vector3.zero
-    if not state.isInWater then
-        gravityComp = Vector3.new(0, 30, 0)  -- Counter gravity
-    end
+    -- Vertical control: pitch moves the nose, creating actual climb/dive
+    -- Also add a direct vertical component for responsive feel
+    local verticalInput = state.pitch * maxSpeed * 0.6
     
     -- Buoyancy in water
     local buoyancy = Vector3.zero
     if state.isInWater then
         local depth = math.max(0, waterLevel + 2 - currentPos.Y)
-        buoyancy = Vector3.new(0, 80 + depth * 10, 0)
+        buoyancy = Vector3.new(0, 60 + depth * 8, 0)
     end
     
-    -- Total velocity target
-    local targetVel = thrust + pitchLift + gravityComp + buoyancy
+    -- Target velocity: forward thrust + vertical control (fights gravity via BodyVelocity MaxForce)
+    -- BodyVelocity with large MaxForce fully counteracts gravity
+    local targetVel = thrust + Vector3.new(0, verticalInput, 0) + buoyancy
     
-    -- Smooth velocity transition
-    local newVel = currentVel:Lerp(targetVel, 0.1)
+    -- Smooth velocity transition (faster lerp for responsive control)
+    local newVel = currentVel:Lerp(targetVel, math.min(dt * 5, 1))
     
-    -- Apply drag
-    if not state.isInWater then
-        newVel = newVel * 0.98
-    else
-        newVel = newVel * 0.95
-    end
+    -- Mild drag
+    local drag = state.isInWater and 0.96 or 0.99
+    newVel = newVel * drag
     
     -- Apply velocity
     if state.bodyVelocity then
         state.bodyVelocity.Velocity = newVel
     end
     
-    -- === ROTATION ===
-    -- Calculate angular velocity based on controls
-    local angularVel = Vector3.new(
-        -state.pitch * 2,  -- Pitch (X axis rotation)
-        state.yaw * 1.5,    -- Yaw (Y axis rotation)
-        -state.roll * 2     -- Roll (Z axis rotation)
-    )
-    
-    -- Add auto-leveling when in water
-    if state.isInWater then
-        angularVel = angularVel + Vector3.new(-currentCFrame:ToEulerAnglesXYZ().X * 0.5, 0, -currentCFrame:ToEulerAnglesXYZ().Z * 0.5)
-    end
-    
-    -- Apply rotation
-    if state.bodyAngularVelocity then
-        state.bodyAngularVelocity.AngularVelocity = angularVel
+    -- === ROTATION via BodyGyro ===
+    -- Build target CFrame by rotating current orientation by pitch/yaw/roll
+    if state.bodyGyro then
+        -- Rotate the gyro target CFrame based on pitch/yaw inputs
+        local pitchDelta = CFrame.Angles(-state.pitch * dt * 2.5, 0, 0)
+        local yawDelta   = CFrame.Angles(0, -state.yaw * dt * 2.5, 0)
+        local rollDelta  = CFrame.Angles(0, 0, state.roll * dt * 1.5)
+        
+        -- Apply rotation deltas to current gyro CFrame
+        local gyroRot = state.bodyGyro.CFrame - state.bodyGyro.CFrame.Position
+        gyroRot = gyroRot * pitchDelta * yawDelta * rollDelta
+        
+        -- Auto-level roll when no yaw input
+        if math.abs(state.yaw) < 0.05 then
+            local rx, ry, rz = gyroRot:ToEulerAnglesXYZ()
+            gyroRot = CFrame.Angles(rx, ry, rz * 0.95)
+        end
+        
+        -- When in water, auto-level pitch too
+        if state.isInWater then
+            local rx, ry, rz = gyroRot:ToEulerAnglesXYZ()
+            gyroRot = CFrame.Angles(rx * 0.85, ry, rz * 0.85)
+        end
+        
+        state.bodyGyro.CFrame = CFrame.new(currentPos) * gyroRot
     end
     
     -- Update state
@@ -338,5 +368,10 @@ function FlightController:GetAltitude() return state.hull and state.hull.Positio
 function FlightController:GetSpeed() return state.velocity.Magnitude end
 function FlightController:IsInWater() return state.isInWater end
 function FlightController.IsActive() return state.jetSky ~= nil end
+
+-- Unlock mouse when paused/destroyed
+function FlightController:Cleanup()
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+end
 
 return FlightController

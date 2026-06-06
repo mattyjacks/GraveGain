@@ -15,45 +15,49 @@ function WorldGenerator.GenerateWorld(startPos)
         islandsFolder.Parent = Workspace
     end
     
-    -- Initialize adaptive ocean
+    -- Initialize adaptive ocean first
     AdaptiveOcean.Init()
     
     -- Create cloud layer at ceiling
     WorldGenerator.CreateCloudLayer()
     
-    -- Starter island at spawn
+    -- Starter island near water surface (Y=5 puts island base just above Y=-10 ocean)
     local seed = math.random(1, 100000)
     local starterIsland = IslandGenerator.CreateNaturalIsland("STARTER", startPos, seed)
     starterIsland.model.Parent = islandsFolder
     table.insert(islands, starterIsland)
+    print("[WorldGenerator] Starter island created at", startPos)
     
-    -- Explorer islands (3)
-    local currentPos = startPos
-    for i = 1, 3 do
+    -- Explorer islands spread horizontally, slightly higher
+    local explorerPositions = {
+        Vector3.new(300, 30, 150),
+        Vector3.new(-280, 50, 320),
+        Vector3.new(150, 70, -350),
+    }
+    for i, offset in ipairs(explorerPositions) do
         seed = seed + 1
-        currentPos = currentPos + Vector3.new(
-            math.random(-200, 200),
-            math.random(50, 120),
-            math.random(-200, 200)
-        )
-        local island = IslandGenerator.CreateNaturalIsland("EXPLORER", currentPos, seed)
+        local pos = startPos + offset
+        local island = IslandGenerator.CreateNaturalIsland("EXPLORER", pos, seed)
         island.model.Parent = islandsFolder
         table.insert(islands, island)
+        print("[WorldGenerator] Explorer island", i, "at", pos)
     end
     
-    -- Summit islands (2)
-    for i = 1, 2 do
+    -- Summit islands high up
+    local summitPositions = {
+        Vector3.new(600, 150, 600),
+        Vector3.new(-550, 220, -500),
+    }
+    for i, offset in ipairs(summitPositions) do
         seed = seed + 1
-        currentPos = currentPos + Vector3.new(
-            math.random(-300, 300),
-            math.random(100, 250),
-            math.random(-300, 300)
-        )
-        local island = IslandGenerator.CreateNaturalIsland("SUMMIT", currentPos, seed)
+        local pos = startPos + offset
+        local island = IslandGenerator.CreateNaturalIsland("SUMMIT", pos, seed)
         island.model.Parent = islandsFolder
         table.insert(islands, island)
+        print("[WorldGenerator] Summit island", i, "at", pos)
     end
     
+    print("[WorldGenerator] Total islands:", #islands)
     return islands
 end
 

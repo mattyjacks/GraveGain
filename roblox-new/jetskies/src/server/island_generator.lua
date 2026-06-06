@@ -49,10 +49,11 @@ function IslandGenerator.CreateNaturalIsland(islandType, position, seed)
     local heightMap = {}
     local resolution = 4  -- studs per terrain cell
     local cells = math.floor(size / resolution)
+    local halfCells = math.floor(cells / 2)
     
-    for x = -cells/2, cells/2 do
+    for x = -halfCells, halfCells do
         heightMap[x] = {}
-        for z = -cells/2, cells/2 do
+        for z = -halfCells, halfCells do
             -- Distance from center (normalized 0-1)
             local dist = math.sqrt(x*x + z*z) / (cells/2)
             
@@ -76,8 +77,8 @@ function IslandGenerator.CreateNaturalIsland(islandType, position, seed)
     end
     
     -- Create terrain parts
-    for x = -cells/2, cells/2 - 1 do
-        for z = -cells/2, cells/2 - 1 do
+    for x = -halfCells, halfCells - 1 do
+        for z = -halfCells, halfCells - 1 do
             local h1 = heightMap[x] and heightMap[x][z] or 0
             local h2 = heightMap[x+1] and heightMap[x+1][z] or 0
             local h3 = heightMap[x] and heightMap[x][z+1] or 0
@@ -126,8 +127,8 @@ function IslandGenerator.CreateNaturalIsland(islandType, position, seed)
     end
     
     -- Add cliffs/rock formations on edges
-    for x = -cells/2, cells/2, 2 do
-        for z = -cells/2, cells/2, 2 do
+    for x = -halfCells, halfCells, 2 do
+        for z = -halfCells, halfCells, 2 do
             local dist = math.sqrt(x*x + z*z) / (cells/2)
             
             if dist > 0.7 and dist < 0.95 then
@@ -153,9 +154,10 @@ function IslandGenerator.CreateNaturalIsland(islandType, position, seed)
     end
     
     -- Add vegetation (trees/rocks) on top
+    local thirdCells = math.floor(halfCells * 2 / 3)
     for i = 1, math.floor(size / 10) do
-        local x = math.random(-cells/3, cells/3)
-        local z = math.random(-cells/3, cells/3)
+        local x = math.random(-thirdCells, thirdCells)
+        local z = math.random(-thirdCells, thirdCells)
         local h = heightMap[x] and heightMap[x][z] or 0
         
         if h > size * 0.04 and h < size * 0.1 then
@@ -198,7 +200,6 @@ end
 
 function IslandGenerator.SpawnRings(parent, islandPos, islandSize, heightMap, resolution, seed)
     local rings = {}
-    local config = GameData.IslandTypes[GameData.IslandTypes.STARTER and "STARTER" or "EXPLORER"]
     local ringCount = math.random(5, 12)
     
     for i = 1, ringCount do
@@ -209,10 +210,11 @@ function IslandGenerator.SpawnRings(parent, islandPos, islandSize, heightMap, re
         local x = math.cos(angle) * radius
         local z = math.sin(angle) * radius
         
-        -- Find height at this position
-        local gridX = math.floor(x / resolution)
-        local gridZ = math.floor(z / resolution)
-        local height = heightMap[gridX] and heightMap[gridX][gridZ] or 10
+        -- Convert world offset to cell coords and clamp
+        local halfCells = math.floor(math.floor(islandSize / resolution) / 2)
+        local gridX = math.max(-halfCells, math.min(halfCells, math.floor(x / resolution)))
+        local gridZ = math.max(-halfCells, math.min(halfCells, math.floor(z / resolution)))
+        local height = (heightMap[gridX] and heightMap[gridX][gridZ]) or 5
         
         local ringPos = Vector3.new(
             islandPos.X + x,
@@ -224,31 +226,43 @@ function IslandGenerator.SpawnRings(parent, islandPos, islandSize, heightMap, re
         local ringModel = Instance.new("Model")
         ringModel.Name = "Ring_" .. i
         
-        -- Outer ring
+        -- Outer ring using SpecialMesh (Torus shape)
         local outer = Instance.new("Part")
         outer.Name = "Outer"
-        outer.Shape = Enum.PartType.Torus
-        outer.Size = Vector3.new(GameData.RING_SIZE, 1.5, GameData.RING_SIZE)
+        outer.Size = Vector3.new(GameData.RING_SIZE, GameData.RING_SIZE, 1.5)
         outer.Color = Color3.fromRGB(255, 215, 0)
         outer.Material = Enum.Material.Neon
         outer.Anchored = true
         outer.CanCollide = false
         outer.Position = ringPos
-        outer.Transparency = 0.2
+        outer.Transparency = 0.1
         outer.Parent = ringModel
+        
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshType = Enum.MeshType.FileMesh
+        mesh.MeshId = "rbxassetid://3270017"
+        mesh.Scale = Vector3.new(GameData.RING_SIZE * 0.18, GameData.RING_SIZE * 0.18, 0.3)
+        mesh.Parent = outer
         
         -- Inner glow
         local inner = Instance.new("Part")
         inner.Name = "Inner"
         inner.Shape = Enum.PartType.Ball
-        inner.Size = Vector3.new(4, 4, 4)
+        inner.Size = Vector3.new(GameData.RING_SIZE * 0.6, GameData.RING_SIZE * 0.6, GameData.RING_SIZE * 0.6)
         inner.Color = Color3.fromRGB(100, 200, 255)
-        inner.Material = Enum.Material.ForceField
+        inner.Material = Enum.Material.Neon
         inner.Anchored = true
         inner.CanCollide = false
         inner.Position = ringPos
-        inner.Transparency = 0.7
+        inner.Transparency = 0.85
         inner.Parent = ringModel
+        
+        -- Point light for glow
+        local light = Instance.new("PointLight")
+        light.Color = Color3.fromRGB(255, 215, 0)
+        light.Brightness = 3
+        light.Range = 20
+        light.Parent = outer
         
         -- Trigger part
         local trigger = Instance.new("Part")
@@ -266,22 +280,17 @@ function IslandGenerator.SpawnRings(parent, islandPos, islandSize, heightMap, re
         value.Value = 1
         value.Parent = trigger
         
-        -- Spin animation
-        local spinScript = Instance.new("Script")
-        spinScript.Name = "Spinner"
-        spinScript.Source = [[
-            local ring = script.Parent:FindFirstChild("Outer")
-            if ring then
-                while true do
-                    ring.CFrame = ring.CFrame * CFrame.Angles(0, 0.03, 0)
-                    task.wait(0.03)
-                end
+        -- Spin animation using server-side task.spawn (no Script.Source)
+        local outerRef = outer
+        task.spawn(function()
+            while outerRef and outerRef.Parent do
+                outerRef.CFrame = outerRef.CFrame * CFrame.Angles(0, math.rad(2), 0)
+                task.wait(0.05)
             end
-        ]]
-        spinScript.Parent = ringModel
+        end)
         
         ringModel.Parent = parent
-        table.insert(rings, {model = ringModel, trigger = trigger, position = ringPos})
+        table.insert(rings, {model = ringModel, trigger = trigger, outer = outer, position = ringPos})
     end
     
     return rings
